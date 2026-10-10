@@ -29,6 +29,7 @@ enum Attraction {
   drone
   crates
   striker
+  ducks
 
   @@map("attraction")
 }

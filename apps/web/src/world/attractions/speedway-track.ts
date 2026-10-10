@@ -2,6 +2,7 @@
 // It's built once, up front (like the coaster tracks), so the trees and the horizon hills can keep
 // clear of it and the minimap can draw it.
 import * as THREE from 'three';
+import { LAYOUT } from '../layout';
 
 /** Half the asphalt's width: 11 m of road, room for four karts and the obstacles. */
 export const ROAD_HALF = 5.5;
@@ -15,8 +16,9 @@ export const START_S = 52;
 
 /**
  * Control points in a frame turned to face the park: `a` runs along the main straight (towards the
- * south-east) and `b` is the distance out from the park's centre, so b = 116 keeps the main straight
- * 20 m outside the fence. Laid out clockwise: a long main straight, a sweeping 180° right-hander, a
+ * south-east) and `b` is the distance out from the frame's origin, which LAYOUT.circuit then moves
+ * to keep the main straight well outside the fence (the circuit itself is the same wherever it
+ * stands). Laid out clockwise: a long main straight, a sweeping 180° right-hander, a
  * dip into the infield, an S up to the back straight and a long right-hander home. No two
  * stretches of track come within 33 m of each other; the tightest corner has a 15 m radius.
  */
@@ -46,7 +48,9 @@ function build(): Circuit {
   // along the straight: the outward direction turned a quarter turn
   const ax = uz;
   const az = -ux;
-  const pts = CONTROL.map(([a, b]) => new THREE.Vector3(ux * b + ax * a, 0, uz * b + az * a));
+  // (the whole frame is then moved to where the park's layout wants the circuit)
+  const o = LAYOUT.circuit;
+  const pts = CONTROL.map(([a, b]) => new THREE.Vector3(o.x + ux * b + ax * a, 0, o.z + uz * b + az * a));
   const curve = new THREE.CatmullRomCurve3(pts, true, 'centripetal');
   const length = curve.getLength();
   const n = Math.round(length);

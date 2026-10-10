@@ -9,11 +9,12 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { Ctx } from './context';
 import { Environment } from './environment';
 import { Input } from './input';
-import { LAYOUT, ZONES, type ZoneId } from './layout';
+import { DISTRICTS, FALCON_STATION, FOOTPRINTS, LAYOUT, PLAZAS, ZONES, type ZoneId } from './layout';
 import { NAME_COLORS, physicsWord } from './letters';
 import { PALETTE } from './textures';
 import { escapeHtml, UI } from './ui';
 import { Zones } from './zones';
+import { Wayfinding } from './wayfinding';
 import { perks } from './perks';
 import { Shop, VENDOR_LOOK } from './shop';
 import { Ideas } from './ideas';
@@ -35,6 +36,7 @@ import { FALCON_PHYS } from './attractions/falcon-track';
 import { Rocket } from './attractions/rocket';
 import { Crates, CRATES_ROUND } from './attractions/crates';
 import { Striker } from './attractions/striker';
+import { Ducks, DUCKS_ROUND } from './attractions/ducks';
 import { Arch, Booth, Carousel } from './attractions/landmarks';
 import { IdeaKiosk } from './attractions/idea-kiosk';
 import { Museum, STOPS } from './attractions/museum';
@@ -45,7 +47,7 @@ import { Ship } from './attractions/ship';
 import { Speedway } from './attractions/speedway';
 import { Trail } from './attractions/trail';
 import { boardListHtml, leaderboard, resetClock, resetIn, trailTime } from '../account/leaderboard';
-import { ApiError, ATTRACTION_IDS, isAttraction, NotEnoughTicketsError, ParkClosedError, RideClosedError, type AttractionId } from '../account/api';
+import { ApiError, ATTRACTION_IDS, isAttraction, isGame, NotEnoughTicketsError, ParkClosedError, RideClosedError, type AttractionId } from '../account/api';
 import { everyHours, formatWait, session } from '../account/session';
 import { authDialog, type AuthMode } from '../account/auth-dialog';
 import { AccountMenu } from '../account/account-menu';
@@ -58,9 +60,9 @@ import { accountButtons, legalLinksHtml, packText, ticketsText, waitHtml } from 
 /** The clock slider / pause / local-time panel. Off for now: the park stays at 16:00. */
 const TIME_CONTROLS = false;
 /** How many guests walk the park, by graphics tier. */
-const CROWD_SIZE = { high: 64, medium: 44, low: 26, lowest: 12 } as const;
+const CROWD_SIZE = { high: 80, medium: 56, low: 32, lowest: 14 } as const;
 
-type Mode = 'drive' | 'coaster' | 'rocket' | 'striker' | 'wheel' | 'drone' | 'flip' | 'ship' | 'race' | 'trail' | 'shop' | 'ideas' | 'museum';
+type Mode = 'drive' | 'coaster' | 'rocket' | 'striker' | 'ducks' | 'wheel' | 'drone' | 'flip' | 'ship' | 'race' | 'trail' | 'shop' | 'ideas' | 'museum';
 
 const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
 
@@ -105,6 +107,9 @@ export class Game {
   private rocket!: Rocket;
   private crates!: Crates;
   private striker!: Striker;
+  private ducks!: Ducks;
+  /** The Duck Shoot's HUD badge, as last drawn. */
+  private ducksBadge = '';
   private wheel!: GiantWheel;
   private booth!: Booth;
   private ideaKiosk!: IdeaKiosk;
@@ -212,13 +217,14 @@ export class Game {
         station: { title: 'THUNDER LOOP', sub: 'Drive it yourself · launch · loop · roll', side: -1 },
         colors: { rail: PALETTE.candy, spine: PALETTE.mustard, cars: [PALETTE.mustard, PALETTE.candy, PALETTE.teal] },
         cars: 3,
+        // (from the head of the station, wherever the layout puts it)
         trackside: [
-          new THREE.Vector3(-50, 3, 38), // loop
-          new THREE.Vector3(-66, 4, 6), // banked turn + camelback
-          new THREE.Vector3(-66, 6, -40), // high turn + roll
-          new THREE.Vector3(-14, 9, -34), // helix
-          new THREE.Vector3(-16, 4, 12), // station
-        ],
+          [-24, 3, 44], // loop
+          [-40, 4, 12], // banked turn + camelback
+          [-40, 6, -34], // high turn + roll
+          [12, 9, -28], // helix
+          [10, 4, 18], // station
+        ].map(([x, y, z]) => new THREE.Vector3(LAYOUT.coaster.x + x, y, LAYOUT.coaster.z + z)),
         intro: (touch) =>
           `<p class="eyebrow">Thunder Loop · You're the driver</p><h2>Hold on tight!</h2><p>${
             touch
@@ -232,11 +238,8 @@ export class Game {
     step(4, () => {
       this.mountain = new Mountain(this.ctx);
       const ground = (x: number, z: number) => this.mountain.sample(x, z);
-      // landmarks a support column must never land on
-      const keep: [number, number, number][] = [
-        [0, 5, 14], [0, -8, 10], [0, -30, 9], [34, -14, 9], [42, -52, 9], [20, 12, 4], [-20, -40, 4], [-26, 3, 6], [12, -53, 10],
-        [LAYOUT.museum.x, LAYOUT.museum.z, 16],
-      ];
+      // the attractions and plazas a support column must never land on (but its own station)
+      const keep: [number, number, number][] = [...FOOTPRINTS.filter((f) => f !== FALCON_STATION), ...PLAZAS.map(([x, z, r]): [number, number, number] => [x, z, r + 1])];
       // the giant hill's crest stands on its own lattice tower
       const crest = FALCON_TRACK.pos[Trackside.hillCrest()];
       keep.push([crest.x, crest.z, 14]);
@@ -268,7 +271,7 @@ export class Game {
         tunnel: 'rock',
         tunnelClip: this.mountain.tunnelPlanes,
         trackside: [
-          new THREE.Vector3(54, 6, 34), // station
+          new THREE.Vector3(LAYOUT.falcon.x - 16, 6, LAYOUT.falcon.z + 12), // station
           atS(110, [0, 8, 45]), // the LSM lift hill
           atS(250, [-45, 6, 0]), // twisted drop + airtime hills
           at('launch', [-38, 8, -60]), // the launch up the cliff
@@ -334,7 +337,12 @@ export class Game {
     step(1, () => {
       this.crates = new Crates(this.ctx);
       this.striker = new Striker(this.ctx);
-      this.updatables.push(this.crates, this.striker);
+      this.ducks = new Ducks(this.ctx);
+      this.updatables.push(this.crates, this.striker, this.ducks);
+    });
+    step(1, () => {
+      // the districts' signs and the fingerposts (once everything they keep clear of is standing)
+      new Wayfinding(this.ctx);
     });
     step(1, async () => {
       this.zones = new Zones(this.ctx);
@@ -511,6 +519,7 @@ export class Game {
     this.stack.input = this.input;
     this.falcon.input = this.input;
     this.drone.input = this.input;
+    this.ducks.input = this.input;
     this.ui.onPromptClick = () => this.onAction();
     this.ui.onRideExit = () => this.onEscape();
     this.ui.onPanelClose = () => {
@@ -618,13 +627,18 @@ export class Game {
     this.rocket.onFinish = () => this.endRide();
     this.wheel.onFinish = () => this.endRide();
     this.striker.onFinish = () => this.endRide();
+    this.ducks.onFinish = () => this.endRide();
+    // the first shot puts the Duck Shoot's card (how to play) away, out of the line of fire
+    this.ducks.onShot = () => {
+      if (this.ui.panelOpenKey === 'ducks-play') this.ui.hidePanel();
+    };
     this.drone.onFinish = () => this.endRide();
     this.flip.onFinish = () => this.endRide();
     this.ship.onFinish = () => this.endRide();
     this.speedway.onFinish = () => this.endRide();
     this.trail.onFinish = () => this.endRide();
     // each attraction ends on its own after one round: back to walking, with the results
-    for (const a of [this.stack, this.falcon, this.rocket, this.wheel, this.flip, this.ship, this.speedway, this.trail, this.striker, this.crates]) a.onComplete = () => this.leave(true);
+    for (const a of [this.stack, this.falcon, this.rocket, this.wheel, this.flip, this.ship, this.speedway, this.trail, this.striker, this.crates, this.ducks]) a.onComplete = () => this.leave(true);
     // the Rally Trail's leaderboard: on its boards and its HUD, and on its card while that's open
     leaderboard.onChange((board) => {
       this.trail.setBoard(board);
@@ -674,33 +688,44 @@ export class Game {
     const user = session.user;
     const cost = (id: AttractionId) =>
       session.maintenance(id) === undefined ? `<span class="cost">${session.cost(id)} 🎟️</span>` : '<span class="cost cost-closed">🚧 Under maintenance</span>';
+    // one line per place, listed district by district (the order and the districts are the map's)
+    const line: Partial<Record<ZoneId, string>> = {
+      booth: "🎟️ <strong>Ticket Booth</strong> — Rosa's counter: your free tickets, treats with perks, and souvenirs to wear",
+      ideas: "💡 <strong>Idea Box</strong> — on the entrance plaza: tell us what you'd love to see in the fair, and follow what becomes of it",
+      crates: `🥫 <strong>Crate Smash</strong> — ${CRATES_ROUND} seconds to knock down as many crates as you can ${cost('crates')}`,
+      striker: `🔔 <strong>High Striker</strong> — three swings to ring the bell ${cost('striker')}`,
+      ducks: `🦆 <strong>Duck Shoot</strong> — ${DUCKS_ROUND} seconds with a cork gun to knock down the tin ducks (and the golden one) ${cost('ducks')}`,
+      falcon: `🦅 <strong>Sky Falcon</strong> — a 4.25 km cliff coaster: 158 m drop at 90°, 250 km/h ${cost('falcon')}`,
+      museum: "🏛️ <strong>Career Museum</strong> — at the end of the East Avenue: Hasan Hmedeh's work from 2019 to today, one framed picture at a time. Free, no ticket",
+      rocket: `🚀 <strong>Rocket Ride</strong> — fire six stages all the way to orbit ${cost('rocket')}`,
+      ship: `🛸 <strong>Nebula 360</strong> — a pendulum ship that loops right round and hangs you upside down ${cost('ship')}`,
+      drone: `🚁 <strong>Drone Flights</strong> — rent a camera drone and fly over the whole park ${cost('drone')}`,
+      ferris: `🎡 <strong>Giant Wheel</strong> — out of the north gate: ride the tallest wheel on Earth, 250 m up ${cost('ferris')}`,
+      coaster: `🎢 <strong>Thunder Loop</strong> — drive the coaster yourself: launch, loop and roll ${cost('coaster')}`,
+      flip: `🌀 <strong>Sky Flip</strong> — swing 125 m up, right over the top, flipping head over heels ${cost('flip')}`,
+      speedway: `🏎️ <strong>Turbo Speedway</strong> — race three rivals round a kart circuit full of obstacles ${cost('speedway')}`,
+      trail: `🚙 <strong>Rally Trail</strong> — a buggy time trial with jumps, mud and crates: beat today's fastest on the leaderboard ${cost('trail')}`,
+    };
+    const districts = Object.values(DISTRICTS)
+      .map((d) => {
+        const items = d.zones.flatMap((z) => (line[z] ? [`<li>${line[z]}</li>`] : []));
+        return items.length ? `<h3><span class="guide-district" style="--district: ${d.color}">${d.icon} ${escapeHtml(d.name)}</span></h3><ul>${items.join('')}</ul>` : '';
+      })
+      .join('');
     return `<p class="eyebrow">${user ? `Welcome back, ${escapeHtml(user.username)}` : 'Welcome to the fair'}</p><h2>Step right up! 🎪</h2><p>Walk around the park and try everything. Every ride and game takes tickets (prices below). Each payment buys one round, then you're back on your feet.</p><p class="booth-account">🎟️ Tickets are free: pick up <strong>${packText()}</strong>${
-        user ? '' : ' with a free account'
-      }. Leftover tickets carry over.</p><h3>🎢 Rides</h3><ul>
-        <li>🎢 <strong>Thunder Loop</strong> — drive the coaster yourself: launch, loop and roll ${cost('coaster')}</li>
-        <li>🦅 <strong>Sky Falcon</strong> — a 4.25 km cliff coaster: 158 m drop at 90°, 250 km/h ${cost('falcon')}</li>
-        <li>🚀 <strong>Rocket Ride</strong> — fire six stages all the way to orbit ${cost('rocket')}</li>
-        <li>🎡 <strong>Giant Wheel</strong> — ride the tallest wheel on Earth, 250 m up ${cost('ferris')}</li>
-        <li>🚁 <strong>Drone Flights</strong> — rent a camera drone and fly over the whole park ${cost('drone')}</li>
-        <li>🌀 <strong>Sky Flip</strong> — swing 125 m up, right over the top, flipping head over heels ${cost('flip')}</li>
-        <li>🛸 <strong>Nebula 360</strong> — a pendulum ship that loops right round and hangs you upside down ${cost('ship')}</li>
-        <li>🏎️ <strong>Turbo Speedway</strong> — race three rivals round a kart circuit full of obstacles ${cost('speedway')}</li>
-        <li>🚙 <strong>Rally Trail</strong> — a buggy time trial with jumps, mud and crates: beat today's fastest on the leaderboard ${cost('trail')}</li>
-      </ul><h3>🎯 Games</h3><ul>
-        <li>🥫 <strong>Crate Smash</strong> — ${CRATES_ROUND} seconds to knock down as many crates as you can ${cost('crates')}</li>
-        <li>🔔 <strong>High Striker</strong> — three swings to ring the bell ${cost('striker')}</li>
-        <li>🎟️ <strong>Ticket Booth</strong> — Rosa's counter: your free tickets, treats with perks, and souvenirs to wear</li>
-        <li>💡 <strong>Idea Box</strong> — on the entrance plaza: tell us what you'd love to see in the fair, and follow what becomes of it</li>
-        <li>🏛️ <strong>Career Museum</strong> — past the Rocket Ride: Hasan Hmedeh's work from 2019 to today, one framed picture at a time. Free, no ticket</li>
-      </ul>${
-        user ? '<p class="panel-actions"><button class="btn btn-primary btn-small" type="button" data-goto="booth">Take me to the Ticket Booth 🎟️</button></p>' : accountButtons()
-      }<p>${this.mobile ? 'Use the joystick to walk (push it all the way to run) and the <kbd>E</kbd> button to play.' : 'Walk with <kbd>WASD</kbd> or arrows, hold <kbd>Shift</kbd> to run, <kbd>Space</kbd> to roll, <kbd>F</kbd> to kick, <kbd>H</kbd> to wave and <kbd>E</kbd> to play. Try kicking the big letters over!'}</p><p class="sub">Open this again any time with the ℹ️ button (top right) or <kbd>I</kbd>.</p>`;
+      user ? '' : ' with a free account'
+    }. Leftover tickets carry over.</p><p>The park is laid out like a wheel: the carousel on the Hub in the middle, four avenues out from it, and the Promenade looping round past every district. Signposts point the way, and the ${
+      this.mobile ? 'minimap opens' : '<kbd>M</kbd> key opens'
+    } the park map, where you can fast travel.</p>${districts}${
+      user ? '<p class="panel-actions"><button class="btn btn-primary btn-small" type="button" data-goto="booth">Take me to the Ticket Booth 🎟️</button></p>' : accountButtons()
+    }<p>${this.mobile ? 'Use the joystick to walk (push it all the way to run) and the <kbd>E</kbd> button to play.' : 'Walk with <kbd>WASD</kbd> or arrows, hold <kbd>Shift</kbd> to run, <kbd>Space</kbd> to roll, <kbd>F</kbd> to kick, <kbd>H</kbd> to wave and <kbd>E</kbd> to play. Try kicking the big letters over!'}</p><p class="sub">Open this again any time with the ℹ️ button (top right) or <kbd>I</kbd>.</p>`;
   }
 
   private onAction() {
     if (!this.running || this.ui.hud.hidden) return;
     if (this.mode === 'rocket') return this.rocket.action();
     if (this.mode === 'striker') return this.striker.action();
+    if (this.mode === 'ducks') return this.ducks.shoot();
     if (this.mode === 'coaster') return this.ride.cycleCamera();
     if (this.mode === 'wheel') return this.wheel.cycleCamera();
     if (this.mode === 'drone') return this.drone.cycleCamera();
@@ -822,6 +847,22 @@ export class Game {
         this.striker.start();
         this.panelZone = 'striker';
         break;
+      case 'ducks': {
+        // the visitor steps up to the counter and takes the gun (the camera is their eyes)
+        this.player.interact();
+        const spot = this.ducks.standSpot;
+        this.player.reset(spot.x, spot.z, spot.heading);
+        this.mode = 'ducks';
+        this.player.enabled = false;
+        this.player.group.visible = false;
+        this.ui.rideExit(true);
+        this.ui.prompt('', '', '');
+        this.ducks.start();
+        this.ducksBadge = '';
+        this.panelZone = 'ducks';
+        this.ui.panel('ducks-play', this.ducks.panelHtml(this.mobile), { accent: PALETTE.mustard });
+        break;
+      }
       case 'crates':
         // a walk-about game: the visitor stays on foot, against the clock
         this.player.interact();
@@ -1327,7 +1368,7 @@ export class Game {
     // nothing to lose (no round, or one already on its way out): straight out as before
     if (!round || this.leaving || this.lockedOut) return this.leave(false);
     if (leaveEarly.isOpen) return;
-    void leaveEarly.ask(ZONES[round.ride].title, round.tickets, round.ride === 'crates' || round.ride === 'striker').then((go) => {
+    void leaveEarly.ask(ZONES[round.ride].title, round.tickets, isGame(round.ride)).then((go) => {
       if (go && this.round === round) this.leave(false);
     });
   }
@@ -1354,7 +1395,7 @@ export class Game {
     if (this.mode === 'shop') return this.leaveShop();
     if (this.mode === 'ideas') return this.leaveIdeas();
     if (this.mode === 'museum') return this.leaveMuseum();
-    const exit: Record<Exclude<Mode, 'drive' | 'striker' | 'shop' | 'ideas' | 'museum'>, () => void> = {
+    const exit: Record<Exclude<Mode, 'drive' | 'striker' | 'ducks' | 'shop' | 'ideas' | 'museum'>, () => void> = {
       coaster: () => this.ride.exit(),
       rocket: () => this.rocket.exit(),
       wheel: () => this.wheel.exit(),
@@ -1366,6 +1407,7 @@ export class Game {
     };
     // each exit() hands back to endRide() (its onFinish)
     if (this.mode === 'striker') this.striker.exit();
+    else if (this.mode === 'ducks') this.ducks.exit();
     else this.fade(exit[this.mode]);
   }
 
@@ -1376,13 +1418,19 @@ export class Game {
       this.mode === 'coaster' || this.mode === 'rocket' || this.mode === 'wheel' || this.mode === 'drone' || this.mode === 'flip' || this.mode === 'ship' || this.mode === 'race' || this.mode === 'trail';
     if (this.mode === 'wheel' || this.mode === 'drone' || this.mode === 'flip') this.env.setHaze(1);
     const from = this.mode;
+    if (from === 'ducks') {
+      // back on foot at the counter, the camera behind the visitor
+      this.player.group.visible = true;
+      this.camYaw = ZONES.ducks.heading;
+      this.ui.score(null);
+    }
     this.mode = 'drive';
     // a ride that ended because the park went under maintenance lands at the intro, not on foot
     this.player.enabled = this.inFair;
     this.ui.cinematic(false);
     this.ui.rideExit(false);
     this.ui.countdown(null);
-    const zoneOf: Partial<Record<Mode, ZoneId>> = { striker: 'striker', drone: 'drone', flip: 'flip', ship: 'ship', race: 'speedway', trail: 'trail', wheel: 'ferris' };
+    const zoneOf: Partial<Record<Mode, ZoneId>> = { striker: 'striker', ducks: 'ducks', drone: 'drone', flip: 'flip', ship: 'ship', race: 'speedway', trail: 'trail', wheel: 'ferris' };
     this.panelZone = from === 'coaster' ? (this.ride === this.falcon ? 'falcon' : 'coaster') : (zoneOf[from] ?? 'rocket');
     if (wasRide) this.updateDriveCamera(1, true);
     const completed = this.leaveCompleted;
@@ -1435,6 +1483,7 @@ export class Game {
       drone: this.drone,
       crates: this.crates,
       striker: this.striker,
+      ducks: this.ducks,
     };
     return cleanStats(measured[ride].roundStats());
   }
@@ -1456,7 +1505,7 @@ export class Game {
 
   /** Fast travel to a zone; `then` runs once the visitor is there (behind the fade). */
   teleport(id: ZoneId, then?: () => void) {
-    if (this.mode === 'striker') this.leave(false);
+    if (this.mode === 'striker' || this.mode === 'ducks') this.leave(false);
     if (this.mode !== 'drive') return;
     const z = ZONES[id];
     this.fade(() => {
@@ -1606,6 +1655,13 @@ export class Game {
       this.camera.position.copy(this.camPos);
       this.camera.lookAt(this.camTarget);
       this.env.follow(this.camTarget);
+    } else if (this.mode === 'ducks') {
+      this.camera.up.set(0, 1, 0);
+      this.zones.setVisible(false);
+      this.ducks.updateCamera(this.camera, dt);
+      this.env.follow(new THREE.Vector3(LAYOUT.ducks.x, 0, LAYOUT.ducks.z));
+      const badge = `🦆 ${Math.ceil(this.ducks.secondsLeft)} s left · ${this.ducks.score} points · ${this.ducks.hits} ducks down`;
+      if (badge !== this.ducksBadge) this.ui.score((this.ducksBadge = badge));
     } else if (this.mode === 'striker') {
       this.camera.up.set(0, 1, 0);
       this.zones.setVisible(false);

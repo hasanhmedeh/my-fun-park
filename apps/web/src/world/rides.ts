@@ -1,10 +1,16 @@
 // Both coaster tracks are built once, up front, so the environment (trees, fence) and the
-// mountain can shape themselves around them.
+// mountain can shape themselves around them. Each is laid out from where the park's layout puts
+// the head of its station; the track itself is the same wherever it stands.
+import * as THREE from 'three';
 import { buildTrack, CONNECTOR_ZONE, DS, LAYOUT_ELEMENTS, STATION_HEADING, STATION_START, type TrackData } from './attractions/track';
 import { FALCON_CONNECTOR, FALCON_ELEMENTS, FALCON_HEADING, FALCON_START } from './attractions/falcon-track';
+import { LAYOUT } from './layout';
 
-export const STACK_TRACK: TrackData = buildTrack(STATION_START, STATION_HEADING, LAYOUT_ELEMENTS, CONNECTOR_ZONE);
-export const FALCON_TRACK: TrackData = buildTrack(FALCON_START, FALCON_HEADING, FALCON_ELEMENTS, FALCON_CONNECTOR);
+/** A track's start, moved to where the layout puts it (at the same height). */
+const placed = (start: THREE.Vector3, at: { x: number; z: number }) => new THREE.Vector3(at.x, start.y, at.z);
+
+export const STACK_TRACK: TrackData = buildTrack(placed(STATION_START, LAYOUT.coaster), STATION_HEADING, LAYOUT_ELEMENTS, CONNECTOR_ZONE);
+export const FALCON_TRACK: TrackData = buildTrack(placed(FALCON_START, LAYOUT.falcon), FALCON_HEADING, FALCON_ELEMENTS, FALCON_CONNECTOR);
 
 /** Spatial hash of every track sample, for quick "is there track near here?" queries. */
 const CELL = 8;

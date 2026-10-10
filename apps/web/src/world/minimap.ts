@@ -1,4 +1,4 @@
-import { FLIP_YAW, LAYOUT, MUSEUM, museumPoint, PATHS, PLAZAS, ZONES, type ZoneId } from './layout';
+import { DISTRICTS, FLIP_YAW, LAYOUT, MUSEUM, museumPoint, PARK, parkBounds, PATHS, PLAZAS, ZONES, type DistrictId, type ZoneId } from './layout';
 import { FALCON_TRACK, STACK_TRACK } from './rides';
 import { CIRCUIT, CIRCUIT_BOUNDS, circuitPoint, ROAD_HALF, START_S, WALL } from './attractions/speedway-track';
 import { START_S as TRAIL_START, TRAIL, TRAIL_BOUNDS, TRAIL_HALF, trailPoint, WALL as TRAIL_WALL } from './attractions/trail-track';
@@ -6,7 +6,7 @@ import { PALETTE } from './textures';
 
 type Place = { icon: string; label: string; blurb: string };
 
-/** Every place on the map, in the order the map's legend lists them (keyed by zone, so a new zone can't be left off). */
+/** Every place on the map (keyed by zone, so a new zone can't be left off). */
 const PLACES: Record<ZoneId, Place> = {
   entrance: { icon: '🎪', label: 'Entrance', blurb: 'The main gate and the welcome plaza' },
   coaster: { icon: '🎢', label: 'Thunder Loop', blurb: 'Drive the coaster yourself: launch, loop and roll' },
@@ -19,12 +19,18 @@ const PLACES: Record<ZoneId, Place> = {
   trail: { icon: '🚙', label: 'Rally Trail', blurb: 'A buggy time trial with jumps: today’s fastest top the leaderboard' },
   crates: { icon: '🥫', label: 'Crate Smash', blurb: 'Kick, roll and smash the crate stacks' },
   striker: { icon: '🔔', label: 'High Striker', blurb: 'Swing the hammer and ring the bell' },
+  ducks: { icon: '🦆', label: 'Duck Shoot', blurb: 'Knock down the tin ducks before the clock runs out' },
   drone: { icon: '🚁', label: 'Drone Flights', blurb: 'Rent a drone and see it all from the sky' },
   booth: { icon: '🎟️', label: 'Ticket Booth', blurb: 'Free tickets, treats and souvenirs at Rosa’s counter' },
   ideas: { icon: '💡', label: 'Idea Box', blurb: 'Tell us what you’d love to see in the fair' },
   museum: { icon: '🏛️', label: 'Career Museum', blurb: 'Hasan Hmedeh’s work from 2019 to today, in framed pictures' },
 };
-export const MAP_PLACES = (Object.entries(PLACES) as [ZoneId, Place][]).map(([id, p]) => ({ id, ...p }));
+/** The places in the order the map's legend lists them: district by district, each with its district. */
+export const MAP_PLACES = (Object.entries(DISTRICTS) as [DistrictId, (typeof DISTRICTS)[DistrictId]][]).flatMap(([district, d]) =>
+  d.zones.map((id) => ({ id, district, ...PLACES[id] })),
+);
+if (import.meta.env.DEV && new Set(MAP_PLACES.map((p) => p.id)).size !== Object.keys(PLACES).length)
+  console.warn('Every zone belongs in exactly one district (DISTRICTS in layout.ts), or the map leaves it out.');
 
 /** Pixels per metre in the pre-rendered map sheet. */
 const SHEET_SCALE = 3;
@@ -35,7 +41,8 @@ const VIEW = 55;
 export function fairBounds() {
   const c = CIRCUIT_BOUNDS;
   const t = TRAIL_BOUNDS;
-  let x0 = Math.min(-LAYOUT.boundary, c.x0, t.x0), x1 = Math.max(LAYOUT.boundary, c.x1, t.x1), z0 = Math.min(-LAYOUT.boundary, c.z0, t.z0), z1 = Math.max(LAYOUT.boundary, c.z1, t.z1);
+  const p = parkBounds();
+  let x0 = Math.min(p.x0, c.x0, t.x0), x1 = Math.max(p.x1, c.x1, t.x1), z0 = Math.min(p.z0, c.z0, t.z0), z1 = Math.max(p.z1, c.z1, t.z1);
   for (const d of [STACK_TRACK, FALCON_TRACK])
     for (const p of d.pos) {
       x0 = Math.min(x0, p.x);
@@ -55,7 +62,7 @@ export function paintFair(g: CanvasRenderingContext2D, X: (x: number) => number,
   // the fair's lawn
   g.fillStyle = '#5c9a4e';
   g.beginPath();
-  g.arc(X(0), Z(0), LAYOUT.boundary * s, 0, Math.PI * 2);
+  g.arc(X(PARK.x), Z(PARK.z), PARK.r * s, 0, Math.PI * 2);
   g.fill();
   g.strokeStyle = 'rgba(29, 18, 56, 0.55)';
   g.lineWidth = 1.2 * s;
@@ -74,6 +81,14 @@ export function paintFair(g: CanvasRenderingContext2D, X: (x: number) => number,
     g.beginPath();
     g.arc(X(x), Z(z), r * s, 0, Math.PI * 2);
     g.fill();
+  }
+  // each district's colour, round its plaza (as it's set into the paving)
+  for (const { plaza: [x, z], color } of Object.values(DISTRICTS)) {
+    g.strokeStyle = color;
+    g.lineWidth = Math.max(1, 1.1 * s);
+    g.beginPath();
+    g.arc(X(x), Z(z), 6.2 * s, 0, Math.PI * 2);
+    g.stroke();
   }
 
   // the kart circuit outside the south-west fence: its lawn, the asphalt and the start line

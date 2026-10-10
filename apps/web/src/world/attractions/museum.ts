@@ -5,7 +5,7 @@ import { LAYOUT, MUSEUM, museumLocal, museumPoint, ZONES } from '../layout';
 import { BODY_FONT, DISPLAY_FONT, hdr, PALETTE, signMaterial, signTexture } from '../textures';
 import { EXHIBITS, PROFILE, SECTIONS, SKILLS, type Exhibit, type SectionId } from '../../data/museum';
 
-// The Career Museum: a long gallery hall under a glass roof, east of the Rocket Ride. Hasan
+// The Career Museum: a long gallery hall under a glass roof, at the end of the East Avenue. Hasan
 // Hmedeh's CV hangs down both walls in order, one framed picture per job, project or achievement,
 // zig-zagging from the door (2019) to the end wall (today), where the toolbox of skills hangs.
 // A banner over the aisle and a gold bar on the carpet mark where each year starts. Walk in and

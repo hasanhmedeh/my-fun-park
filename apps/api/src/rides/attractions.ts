@@ -22,6 +22,7 @@ export const DEFAULT_TICKET_COSTS: Readonly<Record<Attraction, number>> = {
   drone: 1,
   crates: 1,
   striker: 1,
+  ducks: 1,
 };
 
 /** Tickets in one pack, and hours between two purchases, when park_settings has no row. */

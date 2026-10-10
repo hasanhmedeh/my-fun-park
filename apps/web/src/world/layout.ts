@@ -1,27 +1,51 @@
 // Top-down map of the fair (x → east, z → south). The camera looks north (-z).
+//
+// The park is a round lawn inside a fence, laid out like a wheel: the carousel on the Hub at its
+// centre, four straight avenues out from it (Main Street south to the entrance, North Avenue to the
+// gate and the giant wheel, and an avenue east and west), and the Promenade, a loop that ties the
+// districts together. Each district has its own plaza on the loop:
+//
+//   Thrill Ridge (west)      the Thunder Loop and the Sky Flip
+//   Cosmos (north-east)      the Rocket Ride, the Nebula 360 and Drone Flights
+//   Falcon Gate (east)       the Sky Falcon's station and the Career Museum
+//   The Midway (south-east)  the games: Crate Smash, the High Striker and the Duck Shoot
+//   Motor Town (south-west)  the kart garage and the Rally Trail's shed (their tracks lie outside the fence)
+//   Main Gate (south)        the entrance plaza, the Ticket Booth and the Idea Box
+
+/** The park's lawn: a circle of radius `r` around (x, z), inside a fence just beyond it. */
+export const PARK = { x: 0, z: -50, r: 140 };
+/** The fence runs this far outside the lawn's edge. */
+export const FENCE_GAP = 2.5;
+/** The square of park ground (lawn texture, paths and plazas) under the fair: `size` across, centred on (x, z). */
+export const GROUND = { x: 0, z: -50, size: 300 };
+
 export const LAYOUT = {
-  spawn: { x: 0, z: 16, heading: 0 },
-  letters: { x: 0, z: 5 },
-  arch: { x: 0, z: -8 },
-  carousel: { x: 0, z: -30 },
-  ferris: { x: 0, z: -200 }, // the giant wheel stands outside the park, at the end of the boulevard
-  coasterStation: { x: -26, z: 0 },
-  rocket: { x: 42, z: -52 },
-  crates: { x: 34, z: -12 },
-  striker: { x: -20, z: -40 },
-  booth: { x: 20, z: 12 },
-  ideas: { x: -11.5, z: 9 }, // the Idea Box, on the entrance plaza's west side, its slot facing east
-  drone: { x: 12, z: -49 }, // the rental kiosk, beside the boulevard's north plaza
-  dronePad: { x: 12, z: -57.5 },
-  flip: { x: -52, z: -70 }, // the Sky Flip's tower, in the park's north-west corner
-  ship: { x: 22, z: 66 }, // the Nebula 360 pendulum ship, on the lawn south of the entrance
-  speedway: { x: -55, z: 53 }, // the kart garage; the circuit itself lies outside the south-west fence
-  trail: { x: -12, z: 80 }, // the Rally Trail's shed; the trail itself lies outside the south fence
-  museum: { x: 66.5, z: -40 }, // the Career Museum's hall, east of the Rocket Ride; its door faces west
-  boundary: 92,
+  spawn: { x: 0, z: 54, heading: 0 },
+  letters: { x: 0, z: 42 },
+  arch: { x: 0, z: 29 },
+  carousel: { x: PARK.x, z: PARK.z }, // on the Hub, at the park's centre
+  ferris: { x: 0, z: -262 }, // the giant wheel stands outside the park, at the end of the road out of the north gate
+  /** Where each coaster's track starts (the head of its station): the tracks are laid out from here. */
+  coaster: { x: -68, z: -58 },
+  falcon: { x: 110, z: 22 }, // the station stands just inside the east fence; the rest of the ride is out in the desert
+  rocket: { x: 30, z: -150 },
+  crates: { x: 68, z: 6 },
+  striker: { x: 90, z: 10 },
+  ducks: { x: 79, z: 30 }, // the Duck Shoot's stall, south of the Midway, its counter facing north
+  booth: { x: 13.5, z: 40 },
+  ideas: { x: -13.5, z: 46 }, // the Idea Box, on the entrance plaza's west side, its slot facing east
+  drone: { x: 12, z: -170 }, // the rental kiosk, beside North Avenue near the gate
+  dronePad: { x: 12, z: -178.5 },
+  flip: { x: -64, z: -120 }, // the Sky Flip's tower, in the north-west
+  ship: { x: 72, z: -124 }, // the Nebula 360 pendulum ship, at the east end of the Cosmic Way
+  speedway: { x: -58, z: 26 }, // the kart garage; the circuit itself lies outside the south-west fence
+  /** How far the kart circuit is moved from where its design frame puts it (see speedway-track.ts). */
+  circuit: { x: -11, z: 11 },
+  trail: { x: -30, z: 72 }, // the Rally Trail's shed; the trail itself lies outside the south fence
+  museum: { x: 96, z: -50 }, // the Career Museum's hall, at the east end of the East Avenue; its door faces west
 };
 
-/** The Sky Flip's arm swings in a vertical plane turned this far about y, so it faces the entrance. */
+/** The Sky Flip's arm swings in a vertical plane turned this far about y, so it faces the park. */
 export const FLIP_YAW = Math.PI / 6;
 
 /** (x, z) in the Sky Flip's own frame: lx along its swing, lz out towards the park. */
@@ -37,7 +61,7 @@ export function flipLocal(x: number, z: number): [number, number] {
  * The Career Museum: a hall `halfL` either side of its centre along its length and `halfW` across,
  * inside walls `wall` thick, with a porch `porch` deep in front of the door. In its own frame the
  * hall runs from the door (lz = +halfL) to the end wall (lz = -halfL); it is turned by `yaw`, so
- * its door faces the Rocket Ride's plaza.
+ * its door faces down the East Avenue.
  */
 export const MUSEUM = { yaw: -Math.PI / 2, halfW: 6, halfL: 12.5, wall: 0.4, porch: 2.4, height: 6.6 };
 
@@ -64,90 +88,182 @@ export function onMuseum(x: number, z: number, margin = 0) {
   return Math.abs(lx) < m.halfW + m.wall + margin && lz > -m.halfL - m.wall - margin && lz < m.halfL + m.wall + m.porch + margin;
 }
 
-export type ZoneId = 'entrance' | 'coaster' | 'falcon' | 'rocket' | 'crates' | 'striker' | 'ferris' | 'booth' | 'ideas' | 'drone' | 'flip' | 'ship' | 'speedway' | 'trail' | 'museum';
+export type ZoneId =
+  | 'entrance'
+  | 'coaster'
+  | 'falcon'
+  | 'rocket'
+  | 'crates'
+  | 'striker'
+  | 'ducks'
+  | 'ferris'
+  | 'booth'
+  | 'ideas'
+  | 'drone'
+  | 'flip'
+  | 'ship'
+  | 'speedway'
+  | 'trail'
+  | 'museum';
+
+type Zone = { x: number; z: number; radius: number; title: string; action: string; heading: number };
+
+/** A zone `dx`, `dz` from an attraction's anchor: each one keeps its place beside its attraction wherever that stands. */
+const near = (a: { x: number; z: number }, dx: number, dz: number, rest: Omit<Zone, 'x' | 'z'>): Zone => ({ x: a.x + dx, z: a.z + dz, ...rest });
 
 /** Where the visitor is placed when teleporting to a zone, and the zone trigger. */
-export const ZONES: Record<ZoneId, { x: number; z: number; radius: number; title: string; action: string; heading: number }> = {
-  entrance: { x: 0, z: 14, radius: 0, title: 'Entrance', action: '', heading: 0 },
-  coaster: { x: -19, z: 2, radius: 3.6, title: 'Thunder Loop', action: 'Drive the coaster', heading: Math.PI / 2 },
-  // west of the station: the track itself is a solid wall you can't cross
-  falcon: { x: 63, z: 12, radius: 3.6, title: 'Sky Falcon', action: 'Ride the 250 km/h cliff coaster', heading: -Math.PI / 2 },
-  rocket: { x: 42, z: -40, radius: 3.6, title: 'Rocket Ride', action: 'Launch into orbit', heading: 0 },
-  crates: { x: 34, z: -2, radius: 3.6, title: 'Crate Smash', action: 'Play a round', heading: 0 },
-  striker: { x: -20, z: -33, radius: 3.4, title: 'High Striker', action: 'Swing the hammer', heading: 0 },
+export const ZONES: Record<ZoneId, Zone> = {
+  entrance: near(LAYOUT.spawn, 0, -2, { radius: 0, title: 'Entrance', action: '', heading: 0 }),
+  // east of the station: the track itself is a solid wall you can't cross
+  coaster: near(LAYOUT.coaster, 7, 8, { radius: 3.6, title: 'Thunder Loop', action: 'Drive the coaster', heading: Math.PI / 2 }),
+  falcon: near(LAYOUT.falcon, -7, -10, { radius: 3.6, title: 'Sky Falcon', action: 'Ride the 250 km/h cliff coaster', heading: -Math.PI / 2 }),
+  rocket: near(LAYOUT.rocket, 0, 12, { radius: 3.6, title: 'Rocket Ride', action: 'Launch into orbit', heading: 0 }),
+  crates: near(LAYOUT.crates, 0, 10, { radius: 3.6, title: 'Crate Smash', action: 'Play a round', heading: 0 }),
+  striker: near(LAYOUT.striker, 0, 7, { radius: 3.4, title: 'High Striker', action: 'Swing the hammer', heading: 0 }),
+  // at the stall's counter, facing south at the ducks
+  ducks: near(LAYOUT.ducks, 0, -6.4, { radius: 3.2, title: 'Duck Shoot', action: 'Shoot the tin ducks', heading: Math.PI }),
   // at the wheel's boarding terminal, at the far end of the road out of the park
-  ferris: { x: 0, z: -181, radius: 3.6, title: 'Giant Wheel', action: 'Ride the 250 m wheel', heading: 0 },
-  booth: { x: 20, z: 18, radius: 3.4, title: 'Ticket Booth', action: 'Step up to the counter', heading: 0 },
+  ferris: near(LAYOUT.ferris, 0, 19, { radius: 3.6, title: 'Giant Wheel', action: 'Ride the 250 m wheel', heading: 0 }),
+  booth: near(LAYOUT.booth, 0, 6, { radius: 3.4, title: 'Ticket Booth', action: 'Step up to the counter', heading: 0 }),
   // in front of the Idea Box, facing west at its slot
-  ideas: { x: -8, z: 9, radius: 2.6, title: 'Idea Box', action: 'Share an idea', heading: Math.PI / 2 },
+  ideas: near(LAYOUT.ideas, 3.5, 0, { radius: 2.6, title: 'Idea Box', action: 'Share an idea', heading: Math.PI / 2 }),
   // at the kiosk counter, facing east
-  drone: { x: 7, z: -49, radius: 3.2, title: 'Drone Flights', action: 'Rent a drone', heading: -Math.PI / 2 },
+  drone: near(LAYOUT.drone, -5, 0, { radius: 3.2, title: 'Drone Flights', action: 'Rent a drone', heading: -Math.PI / 2 }),
   // outside the Sky Flip's gate, facing the tower
-  flip: { x: -37, z: -56.1, radius: 3.4, title: 'Sky Flip', action: 'Swing 125 m up and flip', heading: FLIP_YAW },
+  flip: near(LAYOUT.flip, 15, 13.9, { radius: 3.4, title: 'Sky Flip', action: 'Swing 125 m up and flip', heading: FLIP_YAW }),
   // at the ship's queue, facing south over the fence at the boat
-  ship: { x: 22, z: 52, radius: 3.4, title: 'Nebula 360', action: 'Loop the pendulum ship', heading: Math.PI },
+  ship: near(LAYOUT.ship, 0, -14, { radius: 3.4, title: 'Nebula 360', action: 'Loop the pendulum ship', heading: Math.PI }),
   // at the kart garage's counter, facing south-west towards the circuit
-  speedway: { x: -48, z: 46, radius: 3.4, title: 'Turbo Speedway', action: 'Race the karts', heading: (3 * Math.PI) / 4 },
+  speedway: near(LAYOUT.speedway, 7, -7, { radius: 3.4, title: 'Turbo Speedway', action: 'Race the karts', heading: (3 * Math.PI) / 4 }),
   // at the Rally Trail's counter, facing south towards the shed and the trail beyond the fence
-  trail: { x: -13, z: 73, radius: 3.4, title: 'Rally Trail', action: 'Drive the time trial', heading: Math.PI },
+  trail: near(LAYOUT.trail, -1, -7, { radius: 3.4, title: 'Rally Trail', action: 'Drive the time trial', heading: Math.PI }),
   // on the museum's porch, facing east through its door
-  museum: { x: 52.4, z: -40, radius: 1.6, title: 'Career Museum', action: 'Take the guided tour', heading: -Math.PI / 2 },
+  museum: near(LAYOUT.museum, -14.1, 0, { radius: 1.6, title: 'Career Museum', action: 'Take the guided tour', heading: -Math.PI / 2 }),
 };
 
+/** Where the road to the giant wheel ends, in front of its terminal. */
+const WHEEL_END = LAYOUT.ferris.z + 22;
+
+/**
+ * The districts, in the order the map lists them: each with its plaza (and the colour of its signs
+ * and paving), its attractions, and where the zoomed-out map writes its name (clear of the pins).
+ */
+export type DistrictId = 'gate' | 'midway' | 'falcon' | 'cosmos' | 'thrill' | 'motor';
+type District = { name: string; icon: string; color: string; plaza: [number, number]; label: [number, number]; zones: ZoneId[] };
+export const DISTRICTS: Record<DistrictId, District> = {
+  gate: { name: 'Main Gate', icon: '🎪', color: '#ff4d6d', plaza: [0, 18], label: [0, 6], zones: ['entrance', 'booth', 'ideas'] },
+  midway: { name: 'The Midway', icon: '🎯', color: '#ffb627', plaza: [79, 18], label: [79, 2], zones: ['crates', 'striker', 'ducks'] },
+  falcon: { name: 'Falcon Gate', icon: '🦅', color: '#2ec4b6', plaza: [64, -50], label: [84, -66], zones: ['falcon', 'museum'] },
+  cosmos: { name: 'Cosmos', icon: '🚀', color: '#7b5cd6', plaza: [0, -138], label: [-24, -140], zones: ['rocket', 'ship', 'drone', 'ferris'] },
+  thrill: { name: 'Thrill Ridge', icon: '🎢', color: '#ff8a3d', plaza: [-56, -50], label: [-34, -62], zones: ['coaster', 'flip'] },
+  motor: { name: 'Motor Town', icon: '🏁', color: '#4a90d9', plaza: [-50, 18], label: [-52, 34], zones: ['speedway', 'trail'] },
+};
+
+/** The Promenade: the loop round the park's heart, past every district (back round to where it starts). */
+export const PROMENADE: [number, number][] = [
+  [0, -112], [44, -100], [64, -76], [64, -50], [64, -24], [50, 18], [0, 18], [-50, 18], [-56, -20], [-56, -50], [-56, -80], [-40, -102], [0, -112],
+];
+
+/** The Midway: the games' alley, east off the Promenade to the Sky Falcon's station. */
+export const MIDWAY: { points: [number, number][]; width: number } = { points: [[50, 18], [98, 18], [103, 12]], width: 5 };
+
 export const PATHS: { points: [number, number][]; width: number }[] = [
-  // main boulevard, running on out of the park's north gate to the giant wheel
-  { points: [[0, 26], [0, -178]], width: 7 },
-  // west loop to coaster + striker
-  { points: [[0, 2], [-12, 2], [-19, 2]], width: 5 },
-  { points: [[0, -30], [-12, -33], [-20, -33]], width: 4.5 },
-  // east to crates and rocket
-  { points: [[0, -6], [18, -4], [34, -2]], width: 5 },
-  { points: [[34, -2], [40, -20], [42, -40]], width: 5 },
-  { points: [[0, -30], [22, -38], [42, -40]], width: 4.5 },
-  // east gate to the Sky Falcon
-  { points: [[20, 18], [48, 17], [63, 12]], width: 4.5 },
-  // booth spur
-  { points: [[0, 18], [12, 18], [20, 18]], width: 4.5 },
-  // north plaza west to the Sky Flip
-  { points: [[0, -62], [-20, -63.5], [-28.9, -58], [-37, -56.1]], width: 4.5 },
-  // entrance plaza south to the Nebula 360
-  { points: [[4, 21], [14, 34], [22, 48]], width: 4.5 },
-  // entrance plaza south-west to the kart garage
-  { points: [[-4, 21], [-20, 26], [-36, 36], [-48, 46]], width: 4.5 },
-  // off the kart garage's path, south between the trees to the Rally Trail's shed
-  { points: [[-20, 26], [-18, 48], [-14, 66], [-13, 72]], width: 4.5 },
-  // the Rocket Ride's plaza east to the Career Museum's door
-  { points: [[42, -40], [51, -40]], width: 4.5 },
+  // Main Street, from the entrance plaza north to the Hub, and on as North Avenue, out of the north gate to the giant wheel
+  { points: [[0, 58], [0, WHEEL_END]], width: 7 },
+  // the East and West Avenues: the Hub out to the museum's door and to the Thunder Loop's station
+  { points: [[0, -50], [82, -50]], width: 5 },
+  { points: [[0, -50], [-61, -50]], width: 5 },
+  // the Promenade
+  { points: PROMENADE, width: 5 },
+  // Cosmos: the Cosmic Way, from North Avenue past the Rocket Ride to the Nebula 360's queue, and the spur to the drone kiosk
+  { points: [[0, -138], [72, -138]], width: 4.5 },
+  { points: [[0, -170], [7, -170]], width: 4.5 },
+  MIDWAY,
+  // the Falcon Walk: from the Promenade below Falcon Gate's plaza, down to the Sky Falcon's station
+  { points: [[64, -24], [103, 12]], width: 4.5 },
+  // the Rally Lane: the Promenade south to the trail's shed
+  { points: [[-31, 18], [-31, 65]], width: 4.5 },
+  // the Sky Flip's gate, off the Promenade
+  { points: [[-41.1, -100.5], [-49, -106.1]], width: 4.5 },
 ];
 
 export const PLAZAS: [number, number, number][] = [
-  [0, 10, 13],
-  [0, -30, 11],
-  [0, -56, 9],
-  [42, -40, 7],
-  [34, -6, 9],
-  [-20, -36, 6],
-  [20, 16, 5],
-  [63, 12, 5],
-  [-20, 2, 5],
-  [0, -178, 10], // in front of the giant wheel's terminal
-  [10, -53, 7.5], // the drone kiosk and its landing pad
-  [-37, -56.1, 3.4], // the Sky Flip's gate
-  [22, 52, 5], // the Nebula 360's queue
-  [-50, 48, 5], // the kart garage
-  [-13, 73, 5], // the Rally Trail's shed
-  [49.5, -40, 3.6], // the Career Museum's steps
+  [0, 46, 13], // the entrance plaza
+  [0, -50, 14], // the Hub, round the carousel
+  [0, -112, 8], // where North Avenue crosses the Promenade
+  [0, WHEEL_END, 10], // in front of the giant wheel's terminal
+  // the districts' plazas
+  ...Object.values(DISTRICTS).map(({ plaza: [x, z] }) => [x, z, 8] as [number, number, number]),
+  [68, 12, 8], // Crate Smash
+  [90, 14, 5.5], // the High Striker
+  [79, 23, 4], // the Duck Shoot's counter
+  [10, -174, 7.5], // the drone kiosk and its landing pad
+  [30, -138, 5], // the Rocket Ride's gate
+  [72, -138, 5], // the Nebula 360's queue
+  [-49, -106.1, 3.4], // the Sky Flip's gate
+  [-51, 19, 5], // the kart garage
+  [-31, 65, 5], // the Rally Trail's shed
+  [84.4, -50, 3.6], // the Career Museum's steps
+  [103, 12, 5], // the Sky Falcon's queue
+  [-61, -50, 5], // the Thunder Loop's queue
 ];
 
-/** The road out to the giant wheel: the one stretch of ground outside the fence you can walk on. */
-export const WHEEL_ROAD = { half: 4.2, end: -178, plaza: { x: 0, z: -178, r: 9.5 } };
+/** The Sky Falcon's station and its queue (its own supports stand in it; nothing else may). */
+export const FALCON_STATION: [number, number, number] = [LAYOUT.falcon.x - 2, LAYOUT.falcon.z - 10, 12];
+
+/**
+ * The ground each attraction stands on, as circles (x, z, radius) that scenery (trees, lamps, stalls,
+ * benches, coaster supports) keeps clear of. The coaster tracks, the Sky Flip's swing and the
+ * museum have their own tests (nearTrack, flipLocal, onMuseum).
+ */
+export const FOOTPRINTS: [number, number, number][] = [
+  [LAYOUT.carousel.x, LAYOUT.carousel.z, 9],
+  [LAYOUT.arch.x - 8, LAYOUT.arch.z, 2],
+  [LAYOUT.arch.x + 8, LAYOUT.arch.z, 2],
+  [LAYOUT.letters.x, LAYOUT.letters.z, 10],
+  [LAYOUT.booth.x, LAYOUT.booth.z, 4.5],
+  [LAYOUT.ideas.x, LAYOUT.ideas.z, 3],
+  [LAYOUT.rocket.x, LAYOUT.rocket.z, 9],
+  [LAYOUT.rocket.x + 5.2, LAYOUT.rocket.z, 3],
+  [LAYOUT.crates.x, LAYOUT.crates.z - 3, 9.5],
+  [LAYOUT.striker.x, LAYOUT.striker.z, 3.5],
+  [LAYOUT.ducks.x, LAYOUT.ducks.z, 8],
+  [LAYOUT.drone.x, LAYOUT.drone.z, 3.5],
+  [LAYOUT.dronePad.x, LAYOUT.dronePad.z, 4],
+  [LAYOUT.ship.x, LAYOUT.ship.z, 21],
+  [LAYOUT.speedway.x, LAYOUT.speedway.z, 8],
+  [LAYOUT.trail.x + 1, LAYOUT.trail.z - 0.5, 10],
+  [LAYOUT.flip.x, LAYOUT.flip.z, 7],
+  [LAYOUT.museum.x, LAYOUT.museum.z, 16],
+  [LAYOUT.coaster.x + 3, LAYOUT.coaster.z + 10, 12], // the Thunder Loop's station
+  FALCON_STATION,
+];
+
+/** True if (x, z) is on an attraction's ground (see FOOTPRINTS), grown by `margin`. */
+export const onFootprint = (x: number, z: number, margin = 0) => FOOTPRINTS.some(([fx, fz, r]) => Math.hypot(x - fx, z - fz) < r + margin);
+
+/** The road out of the north gate to the giant wheel: the one stretch of ground outside the fence you can walk on. */
+export const WHEEL_ROAD = { half: 4.2, end: WHEEL_END, plaza: { x: LAYOUT.ferris.x, z: WHEEL_END, r: 9.5 } };
 
 /**
  * The lawn the road runs through, beyond the edge of the park's own ground: x within ±half,
  * z from z0 (behind the wheel's terminal) to z1 (just inside the park ground's edge). It fades
  * out into the open country over the last `fade` metres of each side.
  */
-export const WHEEL_LAWN = { half: 50, z0: -206, z1: -126, fade: 12 };
+export const WHEEL_LAWN = { half: 50, z0: LAYOUT.ferris.z - 6, z1: GROUND.z - GROUND.size / 2 + 4, fade: 12 };
+
+/** How far (x, z) is from the park's centre. */
+export const parkDistance = (x: number, z: number) => Math.hypot(x - PARK.x, z - PARK.z);
+
+/** True inside the park's fence, or `margin` metres beyond it (negative: that far inside). */
+export const inPark = (x: number, z: number, margin = 0) => parkDistance(x, z) < PARK.r + FENCE_GAP + margin;
+
+/** True on the square of park ground, grown by `margin`. */
+export const onParkGround = (x: number, z: number, margin = 0) =>
+  Math.abs(x - GROUND.x) < GROUND.size / 2 + margin && Math.abs(z - GROUND.z) < GROUND.size / 2 + margin;
+
+/** The park's square bounding box (its lawn), grown by `margin`. */
+export const parkBounds = (margin = 0) => ({ x0: PARK.x - PARK.r - margin, x1: PARK.x + PARK.r + margin, z0: PARK.z - PARK.r - margin, z1: PARK.z + PARK.r + margin });
 
 /** True if (x, z) is on (or within `margin` of) a footpath or plaza. */
 export function onPath(x: number, z: number, margin = 0) {
@@ -168,16 +284,18 @@ export function onPath(x: number, z: number, margin = 0) {
  * nearest walkable point to (x, z), or null when (x, z) is already walkable.
  */
 export function clampToGrounds(x: number, z: number): [number, number] | null {
-  const R = LAYOUT.boundary;
-  const r = Math.hypot(x, z);
+  const R = PARK.r;
+  const r = parkDistance(x, z);
   if (r <= R) return null;
   const { half, end, plaza } = WHEEL_ROAD;
-  if (Math.abs(x) <= half && z < 0 && z >= end) return null;
+  // the road runs from just inside the north gate out to the wheel's plaza
+  const gateZ = PARK.z - R + half;
+  if (Math.abs(x - PARK.x) <= half && z <= gateZ && z >= end) return null;
   const pr = Math.hypot(x - plaza.x, z - plaza.z);
   if (pr <= plaza.r) return null;
   const candidates: [number, number][] = [
-    [(x * R) / r, (z * R) / r],
-    [Math.max(-half, Math.min(half, x)), Math.max(end, Math.min(-R + half, z))],
+    [PARK.x + ((x - PARK.x) * R) / r, PARK.z + ((z - PARK.z) * R) / r],
+    [Math.max(PARK.x - half, Math.min(PARK.x + half, x)), Math.max(end, Math.min(gateZ, z))],
     [plaza.x + ((x - plaza.x) * plaza.r) / pr, plaza.z + ((z - plaza.z) * plaza.r) / pr],
   ];
   let best = candidates[0];

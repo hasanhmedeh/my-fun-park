@@ -14,6 +14,7 @@ export const ICONS: Record<AttractionId, string> = {
   drone: '🚁',
   crates: '🥫',
   striker: '🔔',
+  ducks: '🦆',
 };
 
 /** "Thunder Loop" for "coaster". */

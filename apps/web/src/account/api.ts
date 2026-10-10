@@ -2,10 +2,13 @@
 // so every request goes out with credentials and the page never sees the token.
 
 /** Every attraction that costs tickets (they match the zone ids in world/layout.ts). */
-export const ATTRACTION_IDS = ['coaster', 'falcon', 'rocket', 'ferris', 'flip', 'ship', 'speedway', 'trail', 'drone', 'crates', 'striker'] as const;
+export const ATTRACTION_IDS = ['coaster', 'falcon', 'rocket', 'ferris', 'flip', 'ship', 'speedway', 'trail', 'drone', 'crates', 'striker', 'ducks'] as const;
 export type AttractionId = (typeof ATTRACTION_IDS)[number];
 
 export const isAttraction = (id: string | null | undefined): id is AttractionId => !!id && (ATTRACTION_IDS as readonly string[]).includes(id);
+
+/** The Midway's games (played, rather than ridden). */
+export const isGame = (id: AttractionId) => id === 'crates' || id === 'striker' || id === 'ducks';
 
 /** Tickets per round, until the server's own table arrives (GET /tickets sends the live one). */
 export const DEFAULT_COSTS: Record<AttractionId, number> = {
@@ -20,6 +23,7 @@ export const DEFAULT_COSTS: Record<AttractionId, number> = {
   drone: 1,
   crates: 1,
   striker: 1,
+  ducks: 1,
 };
 /** One free pack per purchase, and one purchase per cool-down (until GET /park sends the live rules). */
 export const PACK_SIZE = 20;

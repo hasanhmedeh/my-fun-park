@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { shadowed, staticBox, std, type Attraction, type Ctx } from '../context';
 import type { Input } from '../input';
-import { LAYOUT } from '../layout';
+import { LAYOUT, parkBounds } from '../layout';
 import { FALCON_TRACK, STACK_TRACK } from '../rides';
 import { hdr, PALETTE, signMaterial, signTexture, stripeTexture } from '../textures';
 
@@ -32,7 +32,7 @@ const CAM_LABEL: Record<Cam, string> = { chase: 'Chase', gimbal: 'Gimbal', top: 
 const $ = (id: string) => document.getElementById(id)!;
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
-/** The drone kiosk on the boulevard: rent the camera drone and fly it anywhere over the park. */
+/** The drone kiosk beside North Avenue: rent the camera drone and fly it anywhere over the park. */
 export class Drone implements Attraction {
   private drone = new THREE.Group();
   private tilt = new THREE.Group();
@@ -76,7 +76,7 @@ export class Drone implements Attraction {
     this.park();
 
     // the flying zone: the park and both coasters, with room to spare
-    let x0 = -LAYOUT.boundary, x1 = LAYOUT.boundary, z0 = -LAYOUT.boundary, z1 = LAYOUT.boundary;
+    let { x0, x1, z0, z1 } = parkBounds();
     for (const d of [STACK_TRACK, FALCON_TRACK])
       for (const p of d.pos) {
         x0 = Math.min(x0, p.x);
@@ -91,7 +91,7 @@ export class Drone implements Attraction {
   private buildKiosk() {
     const root = new THREE.Group();
     root.position.set(LAYOUT.drone.x, 0, LAYOUT.drone.z);
-    root.rotation.y = -Math.PI / 2; // the counter faces the boulevard
+    root.rotation.y = -Math.PI / 2; // the counter faces North Avenue
     const hut = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.8, 2.6), std(PALETTE.violet));
     hut.position.y = 1.4;
     const roof = new THREE.Mesh(new THREE.BoxGeometry(4, 0.3, 3), std(PALETTE.cream));
@@ -201,7 +201,7 @@ export class Drone implements Attraction {
   private park() {
     this.pos.set(this.pad.x, PARKED_Y, this.pad.z);
     this.vel.set(0, 0, 0);
-    this.heading = 0; // facing north, down the boulevard toward the giant wheel
+    this.heading = 0; // facing north, down North Avenue toward the giant wheel
     this.turnRate = 0;
     this.phase = 'parked';
     this.place(0, 0);
@@ -236,7 +236,7 @@ export class Drone implements Attraction {
    */
   offerHtml(cost: number, gate: string | null = null) {
     const { battery } = DRONE_RENTAL;
-    return `<p class="eyebrow">Drone Flights · Rental kiosk</p><h2>See the whole fair from the sky 🚁</h2><p>Take our camera drone up over the park: skim the boulevard, chase the coaster trains, and climb past the top of the 250 m Giant Wheel.</p><p class="drone-offer"><span>🔋 ${fmt(
+    return `<p class="eyebrow">Drone Flights · Rental kiosk</p><h2>See the whole fair from the sky 🚁</h2><p>Take our camera drone up over the park: skim the avenues, chase the coaster trains, and climb past the top of the 250 m Giant Wheel.</p><p class="drone-offer"><span>🔋 ${fmt(
       battery,
     )} of flight</span><span>🎟️ ${cost} ${cost === 1 ? 'ticket' : 'tickets'}</span></p><p>${this.controlsHtml()}</p><p class="sub">One flight per rental: when the battery runs flat (or you press <kbd>H</kbd>), the drone flies itself home and lands on its pad.</p>${
       gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-drone-launch>Launch the drone · ${cost} 🎟️</button></p>`

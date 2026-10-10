@@ -4,7 +4,7 @@ import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { std, staticCylinder, type Ctx } from './context';
 import { Grass } from './grass';
-import { flipLocal, LAYOUT, onMuseum, onPath, PATHS, PLAZAS, WHEEL_LAWN, WHEEL_ROAD } from './layout';
+import { DISTRICTS, FENCE_GAP, flipLocal, GROUND, LAYOUT, MIDWAY, onFootprint, onMuseum, onPath, PARK, parkDistance, PATHS, PLAZAS, WHEEL_LAWN, WHEEL_ROAD, type DistrictId } from './layout';
 import type { Quality } from './quality';
 import { mulberry } from './random';
 import { detailNormalTexture, glowTexture, groundTexture, hdr, PALETTE, lawnPatchTexture, poolTexture, stripeTexture } from './textures';
@@ -16,7 +16,6 @@ import { nearTrail, TRAIL, WALL as TRAIL_WALL } from './attractions/trail-track'
 
 export { mulberry };
 
-const WORLD = 260;
 const FOG_DENSITY = 0.0026;
 /** A full 24-hour day lasts this many real seconds (10 minutes). */
 export const DAY_SECONDS = 600;
@@ -54,6 +53,8 @@ export class Environment {
   private fireflySeeds: Float32Array;
   private balloons: THREE.Group[] = [];
   private bulbs: THREE.InstancedMesh[] = [];
+  /** Lamps in a row along an avenue or the Midway, which the string lights hang between. */
+  private stringRows: [number, number][][] = [];
   /** In-game clock, 0–24. */
   hours = START_HOUR;
   timeMode: TimeMode = 'paused';
@@ -173,14 +174,18 @@ export class Environment {
     scene.add(this.sun, this.sun.target);
 
     // ---------- Ground ----------
-    const ground = groundTexture(ctx.mobile || q.tier === 'lowest' ? 2048 : 4096, WORLD, PATHS, PLAZAS);
+    // the park's lawn with its paths and plazas, each district's colour set into its plaza
+    const WORLD = GROUND.size;
+    const inlays = Object.values(DISTRICTS).map(({ plaza: [x, z], color }) => ({ x, z, r: 6.2, color }));
+    const ground = groundTexture(ctx.mobile || q.tier === 'lowest' ? 2048 : 4096, GROUND, PATHS, PLAZAS, inlays);
     const detail = detailNormalTexture(512);
-    detail.repeat.set(90, 90);
+    detail.repeat.set(90 * (WORLD / 260), 90 * (WORLD / 260));
     const groundMesh = new THREE.Mesh(
       new THREE.PlaneGeometry(WORLD, WORLD),
       std('#ffffff', { map: ground.texture, normalMap: detail, normalScale: new THREE.Vector2(0.9, 0.9), roughness: 0.96 }),
     );
     groundMesh.rotation.x = -Math.PI / 2;
+    groundMesh.position.set(GROUND.x, 0, GROUND.z);
     groundMesh.receiveShadow = true;
     scene.add(groundMesh);
     // the road to the giant wheel runs on past the edge of the park's ground texture, through a
@@ -190,12 +195,12 @@ export class Environment {
     const lawnW = lawnRect.x1 - lawnRect.x0;
     const lawnH = lawnRect.z1 - lawnRect.z0;
     const lawnDetail = detail.clone();
-    lawnDetail.repeat.set((90 * lawnW) / WORLD, (90 * lawnH) / WORLD);
-    const lawnFadeNear = L.z1 + WORLD / 2; // the overlap with the park ground
+    lawnDetail.repeat.set((90 * lawnW) / 260, (90 * lawnH) / 260);
+    const lawnFadeNear = L.z1 - (GROUND.z - WORLD / 2); // the overlap with the park ground
     const lawn = new THREE.Mesh(
       new THREE.PlaneGeometry(lawnW, lawnH).rotateX(-Math.PI / 2),
       std('#ffffff', {
-        map: lawnPatchTexture(lawnRect, ctx.mobile || q.tier === 'lowest' ? 8 : 12, WORLD, { side: L.fade, near: lawnFadeNear }, PATHS, PLAZAS),
+        map: lawnPatchTexture(lawnRect, ctx.mobile || q.tier === 'lowest' ? 8 : 12, GROUND, { side: L.fade, near: lawnFadeNear }, PATHS, PLAZAS),
         normalMap: lawnDetail,
         normalScale: new THREE.Vector2(0.9, 0.9),
         roughness: 0.96,
@@ -221,14 +226,14 @@ export class Environment {
     ctx.world.addBody(groundBody);
 
     // grass grows on the park's lawn and on the lawn along the wheel road (thinning out where it fades)
-    const R = LAYOUT.boundary + 1;
+    const R = PARK.r + 1;
     const growth = (x: number, z: number) => {
-      if (Math.hypot(x, z) < R) return ground.isSand(x, z) || onMuseum(x, z, 0.6) ? 0 : 1;
-      if (Math.abs(x) > L.half || z < L.z0 || z > 0 || onPath(x, z, 1.2)) return 0;
-      const edge = Math.min(L.half - Math.abs(x), z - L.z0);
+      if (parkDistance(x, z) < R) return ground.isSand(x, z) || onMuseum(x, z, 0.6) ? 0 : 1;
+      if (Math.abs(x - LAYOUT.ferris.x) > L.half || z < L.z0 || z > PARK.z || onPath(x, z, 1.2)) return 0;
+      const edge = Math.min(L.half - Math.abs(x - LAYOUT.ferris.x), z - L.z0);
       return THREE.MathUtils.smoothstep(edge, L.fade * 0.25, L.fade);
     };
-    const grassBounds = { x0: -R, x1: R, z0: L.z0, z1: R };
+    const grassBounds = { x0: PARK.x - R, x1: PARK.x + R, z0: L.z0, z1: PARK.z + R };
     this.grass = new Grass(scene, growth, grassBounds, q.grass, q.grassDistance, q.tier !== 'low' && q.tier !== 'lowest');
 
     this.buildTrees();
@@ -239,13 +244,13 @@ export class Environment {
     this.buildBalloons();
 
     // fireflies drifting over the meadow
-    const n = q.tier === 'lowest' ? 0 : q.tier === 'low' ? 60 : 160;
+    const n = q.tier === 'lowest' ? 0 : q.tier === 'low' ? 80 : 240;
     this.fireflySeeds = new Float32Array(n * 4);
     const fr = mulberry(77);
     for (let i = 0; i < n; i++) {
       const a = fr() * Math.PI * 2;
-      const r = 14 + fr() * 70;
-      this.fireflySeeds.set([Math.cos(a) * r, Math.sin(a) * r, 0.6 + fr() * 2.4, fr() * 100], i * 4);
+      const r = 14 + fr() * (PARK.r - 30);
+      this.fireflySeeds.set([PARK.x + Math.cos(a) * r, PARK.z + Math.sin(a) * r, 0.6 + fr() * 2.4, fr() * 100], i * 4);
     }
     const fg = new THREE.BufferGeometry();
     fg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
@@ -264,10 +269,10 @@ export class Environment {
     scene.add(this.fireflies);
   }
 
-  /** Rolling hills on the horizon give the scene depth (fog does the rest). */
+  /** Rolling hills on the horizon, round the park, give the scene depth (fog does the rest). */
   private buildHills() {
     const seg = 180;
-    const radii = [190, 280, 420, 600, 850];
+    const radii = [200, 290, 430, 610, 860];
     const amps = [0, 3, 9, 18, 30];
     const colors = ['#2b5c40', '#2a5038', '#2e4836', '#3a4250', '#4c4562'].map((c) => new THREE.Color(c));
     const pos: number[] = [];
@@ -275,48 +280,30 @@ export class Environment {
     const idx: number[] = [];
     const h = (a: number, k: number) =>
       (Math.sin(a * 3 + k) * 0.5 + Math.sin(a * 7.3 + k * 2.1) * 0.3 + Math.sin(a * 13.7 + k) * 0.2) * 0.5 + 0.5;
-    // flatten the hills into a plain wherever the Sky Falcon runs out into the desert
+    // the hills flatten into a plain out past whatever stands beyond the fence, `spread` sectors either side
     const reach = new Float32Array(seg);
-    for (let k = 0; k < FALCON_TRACK.pos.length; k += 4) {
-      const p = FALCON_TRACK.pos[k];
-      const r = Math.hypot(p.x, p.z);
-      if (r < 150) continue;
-      const a = Math.atan2(p.z, p.x);
-      const si = Math.round((((a / (Math.PI * 2)) % 1) + 1) % 1 * seg);
-      for (let d = -6; d <= 6; d++) {
+    const clear = (x: number, z: number, pad: number, spread: number) => {
+      const r = Math.hypot(x - PARK.x, z - PARK.z) + pad;
+      if (r < 150) return;
+      const si = Math.round(((((Math.atan2(z - PARK.z, x - PARK.x) / (Math.PI * 2)) % 1) + 1) % 1) * seg);
+      for (let d = -spread; d <= spread; d++) {
         const j = (((si + d) % seg) + seg) % seg;
         reach[j] = Math.max(reach[j], r);
       }
-    }
-    // …and behind the kart circuit, so no hillside rises through its far tyre wall
-    for (let k = 0; k < CIRCUIT.n; k += 4) {
-      const x = CIRCUIT.px[k];
-      const z = CIRCUIT.pz[k];
-      const r = Math.hypot(x, z) + WALL;
-      if (r < 150) continue;
-      const si = Math.round((((Math.atan2(z, x) / (Math.PI * 2)) % 1) + 1) % 1 * seg);
-      for (let d = -4; d <= 4; d++) {
-        const j = (((si + d) % seg) + seg) % seg;
-        reach[j] = Math.max(reach[j], r);
-      }
-    }
-    // …and behind the Rally Trail
-    for (let k = 0; k < TRAIL.n; k += 4) {
-      const x = TRAIL.px[k];
-      const z = TRAIL.pz[k];
-      const r = Math.hypot(x, z) + TRAIL_WALL;
-      if (r < 150) continue;
-      const si = Math.round((((Math.atan2(z, x) / (Math.PI * 2)) % 1) + 1) % 1 * seg);
-      for (let d = -4; d <= 4; d++) {
-        const j = (((si + d) % seg) + seg) % seg;
-        reach[j] = Math.max(reach[j], r);
-      }
-    }
+    };
+    // wherever the Sky Falcon runs out into the desert…
+    for (let k = 0; k < FALCON_TRACK.pos.length; k += 4) clear(FALCON_TRACK.pos[k].x, FALCON_TRACK.pos[k].z, 0, 6);
+    // …behind the kart circuit and the Rally Trail, so no hillside rises through their far walls…
+    for (let k = 0; k < CIRCUIT.n; k += 4) clear(CIRCUIT.px[k], CIRCUIT.pz[k], WALL, 4);
+    for (let k = 0; k < TRAIL.n; k += 4) clear(TRAIL.px[k], TRAIL.pz[k], TRAIL_WALL, 4);
+    // …and round the giant wheel and its legs
+    const wheel = LAYOUT.ferris;
+    for (let x = -130; x <= 130; x += 10) for (const dz of [-50, 0, 50]) clear(wheel.x + x, wheel.z + dz, 10, 2);
     radii.forEach((r, row) => {
       for (let i = 0; i <= seg; i++) {
         const a = (i / seg) * Math.PI * 2;
         const flat = row === 0 || r < reach[i % seg] + 140;
-        pos.push(Math.cos(a) * r, flat ? -0.1 : h(a, row) * amps[row] + amps[row] * 0.15, Math.sin(a) * r);
+        pos.push(PARK.x + Math.cos(a) * r, flat ? -0.1 : h(a, row) * amps[row] + amps[row] * 0.15, PARK.z + Math.sin(a) * r);
         col.push(colors[row].r, colors[row].g, colors[row].b);
       }
     });
@@ -334,17 +321,65 @@ export class Environment {
     this.ctx.scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
   }
 
+  /**
+   * The park's trees, planted to a plan: a wood round the outside of the fence, a green belt just
+   * inside it, avenues of trees lining North Avenue and the East and West Avenues, and groves in
+   * the gardens between the paths. Nothing grows on a path or a plaza, on an attraction's ground,
+   * through a coaster, where the Sky Flip swings low, on the road out to the giant wheel, on the
+   * kart circuit or the Rally Trail.
+   */
   private buildTrees() {
     const rnd = mulberry(42);
-    const spots: [number, number, number][] = [];
-    for (let i = 0; i < 130; i++) {
+    const fence = PARK.r + FENCE_GAP;
+    const underFlip = (x: number, z: number) => {
+      const [lx, lz] = flipLocal(x, z);
+      return Math.abs(lx) < 34 && lz > -3 && lz < 21;
+    };
+    const onRoad = (x: number, z: number) => z < PARK.z && Math.abs(x - LAYOUT.ferris.x) < WHEEL_ROAD.half + 5 && z > WHEEL_LAWN.z0 - 10;
+    const free = (x: number, z: number) =>
+      !onPath(x, z, 2.6) &&
+      !onFootprint(x, z, 2) &&
+      !nearTrack(x, z, 5, 9) &&
+      !underFlip(x, z) &&
+      !onMuseum(x, z, 4) &&
+      !onRoad(x, z) &&
+      !nearCircuit(x, z, WALL + 9) &&
+      !nearTrail(x, z, TRAIL_WALL + 7) &&
+      Math.abs(parkDistance(x, z) - fence) > 3;
+    // [x, z, scale, broadleaf only]
+    const spots: [number, number, number, boolean][] = [];
+    const plant = (x: number, z: number, sc: number, gap = 3.2, avenue = false) => {
+      if (!free(x, z) || spots.some(([sx, sz]) => (sx - x) ** 2 + (sz - z) ** 2 < gap * gap)) return;
+      spots.push([x, z, sc, avenue]);
+    };
+    // the wood outside the fence
+    for (let i = 0; i < 230; i++) {
       const a = rnd() * Math.PI * 2;
-      const r = LAYOUT.boundary + 4 + rnd() * 34;
-      spots.push([Math.cos(a) * r, Math.sin(a) * r, 0.85 + rnd() * 0.8]);
+      const r = fence + 4 + rnd() * 36;
+      plant(PARK.x + Math.cos(a) * r, PARK.z + Math.sin(a) * r, 0.85 + rnd() * 0.8);
     }
-    const clusters: [number, number][] = [[-30, 46], [48, 42], [60, -14], [-70, -64], [20, -84], [-34, -76], [70, -70], [-8, 40], [30, 40]];
-    for (const [cx, cz] of clusters)
-      for (let i = 0; i < 5; i++) spots.push([cx + (rnd() - 0.5) * 12, cz + (rnd() - 0.5) * 12, 0.75 + rnd() * 0.6]);
+    // the green belt inside it
+    for (let i = 0; i < 260; i++) {
+      const a = (i / 260) * Math.PI * 2 + (rnd() - 0.5) * 0.02;
+      const r = fence - 6 - rnd() * 12;
+      plant(PARK.x + Math.cos(a) * r, PARK.z + Math.sin(a) * r, 0.8 + rnd() * 0.6, 5.5);
+    }
+    // avenues: a row either side of North Avenue and of the East and West Avenues, evenly spaced
+    for (let z = PARK.z - 20; z > PARK.z - PARK.r + 6; z -= 11) for (const sx of [-1, 1]) plant(PARK.x + sx * 8.5, z, 0.95, 3.2, true);
+    for (let x = 22; x < 60; x += 10)
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) plant(PARK.x + sx * x, PARK.z + sz * 6.8, 0.85, 3.2, true);
+    // groves in the gardens between the paths
+    const groves: [number, number, number][] = [
+      [26, -78, 11], [-24, -78, 11], [30, -24, 10], [-28, -24, 10], // the four gardens round the Hub
+      [96, -96, 13], [106, -18, 9], [-92, 0, 12], [-104, -130, 10], [56, -168, 9], [-40, -150, 11], // out beyond the Promenade
+      [40, 52, 11], [-60, 62, 9], [-6, 78, 7], [104, 48, 8],
+    ];
+    for (const [cx, cz, r] of groves)
+      for (let i = 0; i < 14; i++) {
+        const a = rnd() * Math.PI * 2;
+        const d = Math.sqrt(rnd()) * r;
+        plant(cx + Math.cos(a) * d, cz + Math.sin(a) * d, 0.75 + rnd() * 0.6, 3.6);
+      }
 
     const trunkGeo = new THREE.CylinderGeometry(0.18, 0.34, 2.6, 7);
     trunkGeo.translate(0, 1.3, 0);
@@ -365,28 +400,20 @@ export class Environment {
     const color = new THREE.Color();
     let nl = 0;
     let np = 0;
-    // nothing may grow through a coaster, on the road out to the giant wheel, where the Sky Flip swings
-    // low, on the kart circuit and its grandstand, on the Rally Trail, or on the Career Museum
-    const underFlip = (x: number, z: number) => {
-      const [lx, lz] = flipLocal(x, z);
-      return Math.abs(lx) < 34 && lz > -3 && lz < 21;
-    };
-    for (let i = spots.length - 1; i >= 0; i--)
-      if (nearTrack(spots[i][0], spots[i][1], 5, 9) || (spots[i][1] < 0 && Math.abs(spots[i][0]) < WHEEL_ROAD.half + 5) || underFlip(spots[i][0], spots[i][1]) || onMuseum(spots[i][0], spots[i][1], 4) || nearCircuit(spots[i][0], spots[i][1], WALL + 9) || nearTrail(spots[i][0], spots[i][1], TRAIL_WALL + 7))
-        spots.splice(i, 1);
-    spots.forEach(([x, z, sc], i) => {
+    spots.forEach(([x, z, sc, avenue], i) => {
       q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, rnd() * 6);
       m.compose(new THREE.Vector3(x, 0, z), q, new THREE.Vector3(sc, sc * (0.9 + rnd() * 0.25), sc));
       trunks.setMatrixAt(i, m);
       color.setHSL(0.22 + rnd() * 0.12, 0.3 + rnd() * 0.25, 0.75 + rnd() * 0.2);
-      if (rnd() > 0.42) {
+      // the avenues are all broadleaves; elsewhere a mix
+      if (avenue || rnd() > 0.42) {
         leaves.setMatrixAt(nl, m);
         leaves.setColorAt(nl++, color);
       } else {
         pines.setMatrixAt(np, m);
         pines.setColorAt(np++, color);
       }
-      if (Math.hypot(x, z) < LAYOUT.boundary + 2) staticCylinder(this.ctx, x, z, 0.4 * sc, 3);
+      if (parkDistance(x, z) < fence) staticCylinder(this.ctx, x, z, 0.4 * sc, 3);
     });
     leaves.count = nl;
     pines.count = np;
@@ -399,39 +426,93 @@ export class Environment {
   }
 
   private buildFence() {
-    const n = 220;
+    const r = PARK.r + FENCE_GAP;
+    const n = Math.round((Math.PI * 2 * r) / 2.7);
     const geo = new THREE.BoxGeometry(0.16, 1.2, 0.1);
     geo.translate(0, 0.6, 0);
     const posts = new THREE.InstancedMesh(geo, std(PALETTE.cream, { roughness: 0.7 }), n);
     const m = new THREE.Matrix4();
-    const r = LAYOUT.boundary + 2.5;
     // the north gate, where the road leaves for the giant wheel (centred on angle -π/2)
     const gate = Math.asin((WHEEL_ROAD.half + 0.6) / r);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2;
+      const x = PARK.x + Math.cos(a) * r;
+      const z = PARK.z + Math.sin(a) * r;
       // leave a gap where a coaster runs through the fence, and at the gate
       const g = Math.abs(((a + Math.PI / 2 + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
-      if (nearTrack(Math.cos(a) * r, Math.sin(a) * r, 3, 4) || g < gate) m.makeScale(0, 0, 0);
-      else m.makeRotationY(-a).setPosition(Math.cos(a) * r, 0, Math.sin(a) * r);
+      if (nearTrack(x, z, 3, 4) || g < gate) m.makeScale(0, 0, 0);
+      else m.makeRotationY(-a).setPosition(x, 0, z);
       posts.setMatrixAt(i, m);
     }
     posts.castShadow = true;
     this.ctx.scene.add(posts);
     const rail = new THREE.Mesh(
-      new THREE.TorusGeometry(r, 0.06, 4, 160, Math.PI * 2 - gate * 2).rotateZ(-Math.PI / 2 + gate),
+      new THREE.TorusGeometry(r, 0.06, 4, 240, Math.PI * 2 - gate * 2).rotateZ(-Math.PI / 2 + gate),
       std(PALETTE.candy, { roughness: 0.5 }),
     );
     rail.rotation.x = Math.PI / 2;
-    rail.position.y = 0.95;
+    rail.position.set(PARK.x, 0.95, PARK.z);
     this.ctx.scene.add(rail);
   }
 
-  private buildLamps() {
+  /**
+   * Lamp posts along every path, evenly spaced: both sides of the avenues and the Midway, one side
+   * (taking turns) of the narrower paths, a ring round the Hub and a pair at each district's plaza.
+   * Also returns the lamps along the avenues and the Midway (each side in order), for the string lights.
+   */
+  private lampSpots() {
     const spots: [number, number][] = [];
-    for (let z = -14; z > -56; z -= 10) spots.push([-5.2, z], [5.2, z]);
+    const strings: [number, number][][] = [];
+    const ok = (x: number, z: number) =>
+      parkDistance(x, z) < PARK.r - 1.5 &&
+      !onPath(x, z, 0.4) &&
+      !onFootprint(x, z, 1) &&
+      !nearTrack(x, z, 3) &&
+      !onMuseum(x, z, 1.5) &&
+      spots.every(([sx, sz]) => (sx - x) ** 2 + (sz - z) ** 2 > 36);
+    const add = (x: number, z: number) => {
+      if (!ok(x, z)) return false;
+      spots.push([x, z]);
+      return true;
+    };
+    for (const p of PATHS) {
+      const wide = p.width >= 7;
+      const midway = p === MIDWAY;
+      const both = wide || midway;
+      const step = wide ? 13 : midway ? 10 : 16;
+      const off = p.width / 2 + (wide ? 1.7 : 1.2);
+      const rows: [number, number][][] = [[], []];
+      let side = 1;
+      for (let i = 0; i < p.points.length - 1; i++) {
+        const [ax, az] = p.points[i];
+        const [bx, bz] = p.points[i + 1];
+        const len = Math.hypot(bx - ax, bz - az);
+        const nx = -(bz - az) / len;
+        const nz = (bx - ax) / len;
+        for (let d = step / 2; d < len; d += step) {
+          const cx = ax + ((bx - ax) * d) / len;
+          const cz = az + ((bz - az) * d) / len;
+          for (const s of both ? [1, -1] : [side]) if (add(cx + nx * off * s, cz + nz * off * s)) rows[s > 0 ? 0 : 1].push(spots[spots.length - 1]);
+          side = -side;
+        }
+      }
+      if (both) strings.push(...rows.filter((r) => r.length > 1));
+    }
+    // round the Hub, and a pair at each district's plaza
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+      add(PARK.x + Math.cos(a) * 16, PARK.z + Math.sin(a) * 16);
+    }
+    for (const { plaza: [x, z] } of Object.values(DISTRICTS))
+      for (const a of [Math.PI / 4, (5 * Math.PI) / 4]) add(x + Math.cos(a) * 9.4, z + Math.sin(a) * 9.4);
     // …and on along the road out to the giant wheel
-    for (let z = -66; z > WHEEL_ROAD.end + 4; z -= 12) spots.push([-5.2, z], [5.2, z]);
-    spots.push([-13.5, 15], [13.5, 15], [-14.5, 4], [14.5, 4], [28, -6], [38, -24], [-12, -36], [24, -40], [-8, -26], [8, -26]);
+    for (let z = PARK.z - PARK.r - 6; z > WHEEL_ROAD.end + 4; z -= 12) spots.push([LAYOUT.ferris.x - 5.2, z], [LAYOUT.ferris.x + 5.2, z]);
+    return { spots, strings };
+  }
+
+  private buildLamps() {
+    const { spots, strings } = this.lampSpots();
+    this.stringRows = strings;
 
     const iron = std('#2c2433', { metalness: 0.75, roughness: 0.35 });
     const poleGeo = mergeGeometries([
@@ -467,16 +548,32 @@ export class Environment {
     this.ctx.scene.add(poles, lamps, pools);
   }
 
-  /** Strings of coloured bulbs along the boulevard and around the entrance plaza. */
+  /** Strings of coloured bulbs from lamp to lamp along the avenues and the Midway, and round the entrance plaza. */
   private buildStringLights() {
     const lines: [THREE.Vector3, THREE.Vector3][] = [];
-    for (let z = -14; z > -54; z -= 10) {
-      lines.push([new THREE.Vector3(-5.2, 4.1, z), new THREE.Vector3(-5.2, 4.1, z - 10)]);
-      lines.push([new THREE.Vector3(5.2, 4.1, z), new THREE.Vector3(5.2, 4.1, z - 10)]);
+    for (const row of this.stringRows)
+      for (let i = 0; i < row.length - 1; i++) {
+        const [ax, az] = row[i];
+        const [bx, bz] = row[i + 1];
+        // only between neighbours (not across a gap where a lamp was left out); none out past the Promenade
+        if (Math.hypot(bx - ax, bz - az) < 18 && parkDistance(ax, az) < 75) lines.push([new THREE.Vector3(ax, 4.1, az), new THREE.Vector3(bx, 4.1, bz)]);
+      }
+    // a garland round the north side of the entrance plaza, pole to pole
+    const [ex, ez, er] = PLAZAS[0];
+    const ring: [number, number][] = [];
+    for (let i = 0; i <= 6; i++) {
+      const a = Math.PI * (0.92 + (i / 6) * 1.16);
+      ring.push([ex + Math.cos(a) * (er + 1.6), ez + Math.sin(a) * (er + 1.6)]);
     }
-    const ring: [number, number][] = [[-13.5, 15], [-14.5, 4], [-8, -7.5], [8, -7.5], [14.5, 4], [13.5, 15]];
-    for (let i = 0; i < ring.length - 1; i++)
-      lines.push([new THREE.Vector3(ring[i][0], 4.1, ring[i][1]), new THREE.Vector3(ring[i + 1][0], 4.1, ring[i + 1][1])]);
+    for (let i = 0; i < ring.length - 1; i++) lines.push([new THREE.Vector3(ring[i][0], 4.1, ring[i][1]), new THREE.Vector3(ring[i + 1][0], 4.1, ring[i + 1][1])]);
+    const iron = std('#2c2433', { metalness: 0.75, roughness: 0.35 });
+    const poles = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.06, 0.09, 4.3, 8).translate(0, 2.15, 0), iron, ring.length);
+    ring.forEach(([x, z], i) => {
+      poles.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0, z));
+      staticCylinder(this.ctx, x, z, 0.15, 4);
+    });
+    poles.castShadow = true;
+    this.ctx.scene.add(poles);
 
     const colors = ['#ff5d7a', '#ffd23d', '#5ce1d6', '#a98bff', '#fff3d6'];
     const perLine = 16;
@@ -507,20 +604,32 @@ export class Environment {
     this.bulbs.push(bulbs);
   }
 
+  /**
+   * Striped stalls in rows facing the paths: shops down both sides of Main Street, a row of treat
+   * stalls along the Promenade by the Midway, and one by each district's plaza in its colour.
+   */
   private buildTents() {
-    const spots: [number, number, string][] = [
-      [-14, 18, PALETTE.candy],
-      [-10, -48, PALETTE.violet],
-      [16, -22, PALETTE.teal],
-      [-16, -56, PALETTE.candy],
-      [22, -60, PALETTE.mustard],
-      [56, -28, PALETTE.candy],
-      [-44, -50, PALETTE.teal],
-      // on the lawn beside the path to the Nebula 360 (not on it), clear of the trees west of it
-      [5, 36, PALETTE.violet],
-    ];
-    const rnd = mulberry(8);
-    for (const [x, z, col] of spots) {
+    // [x, z, colour, yaw]: the door (local +z) faces the path
+    const spots: [number, number, string, number][] = [];
+    const shops = [PALETTE.candy, PALETTE.teal, PALETTE.mustard, PALETTE.violet];
+    // Main Street, between the Promenade and the Hub
+    [6, -6, -18, -30].forEach((z, i) => {
+      spots.push([PARK.x - 11.5, z, shops[i % 4], Math.PI / 2]);
+      spots.push([PARK.x + 11.5, z, shops[(i + 2) % 4], -Math.PI / 2]);
+    });
+    // the treat stalls along the Promenade, east of Main Street
+    [16, 27, 38].forEach((x, i) => spots.push([x, 26.5, shops[i], Math.PI]));
+    // one in each district's colour, beside its plaza, its door to the plaza
+    const by = (id: DistrictId, dx: number, dz: number) => {
+      const { plaza, color } = DISTRICTS[id];
+      spots.push([plaza[0] + dx, plaza[1] + dz, color, Math.atan2(-dx, -dz)]);
+    };
+    by('cosmos', -13, 6);
+    by('thrill', 10, 14);
+    by('motor', 12, -12);
+    by('falcon', -12, 13);
+    for (const [x, z, col, yaw] of spots) {
+      if (onPath(x, z, 1.2) || onFootprint(x, z, 2) || nearTrack(x, z, 6)) continue;
       const g = new THREE.Group();
       const stripes = stripeTexture(col, PALETTE.cream, 12);
       const canvas = { map: stripes, roughness: 0.88, side: THREE.DoubleSide } as const;
@@ -540,7 +649,7 @@ export class Environment {
       door.position.set(0, 1, 3.02);
       g.add(wall, roof, scallop, flagPole, flag, door);
       g.position.set(x, 0, z);
-      g.rotation.y = rnd() * Math.PI * 2;
+      g.rotation.y = yaw;
       g.traverse((o) => {
         o.castShadow = true;
         o.receiveShadow = true;
@@ -553,7 +662,10 @@ export class Environment {
 
   private buildBalloons() {
     const colors = [PALETTE.candy, PALETTE.mustard, PALETTE.teal, PALETTE.violet, PALETTE.orange];
-    const clusters: [number, number][] = [[-11, 23], [11, 23], [27, 6], [-10, -20]];
+    const e = LAYOUT.spawn;
+    const c = LAYOUT.carousel;
+    // either side of the entrance plaza, and on the Hub
+    const clusters: [number, number][] = [[e.x - 10.5, e.z + 1], [e.x + 10.5, e.z + 1], [c.x + 11, c.z + 6], [c.x - 11, c.z - 6]];
     const rnd = mulberry(12);
     clusters.forEach(([x, z], ci) => {
       const g = new THREE.Group();

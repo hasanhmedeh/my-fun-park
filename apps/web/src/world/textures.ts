@@ -233,6 +233,14 @@ export interface PathSpec {
   width: number;
 }
 
+/** A coloured band set into a plaza's paving (a district's colour), at radius r. */
+export interface Inlay {
+  x: number;
+  z: number;
+  r: number;
+  color: string;
+}
+
 /** Paints sandy paths (with a darker edge) and decorated plazas, then grains the sand. */
 function paintSand(
   ctx: CanvasRenderingContext2D,
@@ -242,6 +250,7 @@ function paintSand(
   paths: PathSpec[],
   plazas: [number, number, number][],
   rnd: () => number,
+  inlays: Inlay[] = [],
 ) {
   const drawPaths = (color: string, extra: number) => {
     ctx.strokeStyle = color;
@@ -291,6 +300,21 @@ function paintSand(
     ctx.restore();
   }
 
+  // districts' colours, set into their plazas: a band of tiles with a thin dark edge either side
+  for (const { x, z, r, color } of inlays) {
+    ctx.save();
+    ctx.lineWidth = 1.1 * k;
+    ctx.strokeStyle = 'rgba(70, 45, 25, 0.45)';
+    ctx.beginPath();
+    ctx.arc(toX(x), toZ(z), r * k, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.lineWidth = 0.8 * k;
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.85;
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // sand grain (single read-back, then per-pixel noise on sandy pixels only)
   const img = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
   const px = img.data;
@@ -306,12 +330,20 @@ function paintSand(
 }
 
 /** Paints grass, dirt paths and plazas into one big ground texture. */
-export function groundTexture(size: number, worldSize: number, paths: PathSpec[], plazas: [number, number, number][]): { texture: THREE.CanvasTexture; isSand: (x: number, z: number) => boolean } {
+export function groundTexture(
+  size: number,
+  ground: { x: number; z: number; size: number },
+  paths: PathSpec[],
+  plazas: [number, number, number][],
+  inlays: Inlay[] = [],
+): { texture: THREE.CanvasTexture; isSand: (x: number, z: number) => boolean } {
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const ctx = c.getContext('2d')!;
+  const worldSize = ground.size;
   const k = size / worldSize;
-  const toPx = (x: number) => (x + worldSize / 2) * k;
+  const toX = (x: number) => (x - ground.x + worldSize / 2) * k;
+  const toZ = (z: number) => (z - ground.z + worldSize / 2) * k;
 
   const grad = ctx.createRadialGradient(size / 2, size / 2, size * 0.05, size / 2, size / 2, size * 0.7);
   grad.addColorStop(0, '#4f9a5e');
@@ -327,7 +359,7 @@ export function groundTexture(size: number, worldSize: number, paths: PathSpec[]
     ctx.fillRect(rnd() * size, rnd() * size, 2 + rnd() * 3, 2 + rnd() * 3);
   }
 
-  paintSand(ctx, toPx, toPx, k, paths, plazas, rnd);
+  paintSand(ctx, toX, toZ, k, paths, plazas, rnd, inlays);
 
   const t = finish(c);
   t.anisotropy = 8;
@@ -338,24 +370,25 @@ export function groundTexture(size: number, worldSize: number, paths: PathSpec[]
   mc.width = mc.height = M;
   const mctx = mc.getContext('2d')!;
   const mk = M / worldSize;
-  const mp = (v: number) => (v + worldSize / 2) * mk;
+  const mx = (x: number) => (x - ground.x + worldSize / 2) * mk;
+  const mz = (z: number) => (z - ground.z + worldSize / 2) * mk;
   mctx.strokeStyle = mctx.fillStyle = '#fff';
   mctx.lineCap = mctx.lineJoin = 'round';
   for (const p of paths) {
     mctx.lineWidth = (p.width + 2.4) * mk;
     mctx.beginPath();
-    p.points.forEach(([x, z], i) => (i ? mctx.lineTo(mp(x), mp(z)) : mctx.moveTo(mp(x), mp(z))));
+    p.points.forEach(([x, z], i) => (i ? mctx.lineTo(mx(x), mz(z)) : mctx.moveTo(mx(x), mz(z))));
     mctx.stroke();
   }
   for (const [x, z, r] of plazas) {
     mctx.beginPath();
-    mctx.arc(mp(x), mp(z), (r + 1.2) * mk, 0, Math.PI * 2);
+    mctx.arc(mx(x), mz(z), (r + 1.2) * mk, 0, Math.PI * 2);
     mctx.fill();
   }
   const md = mctx.getImageData(0, 0, M, M).data;
   const isSand = (x: number, z: number) => {
-    const px = Math.floor(mp(x));
-    const pz = Math.floor(mp(z));
+    const px = Math.floor(mx(x));
+    const pz = Math.floor(mz(z));
     if (px < 0 || pz < 0 || px >= M || pz >= M) return false;
     return md[(pz * M + px) * 4] > 100;
   };
@@ -363,15 +396,15 @@ export function groundTexture(size: number, worldSize: number, paths: PathSpec[]
 }
 
 /**
- * A patch of the park's lawn (same gradient and speckle as the ground texture of size worldSize, so
- * the two meet seamlessly) with its paths and plazas, over the rectangle x0..x1, z0..z1: for
- * ground beyond the main ground texture. Its edges fade to transparent: `fade` metres at the
- * sides and the far (z0) end, `fadeNear` metres at the z1 end where it overlaps the park ground.
+ * A patch of the park's lawn (same gradient and speckle as the park's ground texture, so the two
+ * meet seamlessly) with its paths and plazas, over the rectangle x0..x1, z0..z1: for ground beyond
+ * the main ground texture. Its edges fade to transparent: `fade` metres at the sides and the far
+ * (z0) end, `fadeNear` metres at the z1 end where it overlaps the park ground.
  */
 export function lawnPatchTexture(
   rect: { x0: number; z0: number; x1: number; z1: number },
   pxPerMetre: number,
-  worldSize: number,
+  ground: { x: number; z: number; size: number },
   fade: { side: number; near: number },
   paths: PathSpec[],
   plazas: [number, number, number][],
@@ -386,7 +419,8 @@ export function lawnPatchTexture(
   const toZ = (z: number) => (z - z0) * k;
 
   // the park ground's radial gradient, centred on the park
-  const grad = ctx.createRadialGradient(toX(0), toZ(0), worldSize * 0.05 * k, toX(0), toZ(0), worldSize * 0.7 * k);
+  const worldSize = ground.size;
+  const grad = ctx.createRadialGradient(toX(ground.x), toZ(ground.z), worldSize * 0.05 * k, toX(ground.x), toZ(ground.z), worldSize * 0.7 * k);
   grad.addColorStop(0, '#4f9a5e');
   grad.addColorStop(1, '#2f6b48');
   ctx.fillStyle = grad;

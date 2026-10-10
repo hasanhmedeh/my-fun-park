@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { shadowed, staticBox, staticCylinder, std, type Attraction, type Ctx } from '../context';
 import type { Input } from '../input';
+import { inPark } from '../layout';
 import { hdr, PALETTE, signMaterial, signTexture, stripeTexture } from '../textures';
 import { boreAxis, DS, sampleTrack, stepRide, TUNNEL_BORE, zoneAt, type Phys, type RideState, type TrackData, type Zone } from './track';
 
@@ -276,7 +277,7 @@ export class Coaster implements Attraction {
       cols.setMatrixAt(k, m.makeScale(w, s.h - s.foot, w).setPosition(s.x, s.foot, s.z));
       heads.setMatrixAt(k, s.m);
       feet.setMatrixAt(k, m.makeScale(w, 1, w).setPosition(s.x, s.foot + 0.17, s.z));
-      if (Math.hypot(s.x, s.z) < 96) staticCylinder(this.ctx, s.x, s.z, 0.35 * w, 3);
+      if (inPark(s.x, s.z, 1.5)) staticCylinder(this.ctx, s.x, s.z, 0.35 * w, 3);
     });
     cols.castShadow = heads.castShadow = true;
     feet.receiveShadow = true;
@@ -285,7 +286,7 @@ export class Coaster implements Attraction {
     // low track is solid for the bumper car
     for (let i = 0; i < n; i += 4) {
       this.railCenter(i, c);
-      if (c.y < 4.6 && d.up[i].y > 0.5 && d.zone[i] !== 'station' && Math.hypot(c.x, c.z) < 96)
+      if (c.y < 4.6 && d.up[i].y > 0.5 && d.zone[i] !== 'station' && inPark(c.x, c.z, 1.5))
         staticBox(this.ctx, c.x, c.y / 2, c.z, 0.9, c.y / 2, 0.9);
     }
   }

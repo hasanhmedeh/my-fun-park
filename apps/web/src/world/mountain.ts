@@ -3,13 +3,14 @@ import type { Ctx } from './context';
 import { boreAxis, TUNNEL_BORE } from './attractions/track';
 import { FALCON_TRACK, nearTrack } from './rides';
 import { withFogSun } from './fog';
-import { WHEEL_LAWN } from './layout';
+import { LAYOUT, onParkGround, WHEEL_LAWN } from './layout';
 import { mulberry } from './random';
 import { hdr, PALETTE, signMaterial, signTexture } from './textures';
 
-// Terrain window (outside the park, north-east): x, z bounds and grid spacing in metres.
+// Terrain window (outside the park, north-east): x, z bounds and grid spacing in metres. Its east
+// edge follows the Sky Falcon, wherever the layout puts its station (its design had it at x = 70).
 const X0 = -110;
-const X1 = 340;
+const X1 = 340 + Math.max(0, LAYOUT.falcon.x - 70);
 const Z0 = -950;
 const Z1 = -96;
 const STEP = 2.5;
@@ -193,7 +194,7 @@ export class Mountain {
         const x = X0 + i * STEP;
         const z = Z0 + j * STEP;
         // under the park's ground / under the lawn by the road to the giant wheel / desert floor
-        const base = Math.abs(x) < 131 && z > -131 ? -2 : lawnZone(x, z) ? 0 : 0.08;
+        const base = onParkGround(x, z, 1) ? -2 : lawnZone(x, z) ? 0 : 0.08;
         // ---- mesa: flat top, steep flanks, a sheer wall along the edge plane ----
         const wob = (noise(x * 0.012, z * 0.012) - 0.5) * 70;
         const dc = Math.hypot(x - mesaC.x, z - mesaC.y) + wob;
@@ -273,7 +274,8 @@ export class Mountain {
         // fade into the desert floor at the window's edges
         const edge = Math.min(x - X0, X1 - x, z - Z0, Z1 - z);
         h = base + (h - base) * THREE.MathUtils.smoothstep(edge, 0, 30);
-        this.heights[j * (NX + 1) + i] = Math.max(-2, h);
+        // (under the park's ground it stays out of sight: the talus apron alone would lift it level with the lawn)
+        this.heights[j * (NX + 1) + i] = base < 0 ? base : Math.max(-2, h);
       }
     this.carveClearance();
 
@@ -398,7 +400,7 @@ export class Mountain {
     const sign = new THREE.Group();
     const board = new THREE.Mesh(
       new THREE.PlaneGeometry(64, 16),
-      signMaterial(signTexture('SKY FALCON', { sub: '4.25 km · 158 m drop at 90° · 250 km/h · ride it from the east gate', border: PALETTE.mustard, width: 1536, height: 384 }), {
+      signMaterial(signTexture('SKY FALCON', { sub: '4.25 km · 158 m drop at 90° · 250 km/h · ride it from Falcon Gate', border: PALETTE.mustard, width: 1536, height: 384 }), {
         emissiveIntensity: 2.4,
       }),
     );

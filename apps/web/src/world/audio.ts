@@ -303,6 +303,20 @@ export class Sfx {
     this.tone(600, 0.12, 'sine', 0.2, 0, 1200);
   }
 
+  /** The Duck Shoot's cork gun going off: a sharp pop of air. */
+  cork() {
+    this.noise(0.06, 1800, 0.35, 1.4);
+    this.tone(320, 0.07, 'triangle', 0.18, 0, 140);
+  }
+
+  /** A cork striking a tin duck (higher for the golden one). */
+  ting(gold = false) {
+    const f = gold ? 2350 : 1760;
+    this.tone(f, 0.35, 'sine', 0.16, 0.01);
+    this.tone(f * 2.76, 0.18, 'sine', 0.05, 0.01);
+    this.noise(0.04, 3200, 0.06, 3, 0.01);
+  }
+
   chime() {
     [523, 659, 784, 1047].forEach((f, i) => this.tone(f, 0.5, 'triangle', 0.12, i * 0.09));
   }

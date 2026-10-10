@@ -10,8 +10,8 @@ import { hdr, PALETTE, signMaterial, signTexture } from '../textures';
 // by two A-frames. The motor pumps it up swing by swing until it goes right over the top, loops,
 // stops dead with everyone hanging upside down, then loops backwards and swings down to rest.
 // Built in a local frame: the boat swings in the x–y plane, the axle runs along z and +z is the
-// front (queue, sign, your seat). The ride stands on the lawn south of the entrance, turned to face
-// back over the park.
+// front (queue, sign, your seat). The ride stands at the east end of Cosmos's Cosmic Way, turned to
+// face the path.
 const PIVOT_Y = 16;
 const R_OUT = 14.9; // the boat's outer (bottom) arc…
 const R_IN = 13; // …and its inner arc, where the arm meets it

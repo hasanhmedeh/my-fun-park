@@ -10,6 +10,7 @@ Walk around a low-poly funfair at dusk as a fully animated visitor:
 | 🚀 Rocket Ride | Countdown, lift-off, stage separation: fire six stages up to orbit |
 | 🥫 Crate Smash | 22 physics crates worth 10, 25 or 50 points; ram them for a high score |
 | 🔔 High Striker | Timing mini-game: swing the hammer and ring the bell |
+| 🦆 Duck Shoot | A shooting gallery on the Midway: 30 seconds with a cork gun to knock down tin ducks gliding along three rails (and the odd golden one) |
 | 🎡 Giant Wheel | A full-size tribute to Ain Dubai, the tallest observation wheel on Earth: 250 m tall, 48 capsules, 192 cable spokes, four 126 m legs. Ride it from inside a capsule (time-lapse of the real 38-minute turn) |
 | 🏎️ Turbo Speedway | Kart racing: three laps against three rivals on a circuit outside the south-west fence, with cones, hay bales, tyre stacks, oil slicks and boost pads laid out fresh every race |
 | 🚙 Rally Trail | A buggy time trial on a dirt loop outside the south fence (after the circuit in Bruno Simon's portfolio): whoops, a big jump, water, mud, crate walls, a spinner and a table-top, with a ghost of your best run and a **daily leaderboard** that starts again every day at 12:00 Beirut time |
@@ -17,7 +18,25 @@ Walk around a low-poly funfair at dusk as a fully animated visitor:
 | 🛸 Nebula 360 | A looping pendulum ship, after the 360° rides at travelling fairs |
 | 🚁 Drone Flights | Rent a camera drone and fly over the whole fair |
 | 🎟️ Ticket Booth | Park guide |
-| 🏛️ Career Museum | Hasan Hmedeh's CV as a walk-in gallery past the Rocket Ride: a framed picture per job, project and achievement, year by year from 2019 to today, and a guided tour. Free |
+| 🏛️ Career Museum | Hasan Hmedeh's CV as a walk-in gallery at the end of the East Avenue: a framed picture per job, project and achievement, year by year from 2019 to today, and a guided tour. Free |
+
+## The park's layout
+
+The park is a round lawn 280 m across inside a fence (`PARK` in `apps/web/src/world/layout.ts`), laid out like a wheel so it's easy to find your way round:
+
+- **The Hub**, at the centre, round the carousel. Four straight avenues lead out of it: **Main Street** south to the entrance plaza (lined with striped shops and string lights), **North Avenue** to the north gate and on down the road to the Giant Wheel, and the **East** and **West Avenues**, ending at the Career Museum's door and the Thunder Loop's station.
+- **The Promenade**, an octagonal loop round the park's heart, passes every district's plaza. Each district has its own colour, set into the paving of its plaza, on a tall sign naming it and its attractions, on the fingerposts at the main crossings, and on the park map, whose legend lists the places district by district.
+
+| District | Where | What's there |
+| --- | --- | --- |
+| 🎪 Main Gate | south | the entrance plaza and the FUNFAIR letters, the Ticket Booth, the Idea Box |
+| 🎯 The Midway | south-east | the games' alley off the Promenade: Crate Smash, the High Striker and the Duck Shoot, ending at the Sky Falcon's station |
+| 🦅 Falcon Gate | east | the Career Museum, and the Sky Falcon's station by the east fence (the Falcon Walk leads down to it from the Promenade) |
+| 🚀 Cosmos | north | the Cosmic Way, with the Rocket Ride and the Nebula 360; Drone Flights by North Avenue; the Giant Wheel out of the north gate |
+| 🎢 Thrill Ridge | west | the Thunder Loop and the Sky Flip |
+| 🏁 Motor Town | south-west | the kart garage and, down the Rally Lane, the Rally Trail's shed (their circuits lie outside the fence) |
+
+Lamps line every path at even spacing, avenues of trees line North Avenue and the East and West Avenues, groves fill the gardens between the paths and a green belt runs inside the fence. Scenery lays itself out from the paths and from each attraction's footprint (`FOOTPRINTS`), so moving an attraction in `LAYOUT` moves its trigger ring, its queue and the space kept clear round it too. The rides outside the fence are placed the same way: each coaster's track starts where `LAYOUT.coaster` / `LAYOUT.falcon` puts its station, and `LAYOUT.circuit` moves the kart circuit (the Rally Trail stays where it is: its ghost runs are kept in world coordinates).
 
 Stack: **Vite + TypeScript + Three.js + cannon-es + postprocessing + N8AO** for the game, **NestJS + Prisma + PostgreSQL** for accounts, in a **pnpm + Turborepo** monorepo. The world is built procedurally and all sound is synthesized with WebAudio; the one model file is the visitor, "Casual Character" by [Quaternius](https://quaternius.com) (CC0, from [Poly Pizza](https://poly.pizza/m/kZ3DmIoGip)).
 
@@ -186,7 +205,7 @@ Every route is under `/api`. While private access is on, every route but `/api/h
 | `GET` | `/api/health` | | **200** `{ ok: true, db: 'up' }`, or **503** if the database is unreachable |
 | | `/api/ringmaster/*` | staff | The office: `GET overview?days=7\|30\|90`, `GET`/`PATCH park`, `GET attractions`, `PATCH attractions/:ride` `{ tickets?, open?, closedMessage? }`, `GET shop`, `PATCH shop/:item` `{ tickets?, stock? }` (`stock: null` for no limit), `GET users?q=&limit=&offset=`, `GET`/`PATCH`/`DELETE users/:id`, `GET purchases`, `GET rounds?ride=`, `GET suggestions?status=&limit=&offset=` (→ `{ suggestions, total, counts }`), `PATCH suggestions/:id` `{ status?, reply? }` (the reply only once: **409** if it has one), `GET trail?day=YYYY-MM-DD` (one of the Rally Trail's boards, today's without `day`: `{ day, startsAt, endsAt, current, board, disqualified, stats, record, daily }`), `PATCH trail/runs/:id` `{ disqualified }` (take a run off its board, or put it back), `GET access` (→ `{ enabled, entries, you: { ip, allowed } }`), `PATCH access` `{ enabled }` (switching on adds the caller's address), `POST access/ips` `{ ip, label? }`, `DELETE access/ips/:id` (**409** for the last entry letting the caller in while it's on), `GET actions`. **401** for guests, **403** for players |
 
-`user` is `{ id, email, username, role, createdAt }` (`role` is `player` or `admin`, i.e. staff). Attraction ids are `coaster`, `falcon`, `rocket`, `ferris`, `flip`, `ship`, `speedway`, `trail`, `drone`, `crates` and `striker`. Prices, maintenance, the pack size and the cooldown are rows in `attraction_settings` and `park_settings`; the defaults for a missing row live in `apps/api/src/rides/attractions.ts`. Signup, login and account deletion are each limited to 10 requests a minute per IP (**429**, with `Retry-After`).
+`user` is `{ id, email, username, role, createdAt }` (`role` is `player` or `admin`, i.e. staff). Attraction ids are `coaster`, `falcon`, `rocket`, `ferris`, `flip`, `ship`, `speedway`, `trail`, `drone`, `crates`, `striker` and `ducks`. Prices, maintenance, the pack size and the cooldown are rows in `attraction_settings` and `park_settings`; the defaults for a missing row live in `apps/api/src/rides/attractions.ts`. Signup, login and account deletion are each limited to 10 requests a minute per IP (**429**, with `Retry-After`).
 
 ## The coaster
 
@@ -200,7 +219,7 @@ The track is built like in real coaster-design tools (`apps/web/src/world/attrac
 
 ## Sky Falcon (the mega-coaster)
 
-A tribute to Falcon's Flight, the record-breaking cliff coaster at Six Flags Qiddiya near Riyadh. Board it from the 🦅 station at the east gate.
+A tribute to Falcon's Flight, the record-breaking cliff coaster at Six Flags Qiddiya near Riyadh. Board it from the 🦅 station in Falcon Gate, by the east fence: take the Falcon Walk down from the Promenade, or walk to the end of the Midway.
 
 - **4,247 m of track** (`apps/web/src/world/attractions/falcon-track.ts`), laid out from the real ride's published stats and checked against a front-row POV video (4,250 m, 250 km/h, 158 m drop at 90°, 163 m hill, no inversions). Dispatch turns right onto a 39 km/h LSM lift, then a twisted drop, airtime hills and an overbanked turn near the giant hill. A **160 km/h LSM launch** fires the train up the cliff; a slow, twisting clifftop section leads to the edge. The train then drops **158 m at 90° down a channel cut into the cliff**, straight into a **keyhole tunnel portal** with a sunburst frame. An LSM launch out of the tunnel fires it at the park at **250 km/h**, over the **163 m hill on its lattice tower**, back up into a high overbanked turn, through a dive, a wave turn and airtime hills, under the overbanked turn, and along the park's edge to the brakes. Turn radii and hill shapes are fitted to the park; the exact plan isn't public.
 - **Trackside scenery** (`apps/web/src/world/trackside.ts`): trees, shrubs, rocks and red-banded marker posts line the Falcon wherever it runs close to the ground, so you can feel the speed.
@@ -210,7 +229,7 @@ A tribute to Falcon's Flight, the record-breaking cliff coaster at Six Flags Qid
 
 ## Turbo Speedway (kart racing)
 
-Walk down the path south-west of the entrance to the kart garage and press `E`. You start at the back of a four-kart grid; three red lights, then green.
+Walk to Motor Town (west along the Promenade from Main Street) to the kart garage and press `E`. You start at the back of a four-kart grid; three red lights, then green.
 
 - **The circuit** (`apps/web/src/world/attractions/speedway-track.ts`): a 472 m clockwise loop on the lawn outside the fence: a long main straight past the grandstand, a sweeping right-hander, a dip into the infield, an S and a long right-hander home. It's a Catmull-Rom spline through control points laid out in a frame facing the park, sampled every metre with its curvature. Red-and-white kerbs mark every corner, gravel traps sit on their outsides, and tyre walls line both sides 10 m from the centre line. Trees and the horizon hills keep clear of it.
 - **Obstacles** (laid out again for every race, never on the grid or the run to turn one): 🟧 cones (lane closures, slaloms and gates) that go flying when you hit them; hay bales and tyre stacks that stop you dead; oil slicks that spin you round; and ⚡ boost pads. Bales, tyre stacks and oil only go on the gentler stretches, never on a corner's apex.
@@ -220,7 +239,7 @@ Walk down the path south-west of the entrance to the kart garage and press `E`. 
 
 ## Rally Trail (time trial and daily leaderboard)
 
-Walk the path south from the kart garage's to the trail's shed and press `E` (its card, with today's top ten, opens as you step into the ring). It's a time trial in a bouncy dune buggy, after the circuit in [Bruno Simon's portfolio](https://bruno-simon.com): one lap against the clock, from the start lights to the line.
+Take the Rally Lane south from the Promenade in Motor Town to the trail's shed and press `E` (its card, with today's top ten, opens as you step into the ring). It's a time trial in a bouncy dune buggy, after the circuit in [Bruno Simon's portfolio](https://bruno-simon.com): one lap against the clock, from the start lights to the line.
 
 - **The trail** (`apps/web/src/world/attractions/trail-track.ts`): a 547 m clockwise dirt loop on the meadow outside the park's south fence, a Catmull-Rom spline through control points in world coordinates, fenced 8.5 m either side of the centre line. The layout never changes, so every time compares. In order: crate pyramids on the start straight; a ⚡ boost out of the first sweep into the **whoops** (rounded bumps to skip over) and the **big jump** (a kicker, a gap and a landing ramp: too slow and you case the landing); checkpoint 1; a **water splash**; **mud** on the inside of the long bottom bend; a slalom of cones; checkpoint 2; two **crate walls** to smash or weave through; the **spinner** (a striped bar sweeping round on a post in the middle of the trail); the hairpin; checkpoint 3 and a boost; three **logs** and a **table-top**; and a last boost to the line. The ground's shape (jumps, whoops, logs, table-top) is a height profile along the centre line, and the dirt ribbon is built from it.
 - **Driving** (`Trail.step`): the speedway's arcade model (engine, brakes, speed-dependent steering, grip that bleeds off sideways speed, a handbrake slide on `Space`) with grip and top speed per surface (dirt, grass, mud, water), a nitro tank on `Shift`, and the vertical. The body rides on springs over the ground averaged under its axles (a log gives a little hop, three times), takes off when the ground falls away faster than gravity can follow, and lands with a thump (too hard and you're stunned). Crates, barrels and cones go flying, a crate pyramid all at once; hay bales don't budge; flying over something clears it. `R` puts you back on the trail where you are, `T` (or the HUD's button) starts the run again from the grid (the ticket covers that, until you cross the line), and `C` cycles Chase / Far / Hood cameras.
@@ -230,11 +249,18 @@ Walk the path south from the kart garage's to the trail's shed and press `E` (it
 
 ## Career Museum (free)
 
-A gallery hall under a glass roof, east of the Rocket Ride's plaza (`apps/web/src/world/attractions/museum.ts`). Hasan Hmedeh's CV hangs down both walls in order, one framed print per job, project or achievement, zig-zagging from the door (2019) to the end wall (today). A banner over the aisle and a gold bar on the red carpet mark where each year starts; each print shows its dates (with months), the year, a picture, the title and who it was for. The **Toolbox** on the end wall has every skill on the CV, and the languages. No ticket needed.
+A gallery hall under a glass roof, at the end of the East Avenue in Falcon Gate (`apps/web/src/world/attractions/museum.ts`). Hasan Hmedeh's CV hangs down both walls in order, one framed print per job, project or achievement, zig-zagging from the door (2019) to the end wall (today). A banner over the aisle and a gold bar on the red carpet mark where each year starts; each print shows its dates (with months), the year, a picture, the title and who it was for. The **Toolbox** on the end wall has every skill on the CV, and the languages. No ticket needed.
 
 - **Walk in** and look around: the follow camera stays inside the hall (it slides in toward the visitor rather than through a wall). Step up to a frame (to its rope) and press `E` to look closer.
 - **The guided tour** (`E` on the porch's ring, or at any frame): the visitor steps aside, the camera glides to the frame and a sheet beside it tells its story (`apps/web/src/world/gallery.ts`): when, where, what was done, with what, links, and where the picture comes from. `←` / `→` (or `E`, or the buttons) step through the collection, the years along the top jump to where each one starts, `Esc` leaves the tour standing in front of the last frame.
 - **The collection** is one data file, `apps/web/src/data/museum.ts`: the years (`SECTIONS`), the profile on the porch's banners, the exhibits (`EXHIBITS`, in the order they hang) and the skills (`SKILLS`). Add an exhibit there and the hall re-hangs itself. Pictures live in `apps/web/public/museum/` (logos are the companies' own, from their sites; the skill icons are from devicon); an exhibit without one, or whose file fails to load, shows a "picture to come" placeholder with its emoji.
+
+## Duck Shoot
+
+A shooting gallery on the Midway (`apps/web/src/world/attractions/ducks.ts`): step up to the counter (`E` in its ring), take the cork gun and you have **30 seconds**. Tin ducks glide along three rails in front of a painted night sky, the higher the rail the faster and the more it's worth (10, 20 and 30 points), and now and then a **golden duck** (50) comes round. A duck you knock down tips back on its hinge and stays down until it comes round again.
+
+- **Aim** with the mouse, or `WASD` / the arrows (the joystick on touch); **fire** with a click, `E` or `Space` (or tap a duck). The gun takes a third of a second to reload; the sight dims meanwhile. The card with how to play goes away with the first shot.
+- **Results**: score, ducks down, accuracy, best streak and golden ducks, with personal bests like every other game.
 
 ## Graphics
 
@@ -293,7 +319,7 @@ On each deployment, `apps/web/vercel.json`'s build command runs from the repo ro
 
 - Rocket stages and High Striker tiers: `apps/web/src/data/fair.ts`
 - The Career Museum's collection (exhibits, years, skills): `apps/web/src/data/museum.ts`, pictures in `apps/web/public/museum/`
-- Park layout / zone positions: `apps/web/src/world/layout.ts` (attraction zone ids must match the `Attraction` enum in `apps/api/prisma/schema.prisma`, `ATTRACTIONS` in `apps/api/src/rides/attractions.ts` and `ATTRACTION_IDS` in `apps/web/src/account/api.ts`)
+- Park layout / zone positions: `apps/web/src/world/layout.ts`: the park's size (`PARK`), where each attraction stands (`LAYOUT`), the districts (`DISTRICTS`: every zone belongs to exactly one, which the map's legend and the guide follow), the paths and plazas. Attraction zone ids must match the `Attraction` enum in `apps/api/prisma/schema.prisma`, `ATTRACTIONS` in `apps/api/src/rides/attractions.ts` and `ATTRACTION_IDS` in `apps/web/src/account/api.ts`; a new attraction also needs a row in `apps/api/prisma/seed.json`
 - Colors: `PALETTE` in `apps/web/src/world/textures.ts` and CSS variables in `apps/web/src/styles.css`
 - 3D font: `node apps/web/scripts/build-font.mjs` regenerates `apps/web/src/assets/lilita.typeface.json` (add characters to `CHARS` if you need more glyphs in 3D text)
 - The page has Open Graph / Twitter cards (`apps/web/public/og-image.jpg`), a web manifest and icons; `sitemap.xml` and `robots.txt` are generated during the build. The 3D world is code-split and loads after the intro card has rendered.
@@ -319,7 +345,9 @@ public/models/guest-anims.glb  "Universal Animation Library" by Quaternius (CC0)
 public/models/dog-*.glb        Shiba Inu and Husky by Quaternius (CC0, via Poly Pizza)
 src/world/subdivide.ts  rounds off faceted models at load: welds, one Loop subdivision, smooth normals, blended skin weights
 src/world/environment.ts sky, lights, ground, trees, lamps, tents, balloons
-src/world/attractions/  coaster, rocket, crates, striker, ferris/carousel/booth/arch, speedway (+ speedway-track),
+src/world/layout.ts     the park's plan: its size, where everything stands, the districts, paths and plazas
+src/world/wayfinding.ts the districts' signs and the fingerposts
+src/world/attractions/  coaster, rocket, crates, striker, ducks (the Duck Shoot), ferris/carousel/booth/arch, speedway (+ speedway-track),
                         trail (+ trail-track), sky-flip, ship (Nebula 360), drone, museum (the Career Museum's hall)
 src/world/gallery.ts    the Career Museum's guided tour: the sheet beside each frame
 src/data/museum.ts      the museum's collection: the CV's exhibits, years and skills

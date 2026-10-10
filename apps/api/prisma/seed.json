@@ -65,6 +65,11 @@
       "tickets": 1,
       "open": true,
       "closedMessage": null
+    },
+    "ducks": {
+      "tickets": 1,
+      "open": true,
+      "closedMessage": null
     }
   },
   "shop": {}

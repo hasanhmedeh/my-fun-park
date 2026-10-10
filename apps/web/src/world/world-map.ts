@@ -1,4 +1,4 @@
-import { ZONES, type ZoneId } from './layout';
+import { DISTRICTS, ZONES, type ZoneId } from './layout';
 import { MAP_PLACES, fairBounds, paintFair, paintTrain, paintVisitor } from './minimap';
 import { PALETTE } from './textures';
 import { escapeHtml } from './ui';
@@ -84,7 +84,18 @@ export class WorldMap {
   private buildPlaces() {
     const pinLayer = this.root.querySelector('.wm-pins')!;
     const list = this.root.querySelector('.wm-legend ul')!;
+    let district = '';
     for (const p of MAP_PLACES) {
+      // a heading for each district, in its colour
+      if (p.district !== district) {
+        district = p.district;
+        const d = DISTRICTS[p.district];
+        const head = document.createElement('li');
+        head.className = 'wm-group';
+        head.style.setProperty('--district', d.color);
+        head.innerHTML = `<span aria-hidden="true">${d.icon}</span>${escapeHtml(d.name)}`;
+        list.appendChild(head);
+      }
       const pin = document.createElement('button');
       pin.type = 'button';
       pin.className = 'wm-pin';
@@ -441,6 +452,23 @@ export class WorldMap {
     }
     g.stroke();
     paintFair(g, (x) => this.toScreen(x, 0).x, (z) => this.toScreen(0, z).y, v.ppm);
+    // zoomed out (where the places' own labels are hidden), each district's name across its plaza
+    if (v.ppm < LABEL_PPM) {
+      const size = Math.round(Math.min(22, Math.max(12, v.ppm * 5.5)));
+      g.font = `${size}px "Lilita One", "Arial Rounded MT Bold", sans-serif`;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.lineJoin = 'round';
+      for (const d of Object.values(DISTRICTS)) {
+        const p = this.toScreen(d.label[0], d.label[1]);
+        const label = d.name.toUpperCase();
+        g.lineWidth = Math.max(3, size * 0.32);
+        g.strokeStyle = 'rgba(29, 18, 56, 0.85)';
+        g.strokeText(label, p.x, p.y);
+        g.fillStyle = d.color;
+        g.fillText(label, p.x, p.y);
+      }
+    }
   }
 
   private placePins() {

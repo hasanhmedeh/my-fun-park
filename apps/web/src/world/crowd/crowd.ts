@@ -3,7 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { staticBox, std, type Ctx } from '../context';
 import type { Coaster } from '../attractions/coaster';
 import type { Striker } from '../attractions/striker';
-import { LAYOUT, PLAZAS } from '../layout';
+import { DISTRICTS, LAYOUT, PARK, PLAZAS, PROMENADE } from '../layout';
 import { mulberry } from '../random';
 import { nearTrack } from '../rides';
 import { NavGraph } from './nav';
@@ -310,14 +310,14 @@ export class Crowd {
   ) {
     this.obs = new Obstacles(ctx.world);
     this.buildBenches(); // (benches are obstacles too: place them before routing round things)
-    this.nav.repair(this.obs, { x: 0, z: 14 });
+    this.nav.repair(this.obs, LAYOUT.spawn);
 
     this.stops = coasters.map((c) => {
       const st = c.station;
       // the line starts at the foot of the entrance stairs and backs up along the path
       const foot = { x: st.entryFoot.x, z: st.entryFoot.z };
       const out = { x: st.entryFoot.x + st.out.x * 1.6, z: st.entryFoot.z + st.out.z * 1.6 };
-      const route = this.nav.route(this.nav.nearest(out.x, out.z).id, this.nav.nearest(0, 10).id).slice(0, 5);
+      const route = this.nav.route(this.nav.nearest(out.x, out.z).id, this.nav.nearest(LAYOUT.carousel.x, LAYOUT.carousel.z).id).slice(0, 5);
       return new RideStop(c, [foot, out, ...route]);
     });
     // ticket booth: the window faces south, the line runs back along the spur
@@ -327,23 +327,27 @@ export class Crowd {
     this.strikerQ = new Queue([{ x: ss.x, z: ss.z }, { x: ss.x + 0.2, z: ss.z + 1.6 }, { x: ss.x + 0.6, z: ss.z + 6 }], 0.9);
 
     const [stack, falcon] = coasters;
-    const sx = LAYOUT.striker;
-    const rk = LAYOUT.rocket;
-    const cs = LAYOUT.carousel;
+    // each spot is set from its attraction, wherever the layout puts it
+    const by = (a: P, dx: number, dz: number) => ({ x: a.x + dx, z: a.z + dz });
+    const { striker: sx, rocket: rk, carousel: cs, letters: lt, crates: cr, ship: sh, flip: fl, ducks: dk } = LAYOUT;
     this.watchSpots = [
-      { at: { x: -13, z: 4 }, look: () => stack.trainPosition },
-      { at: { x: -9, z: -1 }, look: () => stack.trainPosition },
-      { at: { x: 52, z: 18 }, look: () => falcon.trainPosition },
-      { at: { x: 40, z: 15.5 }, look: () => falcon.trainPosition },
-      { at: { x: 38, z: -34 }, look: () => ({ x: rk.x, y: 8, z: rk.z }) },
-      { at: { x: 46, z: -35 }, look: () => ({ x: rk.x, y: 8, z: rk.z }) },
-      { at: { x: -16.5, z: -34.5 }, look: () => ({ x: sx.x, y: 3, z: sx.z }) },
-      { at: { x: -23, z: -35 }, look: () => ({ x: sx.x, y: 3, z: sx.z }) },
-      { at: { x: 9.5, z: -27 }, look: () => ({ x: cs.x, y: 2, z: cs.z }) },
-      { at: { x: -9, z: -33 }, look: () => ({ x: cs.x, y: 2, z: cs.z }) },
-      { at: { x: 4, z: 12 }, look: () => ({ x: LAYOUT.letters.x, y: 2, z: LAYOUT.letters.z }) },
-      { at: { x: -5, z: 13 }, look: () => ({ x: LAYOUT.letters.x, y: 2, z: LAYOUT.letters.z }) },
-      { at: { x: 30, z: -1 }, look: () => ({ x: LAYOUT.crates.x, y: 1, z: LAYOUT.crates.z }) },
+      { at: by(LAYOUT.coaster, 13, 10), look: () => stack.trainPosition },
+      { at: by(LAYOUT.coaster, 17, 5), look: () => stack.trainPosition },
+      { at: by(LAYOUT.falcon, -18, -4), look: () => falcon.trainPosition },
+      { at: by(LAYOUT.falcon, -30, -6.5), look: () => falcon.trainPosition },
+      { at: by(rk, -4, 18), look: () => ({ x: rk.x, y: 8, z: rk.z }) },
+      { at: by(rk, 4, 17), look: () => ({ x: rk.x, y: 8, z: rk.z }) },
+      { at: by(sx, 3.5, 5.5), look: () => ({ x: sx.x, y: 3, z: sx.z }) },
+      { at: by(sx, -3, 5), look: () => ({ x: sx.x, y: 3, z: sx.z }) },
+      { at: by(cs, 9.5, 3), look: () => ({ x: cs.x, y: 2, z: cs.z }) },
+      { at: by(cs, -9, -3), look: () => ({ x: cs.x, y: 2, z: cs.z }) },
+      { at: by(lt, 4, 7), look: () => ({ x: lt.x, y: 2, z: lt.z }) },
+      { at: by(lt, -5, 8), look: () => ({ x: lt.x, y: 2, z: lt.z }) },
+      { at: by(cr, -4, 11), look: () => ({ x: cr.x, y: 1, z: cr.z }) },
+      { at: by(sh, -7, -15.5), look: () => ({ x: sh.x, y: 9, z: sh.z }) },
+      { at: by(sh, 6, -15), look: () => ({ x: sh.x, y: 9, z: sh.z }) },
+      { at: by(fl, 22, 17), look: () => ({ x: fl.x, y: 40, z: fl.z }) },
+      { at: by(dk, 4.5, -8.5), look: () => ({ x: dk.x, y: 2.5, z: dk.z }) },
     ].filter((w) => !this.obs.inside(w.at.x, w.at.z, 0.5));
 
     this.spawn(opts.count);
@@ -357,8 +361,32 @@ export class Crowd {
 
   private buildBenches() {
     const spots: { x: number; z: number; heading: number }[] = [];
-    // along the boulevard, facing it
-    for (const z of [-13, -50, -64, -76]) for (const sx of [-1, 1]) spots.push({ x: sx * 5.4, z, heading: sx > 0 ? -Math.PI / 2 : Math.PI / 2 });
+    // along Main Street and North Avenue, facing them
+    for (const z of [-3, -27, -76, -88, -100, -126, -150, -162]) for (const sx of [-1, 1]) spots.push({ x: PARK.x + sx * 5.4, z, heading: sx > 0 ? -Math.PI / 2 : Math.PI / 2 });
+    // halfway along each stretch of the Promenade, on its outer side, facing it
+    for (let i = 0; i < PROMENADE.length - 1; i++) {
+      const [ax, az] = PROMENADE[i];
+      const [bx, bz] = PROMENADE[i + 1];
+      const len = Math.hypot(bx - ax, bz - az);
+      if (len < 30) continue;
+      let nx = -(bz - az) / len;
+      let nz = (bx - ax) / len;
+      const mx = (ax + bx) / 2;
+      const mz = (az + bz) / 2;
+      if (nx * (mx - PARK.x) + nz * (mz - PARK.z) < 0) (nx = -nx), (nz = -nz);
+      for (const t of [-0.18, 0.18]) {
+        const x = mx + (bx - ax) * t + nx * 3.6;
+        const z = mz + (bz - az) * t + nz * 3.6;
+        spots.push({ x, z, heading: Math.atan2(nx, nz) });
+      }
+    }
+    // a pair at each district's plaza, facing it
+    for (const { plaza: [px, pz] } of Object.values(DISTRICTS))
+      for (const a of [(3 * Math.PI) / 4, -Math.PI / 4]) {
+        const x = px + Math.cos(a) * 10.6;
+        const z = pz + Math.sin(a) * 10.6;
+        spots.push({ x, z, heading: Math.atan2(x - px, z - pz) });
+      }
     // round the carousel plaza, facing the carousel
     for (const a of [0.6, 2.5, 3.8, 5.6]) {
       // outside the ring of waypoints walkers use to get round the carousel
@@ -366,8 +394,10 @@ export class Crowd {
       const z = LAYOUT.carousel.z + Math.sin(a) * 11.8;
       spots.push({ x, z, heading: Math.atan2(x - LAYOUT.carousel.x, z - LAYOUT.carousel.z) });
     }
-    // the entrance plaza and the crates plaza
-    spots.push({ x: -9.5, z: 17, heading: Math.atan2(-9.5, 17) }, { x: 9.5, z: 4, heading: Math.atan2(9.5, 4) }, { x: 34, z: 4.5, heading: 0 });
+    // the entrance plaza (facing out from its middle, like the old ones) and the crates plaza
+    const [ex, ez] = PLAZAS[0];
+    spots.push({ x: ex - 9.5, z: ez + 7, heading: Math.atan2(-9.5, 7) }, { x: ex + 9.5, z: ez - 6, heading: Math.atan2(9.5, -6) });
+    spots.push({ x: LAYOUT.crates.x, z: LAYOUT.crates.z + 16.5, heading: 0 });
     const ok = spots.filter((s) => !this.obs.inside(s.x, s.z, 1.1) && !nearTrack(s.x, s.z, 3));
     const wood = new THREE.InstancedMesh(benchGeometry(), std('#a4683b', { roughness: 0.8 }), ok.length);
     const iron = new THREE.InstancedMesh(benchFrame(), std('#2b2b30', { roughness: 0.45, metalness: 0.6 }), ok.length);
@@ -419,7 +449,7 @@ export class Crowd {
       for (const m of members) m.party = party;
       this.parties.push(party);
       // place them together somewhere in the park
-      const at = this.nav.random(rnd, 85);
+      const at = this.nav.random(rnd, PARK.r - 5);
       members.forEach((m, i) => this.place(m, at.x + R(-1.5, 1.5) + i * 0.3, at.z + R(-1.5, 1.5), R(-Math.PI, Math.PI)));
       if (this.dogFactory && members.length <= 4 && chance(members.length === 1 ? 0.22 : 0.2)) {
         const dog = this.dogFactory.create(chance(0.55) ? 'shiba' : 'husky');
@@ -567,7 +597,7 @@ export class Crowd {
       else {
         act('stroll');
         // stroll: mostly inside the park, now and then out along the road to the wheel
-        const to = this.nav.random(rnd, chance(0.9) ? 80 : Infinity);
+        const to = this.nav.random(rnd, chance(0.9) ? PARK.r - 10 : Infinity);
         yield* this.walkTo(L, to.x + R(-1, 1), to.z + R(-1, 1));
         yield* this.wait(R(0.5, 4));
       }

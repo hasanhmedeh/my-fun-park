@@ -1,4 +1,4 @@
-import { ApiError, type AttractionId, type FinishedRound, type RoundStats } from './api';
+import { ApiError, isGame, type AttractionId, type FinishedRound, type RoundStats } from './api';
 import { session } from './session';
 import { ATTRACTION_STATS, formatStat, HIDDEN_STATS, isPersonalBest, statLabel, trailTime } from './stats';
 import { msUntil, resetIn } from './leaderboard';
@@ -188,7 +188,7 @@ class ResultsDialog {
     const cost = session.cost(r.ride);
     const balance = session.balance;
     if (balance !== null && balance < cost) return `<button type="button" class="btn btn-primary" data-results="booth">Get tickets at the booth 🎟️</button>${close}`;
-    return `<button type="button" class="btn btn-primary" data-results="again">${r.ride === 'crates' || r.ride === 'striker' ? 'Play again' : 'Ride again'} (${cost} 🎟️)</button>${close}`;
+    return `<button type="button" class="btn btn-primary" data-results="again">${isGame(r.ride) ? 'Play again' : 'Ride again'} (${cost} 🎟️)</button>${close}`;
   }
 }
 

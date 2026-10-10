@@ -82,6 +82,11 @@ export const STATS: Record<string, StatDef> = {
   // striker
   bestHit: def('Best hit', 'max', whole, '%'),
   bellsRung: def('Bells rung', 'max', whole),
+  // duck shoot
+  ducksHit: def('Ducks down', 'max', whole),
+  accuracy: def('Accuracy', 'max', whole, '%'),
+  bestStreak: def('Best streak', 'max', whole),
+  goldenDucks: def('Golden ducks', 'max', whole),
 };
 
 /** What each attraction reports, in the order the results screen lists them. */
@@ -97,6 +102,7 @@ export const ATTRACTION_STATS: Record<AttractionId, string[]> = {
   drone: ['durationS', 'maxAltitudeM', 'distanceM', 'topSpeedKmh'],
   crates: ['score', 'cratesSmashed', 'clearTimeS', 'durationS'],
   striker: ['score', 'bestHit', 'bellsRung'],
+  ducks: ['score', 'ducksHit', 'accuracy', 'bestStreak', 'goldenDucks', 'durationS'],
 };
 
 /** Stats the game sends for the server's sake, not for show (when the trail's run crossed the line). */

@@ -1,4 +1,4 @@
-import { PATHS, PLAZAS } from '../layout';
+import { PARK, PATHS, PLAZAS } from '../layout';
 import type { Obstacle, Obstacles } from './obstacles';
 
 export interface NavNode {
@@ -20,7 +20,7 @@ export class NavGraph {
   nodes: NavNode[] = [];
 
   constructor() {
-    const SPLIT = 9; // max metres between nodes, so walkers can turn off mid-boulevard
+    const SPLIT = 9; // max metres between nodes, so walkers can turn off mid-avenue
     const ends = PATHS.flatMap((p) => p.points);
 
     for (const path of PATHS) {
@@ -212,7 +212,7 @@ export class NavGraph {
 
   /** A random walkable node, optionally only within `radius` of the park centre. */
   random(rand: () => number, radius = Infinity) {
-    const pool = this.nodes.filter((n) => n.live && Math.hypot(n.x, n.z) < radius);
+    const pool = this.nodes.filter((n) => n.live && Math.hypot(n.x - PARK.x, n.z - PARK.z) < radius);
     return pool[Math.floor(rand() * pool.length)];
   }
 }

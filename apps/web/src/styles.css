@@ -1206,6 +1206,11 @@ kbd {
   font-size: 1.1rem;
   color: var(--ink);
 }
+/* the guide's districts, each underlined in its colour (as on the map and the signs) */
+.guide-district {
+  padding-bottom: 2px;
+  border-bottom: 3px solid var(--district, var(--mustard));
+}
 .panel .eyebrow {
   margin: 0 0 4px;
   font: 700 0.72rem/1 var(--body);
@@ -1565,6 +1570,46 @@ kbd {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* The Duck Shoot's sight: a ring with a dot, following the mouse (or the keys); it dims while the cork gun reloads */
+.ducks-sight {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  border: 3px solid var(--cream);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(29, 18, 56, 0.55), inset 0 0 0 2px rgba(29, 18, 56, 0.55);
+  pointer-events: none;
+  z-index: 4;
+  transition: opacity 0.12s ease;
+}
+.ducks-sight::before,
+.ducks-sight::after {
+  content: '';
+  position: absolute;
+  background: var(--candy);
+}
+.ducks-sight::before {
+  inset: 17px;
+  border-radius: 50%;
+}
+.ducks-sight::after {
+  left: 50%;
+  top: -10px;
+  bottom: -10px;
+  width: 2px;
+  margin-left: -1px;
+  background: linear-gradient(var(--cream) 0 9px, transparent 9px calc(100% - 9px), var(--cream) calc(100% - 9px));
+}
+.ducks-sight.reloading {
+  opacity: 0.45;
+}
+.ducks-sight[hidden] {
+  display: none;
 }
 
 /* Scene transitions + ride mode */
@@ -2263,6 +2308,23 @@ kbd {
   padding: 0;
   list-style: none;
 }
+/* each district's heading, with its colour */
+.wm-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 4px 2px;
+  padding-left: 8px;
+  border-left: 4px solid var(--district, var(--mustard));
+  color: var(--district, var(--mustard));
+  font: 400 0.8rem/1.2 var(--display);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.wm-group:first-child {
+  margin-top: 2px;
+}
 .wm-legend button {
   display: flex;
   align-items: center;
@@ -2524,6 +2586,13 @@ kbd {
   .wm-legend ul {
     flex-direction: row;
     gap: 6px;
+  }
+  .wm-group {
+    margin: 0 2px 0 8px;
+    align-self: center;
+  }
+  .wm-group:first-child {
+    margin-left: 0;
   }
   .wm-legend button {
     width: auto;

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { std, type Ctx } from './context';
 import { broadleafGeometry, pineGeometry } from './environment';
-import { LAYOUT } from './layout';
+import { inPark, LAYOUT, PARK } from './layout';
 import { mulberry } from './random';
 import { FALCON_TRACK, nearTrack } from './rides';
 import { addWind } from './wind';
@@ -79,8 +79,8 @@ export class Trackside {
     const wheel = LAYOUT.ferris;
     // places nothing may stand: the park, the road out to the wheel, the giant wheel's legs, any track
     const blocked = (x: number, z: number, clearance: number) =>
-      Math.hypot(x, z) < LAYOUT.boundary + 8 ||
-      (Math.abs(x - wheel.x) < 14 && z < 0 && z > wheel.z) ||
+      inPark(x, z, 5.5) ||
+      (Math.abs(x - wheel.x) < 14 && z < PARK.z && z > wheel.z) ||
       (Math.abs(x - wheel.x) < 72 && Math.abs(z - wheel.z) < 56) ||
       nearTrack(x, z, clearance);
 
