@@ -1,10 +1,12 @@
 import * as THREE from 'three';
+import type * as CANNON from 'cannon-es';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { shadowed, staticBox, staticCylinder, std, type Attraction, type Ctx } from '../context';
 import type { Input } from '../input';
 import { inPark } from '../layout';
 import { hdr, PALETTE, signMaterial, signTexture, stripeTexture } from '../textures';
 import { boreAxis, DS, sampleTrack, stepRide, TUNNEL_BORE, zoneAt, type Phys, type RideState, type TrackData, type Zone } from './track';
+import { isStalled, stallWatch, type RideMode, type StallWatch, type TrackZone } from '../../workshop/rules';
 
 /** Riders' hearts sit this far above the rails. */
 const HEART = 1.0;
@@ -16,6 +18,8 @@ const DWELL = 16;
 const STATION_DECEL = 3;
 /** How long your train stands in the station after your lap before you climb out. */
 const UNLOAD = 1.5;
+/** How long a stalled train sits (rolling to rest) before the round ends and it is towed back. */
+const STALL_HOLD = 2.6;
 
 /** A seat on the train, in its car's local frame. */
 export interface Seat {
@@ -50,7 +54,7 @@ export interface CoasterConfig {
   track: TrackData;
   phys: Phys;
   station: { title: string; sub: string; side: 1 | -1 };
-  colors: { rail: string; spine: string; cars: string[] };
+  colors: { rail: string; spine: string; cars: string[]; supports?: string };
   cars: number;
   /** Seat rows in the lead car (default 2; Intamin's Exa trains have a single-row lead car). */
   leadRows?: number;
@@ -67,6 +71,19 @@ export interface CoasterConfig {
   tunnelClip?: THREE.Plane[];
   /** Places where a support column may not land (attractions, other tracks). */
   keepOut?: (x: number, z: number) => boolean;
+  /** Colliders for the visitor and the props (default true): off where nobody walks, so it can be taken down cleanly. */
+  solid?: boolean;
+  /** Where the coaster is built (default the scene), and the render layer it's drawn on (default 0). */
+  parent?: THREE.Object3D;
+  layer?: number;
+  /** Ride physics of its own (a player-built coaster's per-piece lifts, launches and brakes), instead of stepRide with `phys`. */
+  step?: (state: RideState, throttle: number, turbo: boolean, dt: number) => Zone | null;
+  /** A train can run out of speed and stall (a player-built coaster): the round ends there, and the train is towed back. */
+  stalls?: RideMode;
+  /** False for a coaster that rides itself: no power, no brakes (default true). */
+  controls?: boolean;
+  /** What the ghost train's driver does at speed v (m/s): throttle -1..1 (default: nothing). */
+  ghostThrottle?: (v: number) => number;
 }
 const STRIP_BASE = new THREE.Color('#5ce1d6');
 
@@ -126,6 +143,14 @@ export class Coaster implements Attraction {
   private stopS = START_S;
   private dwellLeft = 0;
   private dwelled = false;
+  /** The train ran out of speed this round: how far it got (metres from the station's start), and how long ago. */
+  private stall: { atM: number; t: number } | null = null;
+  private watch: StallWatch = stallWatch();
+  private ghostWatch: StallWatch = stallWatch();
+  private peak = 0;
+  /** Everything the coaster is made of (taken down in one go by dispose). */
+  readonly root = new THREE.Group();
+  private bodies: CANNON.Body[] = [];
   readonly seats: Seat[] = [];
   station!: StationInfo;
   /** Fired when the ghost train stops in the station and when it leaves again. */
@@ -135,6 +160,8 @@ export class Coaster implements Attraction {
   onFinish: (() => void) | null = null;
   /** The lap is done and the train has stopped in the station: the round is over. */
   onComplete: (() => void) | null = null;
+  /** The train stalled (see CoasterConfig.stalls) and came to rest: the round is over, `atM` metres from the station. */
+  onStall: ((atM: number) => void) | null = null;
 
   constructor(private ctx: Ctx, private cfg: CoasterConfig) {
     this.d = cfg.track;
@@ -150,6 +177,39 @@ export class Coaster implements Attraction {
     this.buildTrain();
     this.trackside = cfg.trackside;
     this.placeTrain();
+    if (cfg.layer) this.root.traverse((o) => o.layers.set(cfg.layer!));
+    (cfg.parent ?? ctx.scene).add(this.root);
+  }
+
+  /** Takes the coaster down: out of the scene, its colliders gone, its geometry and textures freed. */
+  dispose() {
+    this.root.removeFromParent();
+    for (const b of this.bodies) this.ctx.world.removeBody(b);
+    this.bodies = [];
+    const seen = new Set<unknown>();
+    this.root.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.geometry && !seen.has(m.geometry)) {
+        seen.add(m.geometry);
+        m.geometry.dispose();
+      }
+      for (const mat of m.material ? (Array.isArray(m.material) ? m.material : [m.material]) : []) {
+        if (seen.has(mat)) continue;
+        seen.add(mat);
+        for (const v of Object.values(mat)) if (v instanceof THREE.Texture && !seen.has(v)) (seen.add(v), v.dispose());
+        mat.dispose();
+      }
+    });
+  }
+
+  /** A static box collider (unless the coaster isn't solid). */
+  private box(x: number, y: number, z: number, hx: number, hy: number, hz: number, rotY = 0) {
+    if (this.cfg.solid !== false) this.bodies.push(staticBox(this.ctx, x, y, z, hx, hy, hz, rotY));
+  }
+
+  /** A static upright cylinder collider (unless the coaster isn't solid). */
+  private cylinder(x: number, z: number, radius: number, height: number) {
+    if (this.cfg.solid !== false) this.bodies.push(staticCylinder(this.ctx, x, z, radius, height));
   }
 
   private get bestKey() {
@@ -190,7 +250,7 @@ export class Coaster implements Attraction {
       const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, n, r, 8, true), mat);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      this.ctx.scene.add(mesh);
+      this.root.add(mesh);
     }
 
     // cross-ties with a web down to the spine (one merged geometry, instanced)
@@ -213,15 +273,24 @@ export class Coaster implements Attraction {
       ties.setMatrixAt(k, m);
     }
     ties.castShadow = true;
-    this.ctx.scene.add(ties);
+    this.root.add(ties);
 
-    // linear motors on the launch, copper fins on the brake run, glow strips beside the launch
+    // linear motors on the launch, copper fins on the brake run, glow strips beside the launch, and
+    // the chain up a lift hill
     const finGeo = new THREE.BoxGeometry(0.05, 0.22, 0.8);
     const lsm: THREE.Matrix4[] = [];
     const brake: THREE.Matrix4[] = [];
     const strips: THREE.Matrix4[] = [];
+    const chain: THREE.Matrix4[] = [];
     for (let i = 0; i < n; i += 2) {
       const z = d.zone[i];
+      if (z === 'lift') {
+        this.railCenter(i, c);
+        back.copy(d.tan[i]).negate();
+        m.makeBasis(d.right[i], d.up[i], back).setPosition(c.clone().addScaledVector(d.up[i], 0.03));
+        chain.push(m.clone());
+        continue;
+      }
       if (z !== 'launch' && z !== 'boost' && z !== 'hyper' && z !== 'brake' && z !== 'trim') continue;
       this.railCenter(i, c);
       back.copy(d.tan[i]).negate();
@@ -237,11 +306,12 @@ export class Coaster implements Attraction {
       const im = new THREE.InstancedMesh(geo, mat, Math.max(1, list.length));
       list.forEach((mm, k) => im.setMatrixAt(k, mm));
       im.count = list.length;
-      this.ctx.scene.add(im);
+      this.root.add(im);
     };
     add(finGeo, std('#7f8794', { metalness: 0.9, roughness: 0.3 }), lsm);
     add(finGeo, std('#c46a2e', { metalness: 1, roughness: 0.3 }), brake);
     add(new THREE.BoxGeometry(0.08, 0.06, 0.9), this.launchStrips, strips);
+    if (chain.length) add(new THREE.BoxGeometry(0.16, 0.07, 0.95), std('#2c2433', { metalness: 0.85, roughness: 0.35 }), chain);
 
     // supports: only under upright track with nothing else in the way
     const supports: { x: number; z: number; h: number; foot: number; m: THREE.Matrix4 }[] = [];
@@ -267,7 +337,7 @@ export class Coaster implements Attraction {
       supports.push({ x: c.x, z: c.z, h: bottom, foot, m: head });
     }
     const colGeo = new THREE.CylinderGeometry(0.16, 0.22, 1, 10).translate(0, 0.5, 0);
-    const steel = std(PALETTE.cream, { metalness: 0.4, roughness: 0.45 });
+    const steel = std(this.cfg.colors.supports ?? PALETTE.cream, { metalness: 0.4, roughness: 0.45 });
     const cols = new THREE.InstancedMesh(colGeo, steel, supports.length);
     const heads = new THREE.InstancedMesh(new THREE.BoxGeometry(1.1, 0.22, 0.3), steel, supports.length);
     const feet = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.5, 0.62, 0.35, 12), std('#8d8a99', { roughness: 0.9 }), supports.length);
@@ -277,17 +347,17 @@ export class Coaster implements Attraction {
       cols.setMatrixAt(k, m.makeScale(w, s.h - s.foot, w).setPosition(s.x, s.foot, s.z));
       heads.setMatrixAt(k, s.m);
       feet.setMatrixAt(k, m.makeScale(w, 1, w).setPosition(s.x, s.foot + 0.17, s.z));
-      if (inPark(s.x, s.z, 1.5)) staticCylinder(this.ctx, s.x, s.z, 0.35 * w, 3);
+      if (inPark(s.x, s.z, 1.5)) this.cylinder(s.x, s.z, 0.35 * w, 3);
     });
     cols.castShadow = heads.castShadow = true;
     feet.receiveShadow = true;
-    this.ctx.scene.add(cols, heads, feet);
+    this.root.add(cols, heads, feet);
 
     // low track is solid for the bumper car
     for (let i = 0; i < n; i += 4) {
       this.railCenter(i, c);
       if (c.y < 4.6 && d.up[i].y > 0.5 && d.zone[i] !== 'station' && inPark(c.x, c.z, 1.5))
-        staticBox(this.ctx, c.x, c.y / 2, c.z, 0.9, c.y / 2, 0.9);
+        this.box(c.x, c.y / 2, c.z, 0.9, c.y / 2, 0.9);
     }
   }
 
@@ -334,7 +404,7 @@ export class Coaster implements Attraction {
     const pc = along(L / 2, 2.4, deckY / 2);
     const deckMat = std('#b98a5a');
     add(new THREE.Mesh(new THREE.BoxGeometry(2.2, deckY, L), deckMat), pc).receiveShadow = true;
-    staticBox(this.ctx, pc.x, deckY / 2, pc.z, 1.1, deckY / 2, L / 2, rotY);
+    this.box(pc.x, deckY / 2, pc.z, 1.1, deckY / 2, L / 2, rotY);
     // entrance and exit stairs down to the queue line (solid, so you can't walk through them)
     const steps = Math.ceil(deckY / 0.18);
     const stepMat = std('#9c7048');
@@ -358,10 +428,10 @@ export class Coaster implements Attraction {
         for (const [o, y] of [[3.5, deckY], [3.5 + STAIR_RUN, 0]]) add(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.9), railMat), along(t + side, o, y + 0.45));
       }
       const sc = along(t, 3.5 + STAIR_RUN / 2, deckY / 4);
-      staticBox(this.ctx, sc.x, deckY / 4, sc.z, 0.75, deckY / 4, STAIR_RUN / 2, rotY + Math.PI / 2);
+      this.box(sc.x, deckY / 4, sc.z, 0.75, deckY / 4, STAIR_RUN / 2, rotY + Math.PI / 2);
     }
     const tc = along(L / 2, 0, 1);
-    staticBox(this.ctx, tc.x, 1, tc.z, 1.1, 1, L / 2 + 0.5, rotY);
+    this.box(tc.x, 1, tc.z, 1.1, 1, L / 2 + 0.5, rotY);
 
     const roofTex = stripeTexture(PALETTE.candy, PALETTE.cream, 10);
     roofTex.repeat.set(4, 1);
@@ -370,7 +440,7 @@ export class Coaster implements Attraction {
       for (const o of [-1.8, 3.4]) {
         const at = along(t, o, 2.75);
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 5.5), std(PALETTE.cream)), at);
-        if (o > 0) staticCylinder(this.ctx, at.x, at.z, 0.25, 5);
+        if (o > 0) this.cylinder(at.x, at.z, 0.25, 5);
       }
     const sign = add(new THREE.Mesh(new THREE.PlaneGeometry(9, 2.6), signMaterial(signTexture(this.cfg.station.title, { sub: this.cfg.station.sub }))), along(L / 2, 3.6, 7.2));
     sign.rotation.y = Math.atan2(out.x, out.z); // face away from the track
@@ -382,7 +452,7 @@ export class Coaster implements Attraction {
     g.add(roofBulbs);
     shadowed(g, true);
     roofBulbs.castShadow = false;
-    this.ctx.scene.add(g);
+    this.root.add(g);
   }
 
   /**
@@ -454,7 +524,7 @@ export class Coaster implements Attraction {
       : std('#ffffff', { map: stripeTexture(PALETTE.violet, '#2a1f45', 8, true), side: THREE.DoubleSide, roughness: 0.8 });
     const shell = new THREE.Mesh(geo, shellMat);
     shell.castShadow = shell.receiveShadow = true;
-    this.ctx.scene.add(shell);
+    this.root.add(shell);
 
     // glowing rings every few metres
     const ringGeo = new THREE.TorusGeometry(R - 0.12, 0.05, 6, 32, Math.PI + 0.4);
@@ -470,7 +540,7 @@ export class Coaster implements Attraction {
       ring.matrix.makeBasis(d.right[i], d.up[i], back).setPosition(c);
       ring.matrix.multiply(new THREE.Matrix4().makeRotationZ(-0.2));
       ring.matrixAutoUpdate = false;
-      this.ctx.scene.add(ring);
+      this.root.add(ring);
     }
   }
 
@@ -549,7 +619,7 @@ export class Coaster implements Attraction {
       shadowed(car);
       car.matrixAutoUpdate = false;
       car.traverse((o) => o !== car && o.updateMatrix());
-      this.ctx.scene.add(car);
+      this.root.add(car);
       this.cars.push(car);
     }
   }
@@ -586,6 +656,9 @@ export class Coaster implements Attraction {
     this.lapTime = 0;
     this.lapDone = false;
     this.parkedT = -1;
+    this.stall = null;
+    this.watch = stallWatch();
+    this.peak = 0;
     sampleTrack(this.d, this.state.s, this.f);
     this.camUp.copy(this.f.u);
     this.camLook.copy(this.f.p).addScaledVector(this.f.t, 10);
@@ -595,6 +668,12 @@ export class Coaster implements Attraction {
     $('ride-hud').hidden = false;
     $('rh-toast').hidden = true;
     document.body.classList.add('is-riding-coaster');
+    // a coaster that rides itself: no power or brakes to show, only the camera
+    const passive = this.cfg.controls === false;
+    document.body.classList.toggle('is-passive-coaster', passive);
+    const keys = $('rh-keys');
+    keys.dataset.keys ??= keys.innerHTML;
+    keys.innerHTML = passive ? (this.ctx.mobile ? 'Sit back and enjoy the ride · <kbd>E</kbd> camera' : 'Sit back and enjoy the ride · <kbd>C</kbd> camera') : keys.dataset.keys;
     this.updateHudStatic();
     // the intro opens by itself the first time (then steps aside after a few seconds); after that it's behind the ℹ️
     const shown = this.ctx.ui.setIntro(`${this.cfg.id}-intro`, this.cfg.name, this.cfg.intro(this.ctx.mobile), { accent: PALETTE.mustard });
@@ -607,11 +686,13 @@ export class Coaster implements Attraction {
   exit() {
     if (!this.active) return;
     this.active = false;
-    // the ghost train carries on from here, and waits in the station for the next guests
+    // the ghost train carries on from here, and waits in the station for the next guests (a stalled
+    // train is towed back to the station first)
     this.dwelled = false;
+    if (this.stall) this.parkGhost();
     $('ride-hud').hidden = true;
     $('gloc').style.opacity = '0';
-    document.body.classList.remove('is-riding-coaster');
+    document.body.classList.remove('is-riding-coaster', 'is-passive-coaster');
     this.onFinish?.();
   }
 
@@ -624,6 +705,7 @@ export class Coaster implements Attraction {
       minG: this.minG,
     };
     if (this.lapDone) stats.lapTimeS = this.lapTime;
+    if (this.stall) stats.stalledAtM = this.stall.atM;
     return stats;
   }
 
@@ -637,8 +719,12 @@ export class Coaster implements Attraction {
 
   update(dt: number) {
     const L = this.d.length;
-    // once your lap is done the station takes over: no more power or brakes
-    const inp = this.active && this.input && !this.lapDone ? { throttle: this.input.throttle, turbo: this.input.boost } : { throttle: 0, turbo: false };
+    // once your lap is done (or the train has stalled) the station takes over: no more power or brakes;
+    // a coaster that rides itself never had any, and the ghost train has its own driver
+    const inp =
+      this.active && this.input && !this.lapDone && !this.stall && this.cfg.controls !== false
+        ? { throttle: this.input.throttle, turbo: this.input.boost }
+        : { throttle: !this.active && this.cfg.ghostThrottle ? this.cfg.ghostThrottle(this.state.v) : 0, turbo: false };
     const s0 = this.state.s;
 
     // two physics substeps per frame for stability at high speed
@@ -657,12 +743,16 @@ export class Coaster implements Attraction {
     } else
       for (let i = 0; i < 2; i++) {
         sampleTrack(this.d, this.state.s, this.f);
-        stepRide(this.d, this.state, inp, h, this.f.t, this.cfg.phys);
+        const z = this.cfg.step ? this.cfg.step(this.state, inp.throttle, inp.turbo, h) : stepRide(this.d, this.state, inp, h, this.f.t, this.cfg.phys);
         if (!this.active) this.ghostStation();
         else if (this.lapDone) this.stationStop();
+        if (this.cfg.stalls) this.watchStall(z, h);
       }
     // distance covered this round (a train that rolls back over the line hasn't done a lap)
-    if (this.active) this.progress += this.state.s - s0;
+    if (this.active) {
+      this.progress += this.state.s - s0;
+      this.peak = Math.max(this.peak, this.progress);
+    }
     if (this.state.s >= L) {
       this.state.s -= L;
       if (this.active) this.onLap();
@@ -715,7 +805,7 @@ export class Coaster implements Attraction {
       this.introTimer -= dt;
       if (this.introTimer <= 0 && this.ctx.ui.panelOpenKey === `${this.cfg.id}-intro`) this.ctx.ui.hidePanel();
     }
-    if (zoneAt(this.d, this.state.s) === 'launch' && this.state.v < -0.5) this.toast('Rolled back! Hold W for power');
+    if (zoneAt(this.d, this.state.s) === 'launch' && this.state.v < -0.5 && this.cfg.controls !== false && !this.stall) this.toast('Rolled back! Hold W for power');
 
     this.updateHud(dt);
   }
@@ -747,6 +837,41 @@ export class Coaster implements Attraction {
       return;
     }
     st.v = Math.max(0.35, Math.min(st.v, Math.sqrt(2 * STATION_DECEL * left)));
+  }
+
+  /**
+   * Watches for a train that has run out of speed. Yours: the round ends once it has come to rest
+   * (see onStall). The ghost train: it's towed straight back to the station.
+   */
+  private watchStall(zone: Zone | null, dt: number) {
+    const mode = this.cfg.stalls!;
+    const z = zone as TrackZone | null;
+    if (!this.active) {
+      if (this.dwellLeft > 0) return;
+      if (isStalled(this.ghostWatch, this.state.v, z, dt, mode)) this.parkGhost();
+      return;
+    }
+    if (this.lapDone || this.parkedT >= 0) return;
+    if (this.stall) {
+      const was = this.stall.t;
+      this.stall.t += dt;
+      if (was <= STALL_HOLD && this.stall.t > STALL_HOLD) this.onStall?.(this.stall.atM);
+      return;
+    }
+    if (!isStalled(this.watch, this.state.v, z, dt, mode)) return;
+    this.stall = { atM: Math.round(START_S + this.peak), t: 0 };
+    this.toast(`Stalled at ${this.stall.atM} m: not enough speed 😬`);
+    this.ctx.sfx.beep();
+  }
+
+  /** The ghost train back in the station, waiting for guests (towed in after a stall). */
+  private parkGhost() {
+    this.state = { s: this.stopS, v: 0, launching: false };
+    this.ghostWatch = stallWatch();
+    this.dwelled = true;
+    this.dwellLeft = DWELL;
+    this.placeTrain();
+    this.onDwell?.(true);
   }
 
   /** Keep the parked ghost train waiting at least this much longer (guests still boarding). */

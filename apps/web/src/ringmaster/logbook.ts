@@ -2,6 +2,7 @@
 import { isAttraction, ringmaster, type AdminAction, type SuggestionStatus } from '../account/api';
 import { STATUSES } from '../account/ideas';
 import { trailTime } from '../account/stats';
+import { PART_IDS, PARTS, type Part } from '../workshop/rules';
 import { esc, onApiError, pagerHtml, rideName, when } from './util';
 
 const LIMIT = 30;
@@ -120,6 +121,26 @@ function describe(a: AdminAction): [string, string] {
         ? ['🚩', `Disqualified <strong>${who}</strong>'s${time}${board}.`]
         : ['🏁', `Put <strong>${who}</strong>'s${time} back${board}.`];
     }
+    // the coasters members sent from the Coaster Workshop (the target is the creator's email)
+    case 'creation.release': {
+      const c = d as Change & { name?: unknown; plot?: unknown; tickets?: unknown; replaced?: unknown };
+      const replaced = typeof c.replaced === 'string' ? `, in place of ${esc(c.replaced)}` : '';
+      return ['🎢', `Released <strong>${esc(c.name)}</strong> by ${target} onto plot ${esc(c.plot)} of Creators' Valley${replaced}, at ${esc(c.tickets)} tickets a ride.`];
+    }
+    case 'creation.decline': {
+      const c = d as Change & { name?: unknown; reply?: unknown };
+      return ['✋', `Declined <strong>${esc(c.name)}</strong> by ${target}: “${esc(c.reply)}”`];
+    }
+    case 'creation.remove': {
+      const c = d as Change & { name?: unknown; plot?: unknown };
+      return ['📦', `Took <strong>${esc(c.name)}</strong> by ${target} out of the park (plot ${esc(c.plot)}).`];
+    }
+    case 'workshop.price':
+      return ['🧰', `Changed the price of <strong>${part(a.target)}</strong> at the Coaster Workshop.${price(before, after)}`];
+    case 'workshop.stock':
+      return ['📦', `${stock(before, after, part(a.target))}`];
+    case 'workshop.update':
+      return ['🧰', `Changed <strong>${part(a.target)}</strong> at the Coaster Workshop.${price(before, after)} ${stock(before, after, part(a.target))}`];
     default:
       return ['📝', `${esc(a.action)} ${target}`];
   }
@@ -127,6 +148,9 @@ function describe(a: AdminAction): [string, string] {
 
 /** The start of the idea, as the logbook kept it. */
 const idea = (d: Change & { excerpt?: unknown }) => (typeof d.excerpt === 'string' ? `“${esc(d.excerpt)}”` : '');
+
+/** "🛤️ Steel track" for a Coaster Workshop part's id, escaped. */
+const part = (id: string | null) => esc(id && (PART_IDS as readonly string[]).includes(id) ? `${PARTS[id as Part].icon} ${PARTS[id as Part].name}` : id);
 
 const statusName = (s: unknown) => (typeof s === 'string' && s in STATUSES ? `“${esc(STATUSES[s as SuggestionStatus].label)}”` : esc(s));
 

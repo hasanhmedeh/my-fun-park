@@ -1,7 +1,7 @@
 // The numbers each attraction reports for a round: one table for their labels, units, formatting
 // and which way a personal best goes. The game measures them (they're client-reported, so
 // they're for fun, not for prizes) and the server keeps them with the round.
-import type { AttractionId, Bests, RoundStats } from './api';
+import { PLOT_IDS, type AttractionId, type Bests, type RoundStats } from './api';
 
 /** Which way a personal best goes: higher, lower, or not a contest at all. */
 export type Better = 'max' | 'min' | 'none';
@@ -87,6 +87,8 @@ export const STATS: Record<string, StatDef> = {
   accuracy: def('Accuracy', 'max', whole, '%'),
   bestStreak: def('Best streak', 'max', whole),
   goldenDucks: def('Golden ducks', 'max', whole),
+  // Creators' Valley: where a train that ran out of speed came to a stop
+  stalledAtM: def('Stalled at', 'none', whole, 'm'),
 };
 
 /** What each attraction reports, in the order the results screen lists them. */
@@ -103,6 +105,8 @@ export const ATTRACTION_STATS: Record<AttractionId, string[]> = {
   crates: ['score', 'cratesSmashed', 'clearTimeS', 'durationS'],
   striker: ['score', 'bestHit', 'bellsRung'],
   ducks: ['score', 'ducksHit', 'accuracy', 'bestStreak', 'goldenDucks', 'durationS'],
+  // every plot runs a player-built coaster
+  ...(Object.fromEntries(PLOT_IDS.map((id) => [id, ['lapTimeS', 'topSpeedKmh', 'maxG', 'minG', 'stalledAtM', 'durationS']])) as Record<(typeof PLOT_IDS)[number], string[]>),
 };
 
 /** Stats the game sends for the server's sake, not for show (when the trail's run crossed the line). */

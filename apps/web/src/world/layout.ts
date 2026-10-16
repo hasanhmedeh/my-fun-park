@@ -11,6 +11,10 @@
 //   The Midway (south-east)  the games: Crate Smash, the High Striker and the Duck Shoot
 //   Motor Town (south-west)  the kart garage and the Rally Trail's shed (their tracks lie outside the fence)
 //   Main Gate (south)        the entrance plaza, the Ticket Booth and the Idea Box
+//   Creators' Valley (west)  out of the west gate: the Coaster Workshop and eight plots for the
+//                            coasters members build there
+
+import { PLOT_IDS, plotNumber, type PlotId } from '../account/api';
 
 /** The park's lawn: a circle of radius `r` around (x, z), inside a fence just beyond it. */
 export const PARK = { x: 0, z: -50, r: 140 };
@@ -104,9 +108,73 @@ export type ZoneId =
   | 'ship'
   | 'speedway'
   | 'trail'
-  | 'museum';
+  | 'museum'
+  | 'workshop'
+  | PlotId;
 
 type Zone = { x: number; z: number; radius: number; title: string; action: string; heading: number };
+
+/**
+ * Creators' Valley, west of the park: the Valley Road leaves the Promenade, runs out of the west
+ * gate and on past eight 70 × 70 m plots, four either side, where the coasters members build in
+ * the Coaster Workshop are released. Odd plots are on the north side of the road, even ones on
+ * the south, numbered from the park outward. Each plot has its own frame (as the builder's): x
+ * across, z towards its front, which faces the road. The plots themselves aren't walkable: the
+ * road and its verges are.
+ */
+export const VALLEY = {
+  /** The road's centre line, from the Promenade out to the far end. */
+  road: { z: -10, x0: -54.4, x1: -540, width: 6 },
+  /** Where the visitor may walk out here (the road and its verges): z0..z1, as far as x1. */
+  walk: { z0: -16.6, z1: -3.4, x1: -536 },
+  /** The plots' centres across (x), and each row's centre (z). */
+  xs: [-265, -343, -421, -499],
+  north: -52,
+  south: 32,
+  size: 70,
+  /**
+   * The valley's lawn, beyond the park's ground: the plots' field, and the strip the road crosses
+   * from the west gate (narrow enough to keep clear of the kart circuit, south of it).
+   */
+  lawns: [
+    { x0: -560, x1: -216, z0: -110, z1: 88 },
+    { x0: -232, x1: -128, z0: -45, z1: 28 },
+  ],
+  /** The Coaster Workshop's kiosk, on the north verge at the valley's entrance (its counter faces the road). */
+  kiosk: { x: -205, z: -21.5 },
+  /** The district's plaza, just inside the west gate. */
+  plaza: [-118, -10] as [number, number],
+};
+
+/** Plot n (1–8): its centre and how its frame is turned (0: front to +z, the north row; π: the south row). */
+export function plotPlace(n: number) {
+  const north = n % 2 === 1;
+  return { x: VALLEY.xs[Math.floor((n - 1) / 2)], z: north ? VALLEY.north : VALLEY.south, yaw: north ? 0 : Math.PI };
+}
+
+/** A point in plot n's own frame (lx across, lz towards its front), out in the fair. */
+export function plotPoint(n: number, lx: number, lz: number) {
+  const p = plotPlace(n);
+  const c = Math.cos(p.yaw);
+  const s = Math.sin(p.yaw);
+  return { x: p.x + lx * c + lz * s, z: p.z - lx * s + lz * c };
+}
+
+/** True on plot n's ground (grown by `margin`). */
+export function onPlot(n: number, x: number, z: number, margin = 0) {
+  const p = plotPlace(n);
+  return Math.abs(x - p.x) < VALLEY.size / 2 + margin && Math.abs(z - p.z) < VALLEY.size / 2 + margin;
+}
+
+/** True on Creators' Valley's lawn (grown by `margin`), out past the fence. */
+export const inValley = (x: number, z: number, margin = 0) =>
+  parkDistance(x, z) > PARK.r + FENCE_GAP && VALLEY.lawns.some((l) => x > l.x0 - margin && x < l.x1 + margin && z > l.z0 - margin && z < l.z1 + margin);
+
+/** Where guests step up to plot n's coaster: on the verge in front of its station's entrance stairs. */
+const plotZone = (n: number): Zone => {
+  const p = plotPoint(n, 4, 37.6);
+  return { x: p.x, z: p.z, radius: 3.2, title: `Plot ${n}`, action: 'Ride the coaster', heading: n % 2 === 1 ? 0 : Math.PI };
+};
 
 /** A zone `dx`, `dz` from an attraction's anchor: each one keeps its place beside its attraction wherever that stands. */
 const near = (a: { x: number; z: number }, dx: number, dz: number, rest: Omit<Zone, 'x' | 'z'>): Zone => ({ x: a.x + dx, z: a.z + dz, ...rest });
@@ -139,7 +207,16 @@ export const ZONES: Record<ZoneId, Zone> = {
   trail: near(LAYOUT.trail, -1, -7, { radius: 3.4, title: 'Rally Trail', action: 'Drive the time trial', heading: Math.PI }),
   // on the museum's porch, facing east through its door
   museum: near(LAYOUT.museum, -14.1, 0, { radius: 1.6, title: 'Career Museum', action: 'Take the guided tour', heading: -Math.PI / 2 }),
+  // at the Coaster Workshop's counter, facing north at the kiosk
+  workshop: near(VALLEY.kiosk, 0, 7, { radius: 3.4, title: 'Coaster Workshop', action: 'Build your own coaster', heading: 0 }),
+  // each plot's title is its coaster's name while one runs there (see setPlotTitle)
+  ...(Object.fromEntries(PLOT_IDS.map((id, i) => [id, plotZone(i + 1)])) as Record<PlotId, Zone>),
 };
+
+/** Names a plot's zone after the coaster running on it (or back to "Plot n" when it's empty). */
+export function setPlotTitle(id: PlotId, name: string | null) {
+  ZONES[id].title = name ?? `Plot ${plotNumber(id)}`;
+}
 
 /** Where the road to the giant wheel ends, in front of its terminal. */
 const WHEEL_END = LAYOUT.ferris.z + 22;
@@ -148,7 +225,7 @@ const WHEEL_END = LAYOUT.ferris.z + 22;
  * The districts, in the order the map lists them: each with its plaza (and the colour of its signs
  * and paving), its attractions, and where the zoomed-out map writes its name (clear of the pins).
  */
-export type DistrictId = 'gate' | 'midway' | 'falcon' | 'cosmos' | 'thrill' | 'motor';
+export type DistrictId = 'gate' | 'midway' | 'falcon' | 'cosmos' | 'thrill' | 'motor' | 'valley';
 type District = { name: string; icon: string; color: string; plaza: [number, number]; label: [number, number]; zones: ZoneId[] };
 export const DISTRICTS: Record<DistrictId, District> = {
   gate: { name: 'Main Gate', icon: '🎪', color: '#ff4d6d', plaza: [0, 18], label: [0, 6], zones: ['entrance', 'booth', 'ideas'] },
@@ -157,6 +234,7 @@ export const DISTRICTS: Record<DistrictId, District> = {
   cosmos: { name: 'Cosmos', icon: '🚀', color: '#7b5cd6', plaza: [0, -138], label: [-24, -140], zones: ['rocket', 'ship', 'drone', 'ferris'] },
   thrill: { name: 'Thrill Ridge', icon: '🎢', color: '#ff8a3d', plaza: [-56, -50], label: [-34, -62], zones: ['coaster', 'flip'] },
   motor: { name: 'Motor Town', icon: '🏁', color: '#4a90d9', plaza: [-50, 18], label: [-52, 34], zones: ['speedway', 'trail'] },
+  valley: { name: "Creators' Valley", icon: '🛠️', color: '#e05aa8', plaza: VALLEY.plaza, label: [-382, -100], zones: ['workshop', ...PLOT_IDS] },
 };
 
 /** The Promenade: the loop round the park's heart, past every district (back round to where it starts). */
@@ -185,6 +263,8 @@ export const PATHS: { points: [number, number][]; width: number }[] = [
   { points: [[-31, 18], [-31, 65]], width: 4.5 },
   // the Sky Flip's gate, off the Promenade
   { points: [[-41.1, -100.5], [-49, -106.1]], width: 4.5 },
+  // the Valley Road: off the Promenade, out of the west gate, past the plots of Creators' Valley
+  { points: [[VALLEY.road.x0, VALLEY.road.z], [VALLEY.road.x1, VALLEY.road.z]], width: VALLEY.road.width },
 ];
 
 export const PLAZAS: [number, number, number][] = [
@@ -237,6 +317,7 @@ export const FOOTPRINTS: [number, number, number][] = [
   [LAYOUT.museum.x, LAYOUT.museum.z, 16],
   [LAYOUT.coaster.x + 3, LAYOUT.coaster.z + 10, 12], // the Thunder Loop's station
   FALCON_STATION,
+  [VALLEY.kiosk.x, VALLEY.kiosk.z, 6], // the Coaster Workshop
 ];
 
 /** True if (x, z) is on an attraction's ground (see FOOTPRINTS), grown by `margin`. */
@@ -280,8 +361,8 @@ export function onPath(x: number, z: number, margin = 0) {
 }
 
 /**
- * Where the visitor may walk: inside the fence, or along the road to the giant wheel. Returns the
- * nearest walkable point to (x, z), or null when (x, z) is already walkable.
+ * Where the visitor may walk: inside the fence, along the road to the giant wheel, or along the
+ * Valley Road. Returns the nearest walkable point to (x, z), or null when (x, z) is already walkable.
  */
 export function clampToGrounds(x: number, z: number): [number, number] | null {
   const R = PARK.r;
@@ -293,10 +374,15 @@ export function clampToGrounds(x: number, z: number): [number, number] | null {
   if (Math.abs(x - PARK.x) <= half && z <= gateZ && z >= end) return null;
   const pr = Math.hypot(x - plaza.x, z - plaza.z);
   if (pr <= plaza.r) return null;
+  // the Valley Road and its verges, from just inside the west gate out to the last plots
+  const w = VALLEY.walk;
+  const westGate = -Math.sqrt(R * R - (VALLEY.road.z - PARK.z) ** 2) + 4;
+  if (x >= w.x1 && x <= westGate && z >= w.z0 && z <= w.z1) return null;
   const candidates: [number, number][] = [
     [PARK.x + ((x - PARK.x) * R) / r, PARK.z + ((z - PARK.z) * R) / r],
     [Math.max(PARK.x - half, Math.min(PARK.x + half, x)), Math.max(end, Math.min(gateZ, z))],
     [plaza.x + ((x - plaza.x) * plaza.r) / pr, plaza.z + ((z - plaza.z) * plaza.r) / pr],
+    [Math.max(w.x1, Math.min(westGate, x)), Math.max(w.z0, Math.min(w.z1, z))],
   ];
   let best = candidates[0];
   let bd = Infinity;

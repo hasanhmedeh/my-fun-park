@@ -70,7 +70,48 @@
       "tickets": 1,
       "open": true,
       "closedMessage": null
+    },
+    "plot1": {
+      "tickets": 1,
+      "open": true,
+      "closedMessage": null
+    },
+    "plot2": {
+      "tickets": 1,
+      "open": true,
+      "closedMessage": null
+    },
+    "plot3": {
+      "tickets": 1,
+      "open": true,
+      "closedMessage": null
+    },
+    "plot4": {
+      "tickets": 1,
+      "open": true,
+      "closedMessage": null
+    },
+    "plot5": {
+      "tickets": 1,
+      "open": true,
+      "closedMessage": null
+    },
+    "plot6": {
+      "tickets": 1,
+      "open": true,
+      "closedMessage": null
+    },
+    "plot7": {
+      "tickets": 1,
+      "open": true,
+      "closedMessage": null
+    },
+    "plot8": {
+      "tickets": 1,
+      "open": true,
+      "closedMessage": null
     }
   },
-  "shop": {}
+  "shop": {},
+  "workshop": {}
 }

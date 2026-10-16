@@ -5,6 +5,7 @@
 import './ringmaster.css';
 import { AccessBlockedError, api, ApiError, LIVE_URL, onAccessBlocked, ringmaster, type AccountNews, type User, type Visitors } from '../account/api';
 import { AttractionsView } from './attractions';
+import { CreationsView } from './creations';
 import { GatesView } from './gates';
 import { IdeasView } from './ideas';
 import { LedgerView } from './ledger';
@@ -15,8 +16,8 @@ import { ShopView } from './shop';
 import { TrailView } from './trail';
 import { errorText, isEditing, num, setApiErrorHandler, toast } from './util';
 
-type Tab = 'overview' | 'attractions' | 'trail' | 'shop' | 'ideas' | 'gates' | 'members' | 'ledger' | 'logbook';
-const TABS: Tab[] = ['overview', 'attractions', 'trail', 'shop', 'ideas', 'gates', 'members', 'ledger', 'logbook'];
+type Tab = 'overview' | 'attractions' | 'trail' | 'shop' | 'ideas' | 'creations' | 'gates' | 'members' | 'ledger' | 'logbook';
+const TABS: Tab[] = ['overview', 'attractions', 'trail', 'shop', 'ideas', 'creations', 'gates', 'members', 'ledger', 'logbook'];
 type Gate = 'loading' | 'login' | 'denied' | 'offline' | 'private';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -35,6 +36,7 @@ const views = {
   trail: new TrailView($('view-trail')),
   shop: new ShopView($('view-shop')),
   ideas: new IdeasView($('view-ideas'), (counts) => renderIdeasBadge(counts.pending)),
+  creations: new CreationsView($('view-creations'), (counts) => renderCreationsBadge(counts.pending)),
   gates: new GatesView($('view-gates')),
   members: new MembersView($('view-members'), () => me),
   ledger: new LedgerView($('view-ledger')),
@@ -46,14 +48,18 @@ const views = {
 /** What each kind of news touches. Only the view on screen is refreshed: the others load fresh when opened. */
 const AFFECTS: Record<string, Tab[]> = {
   members: ['overview', 'members'],
-  purchases: ['overview', 'members', 'ledger', 'shop'],
+  // the Coaster Workshop's parts sell as purchases too
+  purchases: ['overview', 'members', 'ledger', 'shop', 'creations'],
   rounds: ['overview', 'members', 'ledger', 'trail'],
   logbook: ['logbook', 'overview', 'members'],
-  park: ['overview', 'attractions', 'gates'],
+  // a plot's price or switch, or a coaster going up or coming down
+  park: ['overview', 'attractions', 'gates', 'creations'],
   shop: ['shop'],
   suggestions: ['ideas'],
   access: ['gates'],
   trail: ['trail', 'logbook'],
+  creations: ['creations'],
+  workshop: ['creations'],
 };
 /** News is gathered this long, then the view is refreshed once. */
 const SETTLE_MS = 800;
@@ -96,6 +102,8 @@ function openLive() {
   });
   // a price or the stock changed (here, or an item sold)
   source.addEventListener('shop', () => touched(['shop']));
+  // the same for the Coaster Workshop's parts
+  source.addEventListener('workshop', () => touched(['workshop']));
   // private access was switched on, or this address taken off the list, by another member of staff
   source.addEventListener('blocked', (e) => {
     const b = parse<{ message?: unknown; ip?: unknown }>(e);
@@ -176,8 +184,9 @@ function parse<T>(e: Event): T | null {
 
 /** Something happened: the view on screen catches up shortly (the rest when they're opened). */
 function touched(kinds: string[]) {
-  // the Ideas tab's badge keeps count wherever staff are in the office
+  // the Ideas and Creations tabs' badges keep count wherever staff are in the office
   if (kinds.includes('suggestions') && current !== 'ideas') void views.ideas.loadCounts();
+  if (kinds.includes('creations') && current !== 'creations') void views.creations.loadCounts();
   for (const k of kinds) for (const tab of AFFECTS[k] ?? []) stale.add(tab);
   scheduleRefresh(SETTLE_MS);
 }
@@ -220,11 +229,20 @@ function renderIdeasBadge(waiting: number) {
   badge.title = `${num(waiting)} waiting for an answer`;
 }
 
+/** The Creations tab's badge: how many coasters are waiting for a look. */
+function renderCreationsBadge(waiting: number) {
+  const badge = $('creations-badge');
+  badge.hidden = !waiting;
+  badge.textContent = num(waiting);
+  badge.title = `${num(waiting)} waiting for a look`;
+}
+
 /** Shows one of the doors (or none, once staff are in). */
 function showGate(gate: Gate | null) {
   if (gate === null) {
     openLive();
     void views.ideas.loadCounts();
+    void views.creations.loadCounts();
   } else closeLive();
   for (const g of ['loading', 'login', 'denied', 'offline', 'private'] as const) $(`gate-${g}`).hidden = g !== gate;
   tabsNav.hidden = gate !== null;

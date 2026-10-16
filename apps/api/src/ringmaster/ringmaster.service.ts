@@ -17,6 +17,7 @@ import type { UpdateParkDto } from './dto/update-park.dto.js';
 import type { UpdateShopItemDto } from './dto/update-shop-item.dto.js';
 import type { UpdateSuggestionDto } from './dto/update-suggestion.dto.js';
 import type { UpdateUserDto } from './dto/update-user.dto.js';
+import { changes, defined, log } from './logbook.js';
 
 export interface ParkSettingsJson {
   open: boolean;
@@ -136,8 +137,6 @@ export interface PageQuery {
   limit: number;
   offset: number;
 }
-
-type Tx = Prisma.TransactionClient;
 
 const withCounts = { _count: { select: { rounds: true, purchases: true } } } as const;
 type UserWithCounts = Prisma.UserGetPayload<{ include: typeof withCounts }>;
@@ -432,9 +431,12 @@ export class RingmasterService {
     await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({ where: { id }, include: withCounts });
       if (!user) throw new NotFoundException('No such member');
+      const released = await tx.creation.count({ where: { userId: id, status: 'released' } });
       await tx.user.delete({ where: { id } });
       // signed out on the spot, if they're in the fair
       await announce(tx, { t: 'user', id, deleted: true });
+      // their coasters go with them: a plot they had in Creators' Valley empties for everyone
+      if (released) await announce(tx, { t: 'park' });
       await log(tx, actor, 'user.delete', user.email, {
         before: { username: user.username, tickets: user.ticketBalance, rounds: user._count.rounds, purchases: user._count.purchases },
       });
@@ -575,32 +577,6 @@ export class RingmasterService {
       total,
     };
   }
-}
-
-/** Writes one line in the logbook, and tells every open office (other staff see it at once). */
-async function log(tx: Tx, actor: User, action: string, target: string | null, details: object) {
-  await tx.adminAction.create({
-    data: { actorId: actor.id, actorName: actor.username, action, target, details: details as Prisma.InputJsonObject },
-  });
-  await announce(tx, { t: 'office', kind: 'logbook' });
-}
-
-/** `obj` without its undefined keys (the fields a PATCH left out). */
-function defined<T extends Record<string, unknown>>(obj: T): { [K in keyof T]?: Exclude<T[K], undefined> } {
-  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as { [K in keyof T]?: Exclude<T[K], undefined> };
-}
-
-/** The fields of `data` that differ from `current`, before and after; null when nothing changes. */
-function changes(current: object, data: Record<string, unknown>) {
-  const before: Record<string, unknown> = {};
-  const after: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(data)) {
-    const was = (current as Record<string, unknown>)[key];
-    if (was === value) continue;
-    before[key] = was;
-    after[key] = value;
-  }
-  return Object.keys(after).length ? { before, after } : null;
 }
 
 function toParkJson(

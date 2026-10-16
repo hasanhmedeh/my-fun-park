@@ -15,9 +15,18 @@ export const ICONS: Record<AttractionId, string> = {
   crates: '🥫',
   striker: '🔔',
   ducks: '🦆',
+  // Creators' Valley's plots, each running a coaster a member built (or nothing yet)
+  plot1: '🎢',
+  plot2: '🎢',
+  plot3: '🎢',
+  plot4: '🎢',
+  plot5: '🎢',
+  plot6: '🎢',
+  plot7: '🎢',
+  plot8: '🎢',
 };
 
-/** "Thunder Loop" for "coaster". */
+/** "Thunder Loop" for "coaster", "Plot 3" for "plot3". */
 export const rideName = (id: AttractionId) => ZONES[id].title;
 export const rideLabel = (id: AttractionId) => `${ICONS[id]} ${rideName(id)}`;
 

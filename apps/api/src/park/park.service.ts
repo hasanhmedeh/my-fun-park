@@ -42,6 +42,8 @@ export interface PublicPark {
   ticketCap: number | null;
   /** The attractions closed for maintenance, each with its sign (null for the default wording). Open ones are left out. */
   maintenance: Partial<Record<Attraction, string | null>>;
+  /** The player-built coasters running in Creators' Valley, by plot (GET /creations/:id has each one's design). */
+  creations: { plot: number; id: string; name: string; creator: string }[];
 }
 
 export const PARK_CLOSED_MESSAGE = 'The park is closed right now. Come back soon!';
@@ -90,7 +92,11 @@ export class ParkService {
   }
 
   async publicPark(): Promise<PublicPark> {
-    const [rules, attractions] = await Promise.all([this.rules(), this.attractions()]);
+    const [rules, attractions, released] = await Promise.all([
+      this.rules(),
+      this.attractions(),
+      this.prisma.creation.findMany({ where: { status: 'released' }, select: { id: true, plot: true, name: true, user: { select: { username: true } } }, orderBy: { plot: 'asc' } }),
+    ]);
     const maintenance: PublicPark['maintenance'] = {};
     for (const a of attractions) if (!a.open) maintenance[a.attraction] = a.closedMessage;
     return {
@@ -103,6 +109,7 @@ export class ParkService {
       cooldownHours: rules.cooldownHours,
       ticketCap: rules.ticketCap,
       maintenance,
+      creations: released.map((c) => ({ plot: c.plot!, id: c.id, name: c.name, creator: c.user.username })),
     };
   }
 

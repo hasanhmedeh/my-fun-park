@@ -2,7 +2,7 @@
 // wording, the sign-up buttons, the countdown to the next pack, the price list and a member's history.
 import { ATTRACTION_IDS, type AttractionId } from '../account/api';
 import { everyHours, formatWait, session } from '../account/session';
-import { MAP_PLACES } from './minimap';
+import { MAP_PLACES, onMap } from './minimap';
 import { escapeHtml } from './ui';
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -33,9 +33,9 @@ export function waitHtml(ms: number, id = '') {
       : `<p ${attrs}>Your free pack of ${session.packNow} is ready at the Ticket Booth.</p>`;
 }
 
-/** Every attraction and what a round costs (the server's prices once they're in). */
+/** Every attraction and what a round costs (the server's prices once they're in); a plot only while a coaster runs there. */
 export function priceListHtml() {
-  const rows = ATTRACTION_IDS.map((id) => {
+  const rows = ATTRACTION_IDS.filter(onMap).map((id) => {
     const p = MAP_PLACES.find((m) => m.id === id)!;
     const price = session.maintenance(id) === undefined ? ticketsText(session.cost(id)) : '🚧 Under maintenance';
     return `<li><span>${p.icon} ${escapeHtml(p.label)}</span><b>${price}</b></li>`;

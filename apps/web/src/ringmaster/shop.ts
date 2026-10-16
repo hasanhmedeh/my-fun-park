@@ -2,7 +2,7 @@
 import { ringmaster, type AdminShopItem } from '../account/api';
 import { busy, esc, num, onApiError, plural, toast, when } from './util';
 
-const STOCK_MAX = 100_000;
+export const STOCK_MAX = 100_000;
 /** At or below this, an item's stock shows as running low. */
 const LOW_STOCK = 5;
 
@@ -106,7 +106,8 @@ const head = (soldOut?: number) =>
     soldOut ? ` <strong>${plural(soldOut, 'item', 'items')} sold out.</strong>` : ''
   }</p></div></div>`;
 
-function stockPill(stock: number | null) {
+/** No limit, sold out, or how many are left (the Coaster Workshop's parts use it too). */
+export function stockPill(stock: number | null) {
   if (stock === null) return '<span class="pill pill-muted">No limit</span>';
   if (stock === 0) return '<span class="pill pill-bad">Sold out</span>';
   return `<span class="pill ${stock <= LOW_STOCK ? 'pill-staff' : 'pill-good'}">${num(stock)} left</span>`;

@@ -4,7 +4,7 @@ import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { std, staticCylinder, type Ctx } from './context';
 import { Grass } from './grass';
-import { DISTRICTS, FENCE_GAP, flipLocal, GROUND, LAYOUT, MIDWAY, onFootprint, onMuseum, onPath, PARK, parkDistance, PATHS, PLAZAS, WHEEL_LAWN, WHEEL_ROAD, type DistrictId } from './layout';
+import { DISTRICTS, FENCE_GAP, flipLocal, GROUND, inValley, LAYOUT, MIDWAY, onFootprint, onMuseum, onPath, PARK, parkDistance, PATHS, PLAZAS, VALLEY, WHEEL_LAWN, WHEEL_ROAD, type DistrictId } from './layout';
 import type { Quality } from './quality';
 import { mulberry } from './random';
 import { detailNormalTexture, glowTexture, groundTexture, hdr, PALETTE, lawnPatchTexture, poolTexture, stripeTexture } from './textures';
@@ -77,6 +77,8 @@ export class Environment {
   private cubeCam: THREE.CubeCamera;
   private envRT: THREE.WebGLRenderTarget | null = null;
   private tmp = new THREE.Color();
+  /** What's drawn beyond the park too: the sky, the sun and moon, the lights, the far ground and hills (see shareLayer). */
+  private shared: THREE.Object3D[] = [];
 
   constructor(private ctx: Ctx, q: Quality) {
     const { scene } = ctx;
@@ -172,6 +174,7 @@ export class Environment {
     this.sun.shadow.normalBias = 0.035;
     this.sun.shadow.radius = 2.5;
     scene.add(this.sun, this.sun.target);
+    this.shared.push(this.sky, this.moon, this.stars, this.hemi, this.sun, this.sun.target);
 
     // ---------- Ground ----------
     // the park's lawn with its paths and plazas, each district's colour set into its plaza
@@ -214,10 +217,35 @@ export class Environment {
     lawn.position.set((lawnRect.x0 + lawnRect.x1) / 2, 0.03, (lawnRect.z0 + lawnRect.z1) / 2);
     lawn.receiveShadow = true;
     scene.add(lawn);
+    // Creators' Valley's lawn, out past the west gate, with the Valley Road running through it
+    for (const V of VALLEY.lawns) {
+      const valleyW = V.x1 - V.x0;
+      const valleyH = V.z1 - V.z0;
+      const valleyDetail = detail.clone();
+      valleyDetail.repeat.set((90 * valleyW) / 260, (90 * valleyH) / 260);
+      const valley = new THREE.Mesh(
+        new THREE.PlaneGeometry(valleyW, valleyH).rotateX(-Math.PI / 2),
+        std('#ffffff', {
+          map: lawnPatchTexture(V, ctx.mobile || q.tier === 'lowest' ? 5 : 8, GROUND, { side: L.fade, near: L.fade }, PATHS, PLAZAS),
+          normalMap: valleyDetail,
+          normalScale: new THREE.Vector2(0.9, 0.9),
+          roughness: 0.96,
+          transparent: true,
+          alphaTest: 0.02,
+          depthWrite: false,
+          polygonOffset: true,
+          polygonOffsetFactor: -1,
+        }),
+      );
+      valley.position.set((V.x0 + V.x1) / 2, 0.03, (V.z0 + V.z1) / 2);
+      valley.receiveShadow = true;
+      scene.add(valley);
+    }
     const far = new THREE.Mesh(new THREE.CircleGeometry(900, 64), std('#2b5c40', { roughness: 1 }));
     far.rotation.x = -Math.PI / 2;
     far.position.y = -0.05;
     scene.add(far);
+    this.shared.push(far);
     this.buildHills();
 
     const groundBody = new CANNON.Body({ mass: 0, material: ctx.mats.ground });
@@ -299,6 +327,8 @@ export class Environment {
     // …and round the giant wheel and its legs
     const wheel = LAYOUT.ferris;
     for (let x = -130; x <= 130; x += 10) for (const dz of [-50, 0, 50]) clear(wheel.x + x, wheel.z + dz, 10, 2);
+    // …and over Creators' Valley, whose coasters climb 35 m
+    for (const l of VALLEY.lawns) for (let x = l.x0; x <= l.x1; x += 15) for (let z = l.z0; z <= l.z1; z += 15) clear(x, z, 40, 3);
     radii.forEach((r, row) => {
       for (let i = 0; i <= seg; i++) {
         const a = (i / seg) * Math.PI * 2;
@@ -318,7 +348,14 @@ export class Environment {
     g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     g.setIndex(idx);
     g.computeVertexNormals();
-    this.ctx.scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+    const hills = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+    this.ctx.scene.add(hills);
+    this.shared.push(hills);
+  }
+
+  /** Draws the sky, the lights and the far hills on another render layer too (the Builder's Yard's). */
+  shareLayer(layer: number) {
+    for (const o of this.shared) o.traverse((c) => c.layers.enable(layer));
   }
 
   /**
@@ -345,6 +382,7 @@ export class Environment {
       !onRoad(x, z) &&
       !nearCircuit(x, z, WALL + 9) &&
       !nearTrail(x, z, TRAIL_WALL + 7) &&
+      !inValley(x, z, 6) &&
       Math.abs(parkDistance(x, z) - fence) > 3;
     // [x, z, scale, broadleaf only]
     const spots: [number, number, number, boolean][] = [];
@@ -432,27 +470,38 @@ export class Environment {
     geo.translate(0, 0.6, 0);
     const posts = new THREE.InstancedMesh(geo, std(PALETTE.cream, { roughness: 0.7 }), n);
     const m = new THREE.Matrix4();
-    // the north gate, where the road leaves for the giant wheel (centred on angle -π/2)
-    const gate = Math.asin((WHEEL_ROAD.half + 0.6) / r);
+    // the gates: north, where the road leaves for the giant wheel (centred on angle -π/2), and west,
+    // where the Valley Road leaves for Creators' Valley
+    const dz = VALLEY.road.z - PARK.z;
+    const gates = [
+      { at: -Math.PI / 2, half: Math.asin((WHEEL_ROAD.half + 0.6) / r) },
+      { at: Math.atan2(dz, -Math.sqrt(r * r - dz * dz)), half: Math.asin(((VALLEY.walk.z1 - VALLEY.walk.z0) / 2 + 0.6) / r) },
+    ];
+    const turn = Math.PI * 2;
+    const gap = (a: number, at: number) => Math.abs((((a - at + Math.PI) % turn) + turn) % turn - Math.PI);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2;
       const x = PARK.x + Math.cos(a) * r;
       const z = PARK.z + Math.sin(a) * r;
       // leave a gap where a coaster runs through the fence, and at the gate
-      const g = Math.abs(((a + Math.PI / 2 + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
-      if (nearTrack(x, z, 3, 4) || g < gate) m.makeScale(0, 0, 0);
+      if (nearTrack(x, z, 3, 4) || gates.some((g) => gap(a, g.at) < g.half)) m.makeScale(0, 0, 0);
       else m.makeRotationY(-a).setPosition(x, 0, z);
       posts.setMatrixAt(i, m);
     }
     posts.castShadow = true;
     this.ctx.scene.add(posts);
-    const rail = new THREE.Mesh(
-      new THREE.TorusGeometry(r, 0.06, 4, 240, Math.PI * 2 - gate * 2).rotateZ(-Math.PI / 2 + gate),
-      std(PALETTE.candy, { roughness: 0.5 }),
-    );
-    rail.rotation.x = Math.PI / 2;
-    rail.position.set(PARK.x, 0.95, PARK.z);
-    this.ctx.scene.add(rail);
+    // the rail runs round from gate to gate
+    const railMat = std(PALETTE.candy, { roughness: 0.5 });
+    const sorted = gates.map((g) => ({ ...g, at: ((g.at % turn) + turn) % turn })).sort((p, q) => p.at - q.at);
+    sorted.forEach((g, i) => {
+      const next = sorted[(i + 1) % sorted.length];
+      const from = g.at + g.half;
+      const to = next.at - next.half + (i === sorted.length - 1 ? turn : 0);
+      const rail = new THREE.Mesh(new THREE.TorusGeometry(r, 0.06, 4, Math.ceil((240 * (to - from)) / turn), to - from).rotateZ(from), railMat);
+      rail.rotation.x = Math.PI / 2;
+      rail.position.set(PARK.x, 0.95, PARK.z);
+      this.ctx.scene.add(rail);
+    });
   }
 
   /**

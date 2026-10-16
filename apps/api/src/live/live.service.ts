@@ -63,6 +63,7 @@ export class LiveService implements OnModuleDestroy {
   private parkTimer: ReturnType<typeof setTimeout> | null = null;
   private shopTimer: ReturnType<typeof setTimeout> | null = null;
   private boardTimer: ReturnType<typeof setTimeout> | null = null;
+  private workshopTimer: ReturnType<typeof setTimeout> | null = null;
   private officeKinds = new Set<OfficeKind>();
   private officeTimer: ReturnType<typeof setTimeout> | null = null;
   private presenceTimer: ReturnType<typeof setInterval> | null = null;
@@ -232,6 +233,12 @@ export class LiveService implements OnModuleDestroy {
         this.boardTimer = null;
         for (const { res } of this.streams) send(res, 'leaderboard', {});
       }, DEBOUNCE_MS);
+    } else if (notice.t === 'workshop') {
+      // just the word: tabs with the Coaster Workshop open fetch GET /workshop/parts
+      this.workshopTimer ??= setTimeout(() => {
+        this.workshopTimer = null;
+        for (const { res } of this.streams) send(res, 'workshop', {});
+      }, DEBOUNCE_MS);
     } else if (notice.t === 'office') {
       this.officeKinds.add(notice.kind);
       this.officeTimer ??= setTimeout(() => {
@@ -243,6 +250,9 @@ export class LiveService implements OnModuleDestroy {
     } else if (notice.t === 'suggestions') {
       // just the word: the member's tabs fetch GET /suggestions (staff answered, or another tab read it)
       for (const s of this.streams) if (s.userId === notice.userId) send(s.res, 'suggestions', {});
+    } else if (notice.t === 'creations') {
+      // just the word: the member's tabs fetch GET /workshop/creations (staff released or declined one)
+      for (const s of this.streams) if (s.userId === notice.userId) send(s.res, 'creations', {});
     } else if (notice.t === 'user') {
       const { t: _t, id, ...news } = notice;
       for (const s of this.streams) {

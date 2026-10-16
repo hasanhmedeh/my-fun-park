@@ -9,7 +9,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { Ctx } from './context';
 import { Environment } from './environment';
 import { Input } from './input';
-import { DISTRICTS, FALCON_STATION, FOOTPRINTS, LAYOUT, PLAZAS, ZONES, type ZoneId } from './layout';
+import { DISTRICTS, FALCON_STATION, FOOTPRINTS, LAYOUT, PLAZAS, setPlotTitle, ZONES, type ZoneId } from './layout';
 import { NAME_COLORS, physicsWord } from './letters';
 import { PALETTE } from './textures';
 import { escapeHtml, UI } from './ui';
@@ -20,7 +20,7 @@ import { Shop, VENDOR_LOOK } from './shop';
 import { Ideas } from './ideas';
 import { Gallery } from './gallery';
 import { Wardrobe } from './souvenirs';
-import { Minimap } from './minimap';
+import { Minimap, setPlotPlace } from './minimap';
 import { WorldMap } from './world-map';
 import { Trackside } from './trackside';
 import { TimeControl } from './time-control';
@@ -47,7 +47,22 @@ import { Ship } from './attractions/ship';
 import { Speedway } from './attractions/speedway';
 import { Trail } from './attractions/trail';
 import { boardListHtml, leaderboard, resetClock, resetIn, trailTime } from '../account/leaderboard';
-import { ApiError, ATTRACTION_IDS, isAttraction, isGame, NotEnoughTicketsError, ParkClosedError, RideClosedError, type AttractionId } from '../account/api';
+import {
+  api,
+  ApiError,
+  ATTRACTION_IDS,
+  isAttraction,
+  isGame,
+  isPlot,
+  NotEnoughTicketsError,
+  ParkClosedError,
+  PLOT_IDS,
+  plotNumber,
+  RideClosedError,
+  type AttractionId,
+  type CreationDetail,
+  type PlotId,
+} from '../account/api';
 import { everyHours, formatWait, session } from '../account/session';
 import { authDialog, type AuthMode } from '../account/auth-dialog';
 import { AccountMenu } from '../account/account-menu';
@@ -56,13 +71,16 @@ import { leaveEarly } from '../account/leave-early';
 import { cleanStats } from '../account/stats';
 import { STATUSES } from '../account/ideas';
 import { accountButtons, legalLinksHtml, packText, ticketsText, waitHtml } from './ticket-counter';
+import { Valley } from '../workshop/valley';
+import { Yard, YARD_LAYER } from '../workshop/yard';
+import { Builder } from '../workshop/builder';
 
 /** The clock slider / pause / local-time panel. Off for now: the park stays at 16:00. */
 const TIME_CONTROLS = false;
 /** How many guests walk the park, by graphics tier. */
 const CROWD_SIZE = { high: 80, medium: 56, low: 32, lowest: 14 } as const;
 
-type Mode = 'drive' | 'coaster' | 'rocket' | 'striker' | 'ducks' | 'wheel' | 'drone' | 'flip' | 'ship' | 'race' | 'trail' | 'shop' | 'ideas' | 'museum';
+type Mode = 'drive' | 'coaster' | 'rocket' | 'striker' | 'ducks' | 'wheel' | 'drone' | 'flip' | 'ship' | 'race' | 'trail' | 'shop' | 'ideas' | 'museum' | 'workshop';
 
 const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
 
@@ -119,6 +137,20 @@ export class Game {
   private ship!: Ship;
   private speedway!: Speedway;
   private trail!: Trail;
+  /** Creators' Valley: its plots, and the coasters members built running on them. */
+  private valley!: Valley;
+  /** A round on one of Creators' Valley's coasters: its plot, and the coaster (which creation, its name) it boarded. */
+  private plotRound: { plot: PlotId; creation: string; name: string; coaster: Coaster } | null = null;
+  /** The train ran out of speed this round: how far it got (metres), for the results. */
+  private stalledAt: number | null = null;
+  /** The Coaster Workshop's Builder's Yard (drawn on its own layer) and its sheet. */
+  private yard!: Yard;
+  private workshop: Builder | null = null;
+  /** A free test ride from the yard is on (no round, no tickets), and where its train stalled. */
+  private testRide = false;
+  private testStall: number | null = null;
+  /** The office's "test-ride in the game" link (?coaster=<id>) has been followed. */
+  private inspected = false;
   private updatables: { update(dt: number, t: number): void }[] = [];
   private mode: Mode = 'drive';
   private camTarget = new THREE.Vector3();
@@ -329,6 +361,15 @@ export class Game {
     step(2, () => {
       this.trail = new Trail(this.ctx);
       this.updatables.push(this.trail);
+    });
+    step(1, () => {
+      // Creators' Valley, out of the west gate (its coasters arrive with the park's state)
+      this.valley = new Valley(this.ctx);
+      this.updatables.push(this.valley);
+      // the Builder's Yard: its own layer, with the park's sky and far hills
+      this.yard = new Yard(this.ctx);
+      this.updatables.push(this.yard);
+      this.env.shareLayer(YARD_LAYER);
     });
     step(2, () => {
       this.rocket = new Rocket(this.ctx, this.env);
@@ -583,6 +624,15 @@ export class Game {
       onAuth: (mode) => void this.signIn(mode, null),
       onLeave: () => this.leaveIdeas(),
     });
+    this.workshop = new Builder({
+      root: document.getElementById('workshop')!,
+      yard: this.yard,
+      sfx: this.sfx,
+      mobile: this.mobile,
+      onLeave: () => this.leaveWorkshop(),
+      onTestRide: () => this.testRideYard(),
+      onAuth: (mode) => void this.signIn(mode, null),
+    });
     this.gallery = new Gallery({
       root: document.getElementById('museum')!,
       sfx: this.sfx,
@@ -620,6 +670,11 @@ export class Game {
     };
     this.worldMap.onTravel = (id) => this.teleport(id);
     this.minimap.onOpen = () => this.worldMap.open();
+    // Creators' Valley's coasters come and go with the park's state: released, replaced, taken out
+    for (const id of PLOT_IDS) this.zones.setZone(id, false);
+    this.valley.onChange = (plot) => this.onPlotChange(plot);
+    session.onCreations(() => this.valley.sync(session.creations));
+    this.valley.sync(session.creations);
     new GraphicsMenu(this.quality);
 
     this.stack.onFinish = () => this.endRide();
@@ -676,6 +731,12 @@ export class Game {
     if (this.mode === 'drive') this.player.enabled = true;
     session.watchPark();
     this.onParkChange();
+    // the office's "test-ride in the game" link: that coaster, in the Builder's Yard
+    const inspect = new URLSearchParams(location.search).get('coaster');
+    if (inspect && !this.inspected) {
+      this.inspected = true;
+      void this.openInspect(inspect);
+    }
     // back in after the park's maintenance: no second welcome
     if (this.welcomed) return;
     this.welcomed = true;
@@ -705,7 +766,11 @@ export class Game {
       flip: `🌀 <strong>Sky Flip</strong> — swing 125 m up, right over the top, flipping head over heels ${cost('flip')}`,
       speedway: `🏎️ <strong>Turbo Speedway</strong> — race three rivals round a kart circuit full of obstacles ${cost('speedway')}`,
       trail: `🚙 <strong>Rally Trail</strong> — a buggy time trial with jumps, mud and crates: beat today's fastest on the leaderboard ${cost('trail')}`,
+      workshop:
+        "🛠️ <strong>Coaster Workshop</strong> — out of the west gate: build your own coaster from parts, ride it for free, and send it to staff. Released ones open here, and you earn tickets each time someone rides them",
     };
+    for (const r of this.valley.coasters)
+      line[r.plot] = `🎢 <strong>${escapeHtml(r.creation.name)}</strong> — a coaster by @${escapeHtml(r.creation.creator)}, built in the Coaster Workshop ${cost(r.plot)}`;
     const districts = Object.values(DISTRICTS)
       .map((d) => {
         const items = d.zones.flatMap((z) => (line[z] ? [`<li>${line[z]}</li>`] : []));
@@ -744,6 +809,8 @@ export class Game {
       this.enterShop();
     } else if (z === 'ideas') {
       this.enterIdeas();
+    } else if (z === 'workshop') {
+      this.enterWorkshop();
     } else if (z === 'drone') {
       // E at the counter shows the offer; E again (or its button) takes off
       if (this.panelZone === 'drone' && this.ui.panelOpenKey.startsWith('drone-offer')) this.board('drone');
@@ -763,6 +830,8 @@ export class Game {
   private board(ride: AttractionId) {
     // one round at a time, and none while one is starting (the visitor is frozen then)
     if (this.mode !== 'drive' || this.boarding || this.round || this.leaving || !this.player.enabled) return;
+    // a Creators' Valley plot with nothing running on it (its ring is off, but the results' "again" can land here)
+    if (isPlot(ride) && !this.valley.on(ride)) return;
     // staff ride through closed gates: that's how they test an attraction before it reopens
     if (!session.isStaff && !session.parkOpen) return this.showClosed(ride);
     if (!session.isStaff && session.maintenance(ride) !== undefined) return this.showMaintenance(ride);
@@ -794,8 +863,12 @@ export class Game {
     this.worldMap.close();
     results.close(null);
     this.round = { id, ride, tickets };
+    // a member's coaster: the one running on its plot now (taken out while the ticket printed: none)
+    const run = isPlot(ride) ? this.valley.on(ride) : null;
+    this.plotRound = run && { plot: run.plot, creation: run.creation.id, name: run.creation.name, coaster: run.coaster };
+    this.stalledAt = null;
     // closed while the ticket printed: the round ends before it starts, and the tickets come back
-    if (session.shutOut || (!session.isStaff && (!session.parkOpen || session.maintenance(ride) !== undefined))) {
+    if (session.shutOut || (isPlot(ride) && !run) || (!session.isStaff && (!session.parkOpen || session.maintenance(ride) !== undefined))) {
       this.lockedOut = true;
       return this.finishRound(false);
     }
@@ -871,6 +944,47 @@ export class Game {
         this.cratesDismissed = false;
         this.showZonePanel('crates');
         break;
+      default:
+        if (isPlot(ride)) this.launchPlot();
+    }
+  }
+
+  /** Boards the coaster a member built (see begin: the one on its plot when the ticket printed). */
+  private launchPlot() {
+    const c = this.plotRound?.coaster;
+    if (!c) return;
+    c.input = this.input;
+    c.onFinish = () => this.endRide();
+    c.onComplete = () => this.leave(true);
+    // out of speed on a climb: the round ends there, and the crew tows the train home
+    c.onStall = (atM) => {
+      this.stalledAt = atM;
+      this.leave(false);
+    };
+    this.startRide('coaster', () => {
+      this.ride = c;
+      // taken out of the park while ridden, it stays until the rider is off (see endRide)
+      this.valley.busy = c;
+      c.start();
+    });
+  }
+
+  /**
+   * A plot's coaster opened, changed or closed: its ring, its name on the signs and the maps, and a
+   * round on the coaster that just left (taken out, or replaced by a newer version) stops with a refund.
+   */
+  private onPlotChange(plot: PlotId) {
+    const r = this.valley.on(plot);
+    setPlotTitle(plot, r ? r.creation.name : null);
+    setPlotPlace(plot, r ? { name: r.creation.name, creator: r.creation.creator, track: r.track, color: r.detail.data.colors.rails } : null);
+    this.zones.setZone(plot, !!r);
+    this.minimap.redraw();
+    this.worldMap.refreshPlaces();
+    if (this.round?.ride === plot && this.plotRound && r?.creation.id !== this.plotRound.creation) this.lockOut();
+    // a card open at that plot is about a coaster that's gone
+    if (!r && this.mode === 'drive' && this.panelZone === plot && !this.round) {
+      this.ui.hidePanel();
+      this.panelZone = null;
     }
   }
 
@@ -897,8 +1011,8 @@ export class Game {
     this.ui.panel(
       `ticket-error-${Date.now()}`,
       closed
-        ? `<p class="eyebrow">${z.title} · Ticket office</p><h2>The ticket office is closed 🚧</h2><p>We can't reach the ticket office right now, and it has to punch your ticket before ${z.title} can start. Your tickets are safe: try again in a moment.</p><p class="panel-actions"><button class="btn btn-primary btn-small" type="button" data-board data-ride="${ride}">Try again</button></p>`
-        : `<p class="eyebrow">${z.title} · Ticket office</p><h2>No ticket this time</h2><p>${escapeHtml(err.message)}</p>`,
+        ? `<p class="eyebrow">${escapeHtml(z.title)} · Ticket office</p><h2>The ticket office is closed 🚧</h2><p>We can't reach the ticket office right now, and it has to punch your ticket before ${escapeHtml(z.title)} can start. Your tickets are safe: try again in a moment.</p><p class="panel-actions"><button class="btn btn-primary btn-small" type="button" data-board data-ride="${ride}">Try again</button></p>`
+        : `<p class="eyebrow">${escapeHtml(z.title)} · Ticket office</p><h2>No ticket this time</h2><p>${escapeHtml(err.message)}</p>`,
       { accent: PALETTE.mustard },
     );
   }
@@ -912,7 +1026,7 @@ export class Game {
     const sign = session.park?.message ?? "The park is closed right now. Come back soon: you're welcome to look around meanwhile.";
     this.ui.panel(
       `closed-${ride}-${Date.now()}`,
-      `<p class="eyebrow">${z.title} · Park closed</p><h2>🚧 The park is closed</h2><p>${escapeHtml(sign)}</p><p class="sub">No tickets are spent while the park is closed.</p>`,
+      `<p class="eyebrow">${escapeHtml(z.title)} · Park closed</p><h2>🚧 The park is closed</h2><p>${escapeHtml(sign)}</p><p class="sub">No tickets are spent while the park is closed.</p>`,
       { accent: PALETTE.candy },
     );
   }
@@ -927,7 +1041,10 @@ export class Game {
     if (this.mode === 'shop') this.leaveShop();
     if (this.mode === 'ideas') this.leaveIdeas();
     if (this.mode === 'museum') this.leaveMuseum(true);
+    if (this.mode === 'workshop') this.leaveWorkshop(true);
     this.inFair = false;
+    // a test ride from the yard ends (and lands back on foot: see endTestRide)
+    if (this.testRide) this.leave(false);
     session.setInFair(false);
     if (this.round) this.lockOut();
     this.ui.hidePanel();
@@ -951,22 +1068,39 @@ export class Game {
   }
 
   /** After a lock-out: the round's tickets go back, and the sign says why it stopped. */
-  private async showLockedOut(ride: AttractionId, roundId: string) {
+  private async showLockedOut(ride: AttractionId, roundId: string, coaster: string | null = null) {
     const refunded = await session.refund(roundId);
     // open again already, or the server's away: the round is closed as usual, without the results
     if (refunded === null) void session.finish(roundId, false, {}).catch(() => {});
     if (!this.inFair || this.mode !== 'drive' || this.round || this.boarding) return;
     const z = ZONES[ride];
     const parkClosed = !session.parkOpen;
+    const back = refunded ? (refunded === 1 ? 'its ticket is back in your wallet' : `its ${refunded} tickets are back in your wallet`) : 'it has been ended';
+    // a member's coaster taken out of Creators' Valley (or swapped for a newer version) under the rider
+    if (isPlot(ride) && coaster !== null && !parkClosed && session.maintenance(ride) === undefined) {
+      const newer = session.creationOn(plotNumber(ride));
+      const name = escapeHtml(coaster);
+      this.sfx.beep();
+      this.panelZone = ride;
+      this.ui.panel(
+        `taken-${ride}-${Date.now()}`,
+        `<p class="eyebrow">${name} · Creators' Valley</p><h2>🚧 ${name} just left the park</h2><p>${
+          newer
+            ? `Staff swapped it for ${newer.name === coaster ? 'a newer version' : `<strong>${escapeHtml(newer.name)}</strong>`}, opening on this plot in a moment.`
+            : "Staff took it out of Creators' Valley."
+        }</p><p class="sub">Your round was stopped, and ${back}.</p>`,
+        { accent: PALETTE.candy },
+      );
+      return;
+    }
     const sign = parkClosed
       ? (session.park?.message ?? "The park is closed right now. Come back soon: you're welcome to look around meanwhile.")
       : (session.maintenance(ride) ?? `Our crew is giving ${z.title} some care. It will be back soon: try another attraction meanwhile!`);
-    const back = refunded ? (refunded === 1 ? 'its ticket is back in your wallet' : `its ${refunded} tickets are back in your wallet`) : 'it has been ended';
     this.sfx.beep();
     this.panelZone = ride;
     this.ui.panel(
       `${parkClosed ? 'closed' : 'maintenance'}-${ride}-${Date.now()}`,
-      `<p class="eyebrow">${z.title} · ${parkClosed ? 'Park closed' : 'Under maintenance'}</p><h2>🚧 ${parkClosed ? 'The park just closed' : `${escapeHtml(z.title)} just closed`}</h2><p>${escapeHtml(sign)}</p><p class="sub">Your round was stopped, and ${back}.</p>`,
+      `<p class="eyebrow">${escapeHtml(z.title)} · ${parkClosed ? 'Park closed' : 'Under maintenance'}</p><h2>🚧 ${parkClosed ? 'The park just closed' : `${escapeHtml(z.title)} just closed`}</h2><p>${escapeHtml(sign)}</p><p class="sub">Your round was stopped, and ${back}.</p>`,
       { accent: PALETTE.candy },
     );
   }
@@ -980,7 +1114,7 @@ export class Game {
     const sign = session.maintenance(ride) ?? `Our crew is giving ${z.title} some care. It will be back soon: try another attraction meanwhile!`;
     this.ui.panel(
       `maintenance-${ride}-${Date.now()}`,
-      `<p class="eyebrow">${z.title} · Under maintenance</p><h2>🚧 Under maintenance</h2><p>${escapeHtml(sign)}</p><p class="sub">No tickets were spent.</p>`,
+      `<p class="eyebrow">${escapeHtml(z.title)} · Under maintenance</p><h2>🚧 Under maintenance</h2><p>${escapeHtml(sign)}</p><p class="sub">No tickets were spent.</p>`,
       { accent: PALETTE.candy },
     );
   }
@@ -1030,7 +1164,7 @@ export class Game {
     this.panelZone = ride;
     this.ui.panel(
       `gate-${ride}-${Date.now()}`,
-      `<p class="eyebrow">${z.title} · ${ticketsText(session.cost(ride))}</p><h2>🎟️ Members only</h2><p>${
+      `<p class="eyebrow">${escapeHtml(z.title)} · ${ticketsText(session.cost(ride))}</p><h2>🎟️ Members only</h2><p>${
         expired ? "Your session ran out, so you're back to being a guest. " : ''
       }Every ride and game costs tickets, and tickets come with a free account: pick up ${packText()}. Visiting the booth is always free.</p>${accountButtons(ride)}`,
       { accent: PALETTE.mustard },
@@ -1046,7 +1180,7 @@ export class Game {
     const wait = session.msUntilPurchase();
     this.ui.panel(
       `short-${ride}-${Date.now()}`,
-      `<p class="eyebrow">${z.title} · ${ticketsText(cost)}</p><h2>Not enough tickets</h2><p>${z.title} costs <strong>${ticketsText(cost)}</strong> a round, and you have <strong>${balance}</strong>.</p>${
+      `<p class="eyebrow">${escapeHtml(z.title)} · ${ticketsText(cost)}</p><h2>Not enough tickets</h2><p>${escapeHtml(z.title)} costs <strong>${ticketsText(cost)}</strong> a round, and you have <strong>${balance}</strong>.</p>${
         wait === null ? '' : waitHtml(wait)
       }<p class="panel-actions"><button class="btn btn-primary btn-small" type="button" data-goto="booth">Go to the Ticket Booth 🎟️</button></p>`,
       { accent: PALETTE.mustard },
@@ -1079,6 +1213,7 @@ export class Game {
     const user = session.user?.id ?? null;
     const switched = user !== this.sessionUser;
     this.sessionUser = user;
+    if (switched && this.mode === 'workshop') this.leaveWorkshop();
     const key = this.ui.panelOpenKey;
     if (!key || this.mode !== 'drive') return;
     if (switched && session.user && key.startsWith('gate-')) {
@@ -1233,6 +1368,132 @@ export class Game {
     this.teleport('ideas', () => this.enterIdeas());
   }
 
+  /** The members-only card at the Coaster Workshop's kiosk. */
+  private showWorkshopGate() {
+    this.player.interact();
+    this.sfx.beep();
+    this.panelZone = 'workshop';
+    this.ui.panel(
+      `gate-workshop-${Date.now()}`,
+      `<p class="eyebrow">Coaster Workshop · Creators' Valley</p><h2>🛠️ Members only</h2><p>Build your own coaster here: buy parts with tickets, lay the track piece by piece and ride it for free. Send it to staff, and if they release it in Creators' Valley, your name goes on the station and you earn tickets every time someone rides it.</p><p>It starts with a free account, and a free starter kit.</p>${accountButtons()}`,
+      { accent: '#e05aa8' },
+    );
+  }
+
+  /**
+   * Into the Builder's Yard (behind a quick fade): the park makes way for the yard's own layer, and
+   * the workshop's sheet opens. With `inspect`, a submitted coaster to look at and ride instead.
+   */
+  private enterWorkshop(inspect?: CreationDetail) {
+    if (this.mode !== 'drive' || this.round || this.boarding || this.leaving || !this.workshop) return;
+    if (!session.user && !inspect) return this.showWorkshopGate();
+    this.ui.hidePanel();
+    this.panelZone = null;
+    this.ui.prompt('', '', '');
+    this.player.enabled = false;
+    this.worldMap.close();
+    this.fade(() => {
+      this.mode = 'workshop';
+      this.player.group.visible = false;
+      document.body.classList.add('is-shopping', 'is-workshop');
+      this.camera.layers.set(YARD_LAYER);
+      this.yard.active = true;
+      this.yard.snap();
+      if (inspect) this.workshop!.inspect(inspect);
+      else this.workshop!.open();
+      this.resize();
+    });
+  }
+
+  /** Back from the yard to the kiosk, on foot. */
+  private leaveWorkshop(now = false) {
+    if (this.mode !== 'workshop') return;
+    this.workshop?.close();
+    this.yard.active = false;
+    const back = () => {
+      this.mode = 'drive';
+      this.camera.layers.set(0);
+      document.body.classList.remove('is-shopping', 'is-workshop');
+      const z = ZONES.workshop;
+      this.player.reset(z.x, z.z, z.heading);
+      this.player.group.visible = true;
+      this.player.enabled = this.inFair;
+      this.camYaw = z.heading; // behind the visitor, facing the kiosk
+      this.camPitch = 0.2;
+      this.resize();
+      this.updateDriveCamera(1, true);
+    };
+    if (now) return back();
+    this.fade(back);
+    this.sfx.chime();
+  }
+
+  /** The office's link to a submitted coaster: into the yard with it, once the fair is open. */
+  private async openInspect(id: string) {
+    try {
+      const c = await api.creation(id);
+      if (this.mode === 'drive' && this.inFair) this.enterWorkshop(c);
+    } catch (err) {
+      this.panelZone = null;
+      this.ui.panel(
+        `inspect-${Date.now()}`,
+        `<p class="eyebrow">Coaster Workshop</p><h2>That coaster isn't here</h2><p>${
+          err instanceof ApiError && err.status === 404
+            ? 'It may have been taken back, or only its creator and staff can see it: log in with a staff account and try the link again.'
+            : escapeHtml(err instanceof Error ? err.message : "Couldn't load it.")
+        }</p>`,
+        { accent: '#e05aa8' },
+      );
+    }
+  }
+
+  /** A free test ride on the coaster in the yard: no round and no tickets, back to the yard after. */
+  private testRideYard() {
+    if (this.mode !== 'workshop' || this.leaving || !this.workshop) return;
+    const c = this.yard.flush();
+    if (!c) return;
+    this.workshop.suspend();
+    this.yard.active = false;
+    this.testRide = true;
+    this.testStall = null;
+    c.input = this.input;
+    c.onFinish = () => this.endTestRide(c);
+    c.onComplete = () => this.leave(true);
+    c.onStall = (atM) => {
+      this.testStall = atM;
+      this.leave(false);
+    };
+    this.startRide('coaster', () => {
+      document.body.classList.remove('is-shopping');
+      this.ride = c;
+      c.start();
+      this.resize();
+    });
+  }
+
+  /** The test ride's over: back in the yard, with how it went. */
+  private endTestRide(c: Coaster) {
+    const completed = this.leaveCompleted;
+    this.leaving = this.leaveCompleted = false;
+    this.testRide = false;
+    this.camera.up.set(0, 1, 0);
+    this.ui.endIntro();
+    this.ui.cinematic(false);
+    this.ui.rideExit(false);
+    this.ui.countdown(null);
+    this.mode = 'workshop';
+    document.body.classList.add('is-shopping');
+    const stalledAt = this.testStall;
+    this.testStall = null;
+    // out of the fair (or signed out) meanwhile: straight back on foot
+    if (!this.inFair || (!session.user && !this.workshop?.inspecting)) return this.leaveWorkshop(true);
+    this.yard.active = true;
+    this.yard.snap();
+    this.workshop?.resume();
+    this.workshop?.testDone({ completed, stalledAt, stats: c.roundStats() });
+    this.resize();
+  }
+
   /**
    * The Career Museum's tour, at stop `i` (0: the porch, then each frame, then the toolbox): the
    * visitor steps aside (behind a quick fade), the camera glides to the frame, and the sheet with
@@ -1353,6 +1614,7 @@ export class Game {
     if (this.mode === 'shop') return this.leaveShop();
     if (this.mode === 'ideas') return this.leaveIdeas();
     if (this.mode === 'museum') return this.leaveMuseum();
+    if (this.mode === 'workshop') return this.workshop?.escape();
     // past the line already: the run's done, so this is no early exit
     if (this.mode === 'trail' && this.trail.finished) return this.leave(true);
     if (this.mode !== 'drive' || this.round?.ride === 'crates') return this.askToLeave();
@@ -1395,7 +1657,11 @@ export class Game {
     if (this.mode === 'shop') return this.leaveShop();
     if (this.mode === 'ideas') return this.leaveIdeas();
     if (this.mode === 'museum') return this.leaveMuseum();
-    const exit: Record<Exclude<Mode, 'drive' | 'striker' | 'ducks' | 'shop' | 'ideas' | 'museum'>, () => void> = {
+    if (this.mode === 'workshop') {
+      this.leaving = false;
+      return this.leaveWorkshop();
+    }
+    const exit: Record<Exclude<Mode, 'drive' | 'striker' | 'ducks' | 'shop' | 'ideas' | 'museum' | 'workshop'>, () => void> = {
       coaster: () => this.ride.exit(),
       rocket: () => this.rocket.exit(),
       wheel: () => this.wheel.exit(),
@@ -1431,7 +1697,10 @@ export class Game {
     this.ui.rideExit(false);
     this.ui.countdown(null);
     const zoneOf: Partial<Record<Mode, ZoneId>> = { striker: 'striker', ducks: 'ducks', drone: 'drone', flip: 'flip', ship: 'ship', race: 'speedway', trail: 'trail', wheel: 'ferris' };
-    this.panelZone = from === 'coaster' ? (this.ride === this.falcon ? 'falcon' : 'coaster') : (zoneOf[from] ?? 'rocket');
+    this.panelZone =
+      from === 'coaster' ? (this.ride === this.falcon ? 'falcon' : this.ride === this.stack ? 'coaster' : (this.plotRound?.plot ?? 'coaster')) : (zoneOf[from] ?? 'rocket');
+    // a member's coaster taken out of the park while it was ridden can go now
+    if (from === 'coaster') this.valley.release();
     if (wasRide) this.updateDriveCamera(1, true);
     const completed = this.leaveCompleted;
     this.leaving = this.leaveCompleted = false;
@@ -1448,17 +1717,35 @@ export class Game {
     if (!round) return;
     this.round = null;
     leaveEarly.close(false);
+    const plotRound = this.plotRound;
+    const stalled = this.stalledAt;
+    this.stalledAt = null;
     if (this.lockedOut) {
       this.lockedOut = false;
+      this.plotRound = null;
       this.ui.hidePanel();
       this.panelZone = null;
-      return void this.showLockedOut(round.ride, round.id);
+      return void this.showLockedOut(round.ride, round.id, plotRound?.name ?? null);
     }
     const stats = this.measuredStats(round.ride);
+    this.plotRound = null;
     // the attraction's own card is done with: the results screen takes over
     this.ui.hidePanel();
     this.panelZone = null;
-    const result: RoundResult = { ride: round.ride, title: ZONES[round.ride].title, completed, stats };
+    const result: RoundResult = {
+      ride: round.ride,
+      title: plotRound?.name ?? ZONES[round.ride].title,
+      completed,
+      stats,
+      ...(stalled === null
+        ? {}
+        : {
+            ending: {
+              headline: `Stalled at ${stalled} m`,
+              lead: 'Not enough speed to make it over the top: the train rolled to a stop, and the crew towed it back to the station.',
+            },
+          }),
+    };
     void results.open(result).then((choice) => this.afterResults(round.ride, choice));
     session.finish(round.id, completed, stats).then(
       (res) => results.saved(result, res),
@@ -1471,7 +1758,9 @@ export class Game {
 
   /** What the attraction measured of its round, ready for the server. */
   private measuredStats(ride: AttractionId) {
-    const measured: Record<AttractionId, Measured> = {
+    // a member's coaster: the one boarded (see begin)
+    if (isPlot(ride)) return cleanStats(this.plotRound?.coaster.roundStats() ?? {});
+    const measured: Record<Exclude<AttractionId, PlotId>, Measured> = {
       coaster: this.stack,
       falcon: this.falcon,
       rocket: this.rocket,
@@ -1532,7 +1821,9 @@ export class Game {
           ? this.ideas.viewOffset(w, h)
           : this.mode === 'museum' && this.gallery
             ? this.gallery.viewOffset(w, h)
-            : null;
+            : this.mode === 'workshop' && this.workshop
+              ? this.workshop.viewOffset(w, h)
+              : null;
     if (off && (off.x || off.y)) this.camera.setViewOffset(w, h, off.x, off.y, w, h);
     else this.camera.clearViewOffset();
     this.camera.updateProjectionMatrix();
@@ -1655,6 +1946,10 @@ export class Game {
       this.camera.position.copy(this.camPos);
       this.camera.lookAt(this.camTarget);
       this.env.follow(this.camTarget);
+    } else if (this.mode === 'workshop') {
+      this.zones.setVisible(false);
+      this.yard.updateCamera(this.camera, dt);
+      this.env.follow(this.yard.focus);
     } else if (this.mode === 'ducks') {
       this.camera.up.set(0, 1, 0);
       this.zones.setVisible(false);
@@ -1696,6 +1991,8 @@ export class Game {
       this.renderer.setPixelRatio(this.quality.dpr * this.adaptive.scale);
       this.resize();
     }
+    // a picture of the coaster for staff, taken just before the frame covers it
+    if (this.mode === 'workshop') this.yard.takeSnapshot(this.scene);
     this.post.render(dt);
   }
 
@@ -1719,6 +2016,8 @@ export class Game {
     const trains = [
       { x: this.stack.trainPosition.x, z: this.stack.trainPosition.z, color: PALETTE.mustard },
       { x: this.falcon.trainPosition.x, z: this.falcon.trainPosition.z, color: PALETTE.teal },
+      // Creators' Valley's trains, in their first car's colour
+      ...this.valley.coasters.map((r) => ({ x: r.coaster.trainPosition.x, z: r.coaster.trainPosition.z, color: r.detail.data.colors.cars[0] })),
       // the rivals (and, unless it's yours, the candy-red kart)
       ...(racing ? karts.slice(1) : karts),
       // the trail's demo buggy (yours is the arrow)
@@ -1741,7 +2040,7 @@ export class Game {
     }
     let best = 0;
     let launching = false;
-    for (const c of [this.stack, this.falcon]) {
+    for (const c of [this.stack, this.falcon, ...this.valley.coasters.map((r) => r.coaster)]) {
       const near = Math.max(0, 1 - c.trainPosition.distanceTo(this.camera.position) / 90);
       const level = Math.min(1, c.speed / 30) * near;
       if (level > best) {

@@ -11,6 +11,8 @@ interface Marker {
   label: THREE.Sprite;
   baseY: number;
   closed: boolean;
+  /** Switched off (an empty plot in Creators' Valley): no ring, no label, no prompt. */
+  off: boolean;
   /** Built the first time the attraction closes. */
   site: MaintenanceSite | null;
 }
@@ -38,7 +40,7 @@ export class Zones {
       const label = makeSprite(floatingTextTexture(z.title, z.action), 7);
       label.position.set(z.x, 3.4, z.z);
       ctx.scene.add(ring, fill, label);
-      this.markers.push({ id, ring, fill, label, baseY: 3.4, closed: false, site: null });
+      this.markers.push({ id, ring, fill, label, baseY: 3.4, closed: false, off: false, site: null });
     }
   }
 
@@ -57,17 +59,36 @@ export class Zones {
       mat.map = now ? floatingTextTexture(z.title, '🚧 Under maintenance') : floatingTextTexture(z.title, z.action);
       mat.needsUpdate = true;
       if (now && !m.site) this.ctx.scene.add((m.site = new MaintenanceSite(m.id)).group);
-      if (m.site) m.site.group.visible = now;
+      if (m.site) m.site.group.visible = now && !m.off;
     }
   }
 
+  /**
+   * Switches a zone on or off (a plot in Creators' Valley, with or without a coaster), and draws
+   * its label again from its title (a plot is named after its coaster).
+   */
+  setZone(id: ZoneId, on: boolean) {
+    const m = this.markers.find((k) => k.id === id);
+    if (!m) return;
+    m.off = !on;
+    m.ring.visible = m.fill.visible = m.label.visible = on;
+    if (m.site) m.site.group.visible = on && m.closed;
+    const z = ZONES[id];
+    const mat = m.label.material as THREE.SpriteMaterial;
+    mat.map?.dispose();
+    mat.map = floatingTextTexture(z.title, m.closed ? '🚧 Under maintenance' : z.action);
+    mat.needsUpdate = true;
+    if (!on && this.active === id) this.active = null;
+  }
+
   setVisible(v: boolean) {
-    for (const m of this.markers) m.label.visible = v;
+    for (const m of this.markers) m.label.visible = v && !m.off;
   }
 
   update(carPos: THREE.Vector3, t: number) {
     let found: ZoneId | null = null;
     for (const m of this.markers) {
+      if (m.off) continue;
       const z = ZONES[m.id];
       const inside = Math.hypot(carPos.x - z.x, carPos.z - z.z) < z.radius;
       if (inside) found = m.id;

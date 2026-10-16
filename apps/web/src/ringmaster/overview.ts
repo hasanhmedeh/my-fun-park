@@ -1,5 +1,5 @@
 // The analytics: who plays, what they play, when, and the records.
-import { ATTRACTION_IDS, OVERVIEW_DAYS, ringmaster, type Overview, type OverviewDays } from '../account/api';
+import { ATTRACTION_IDS, isPlot, OVERVIEW_DAYS, ringmaster, type Overview, type OverviewDays } from '../account/api';
 import { betterOf, formatStat, statLabel } from '../account/stats';
 import { renderBarChart } from './charts';
 import { dayLabel, duration, esc, num, onApiError, pct, plural, rideLabel, rideName, when } from './util';
@@ -61,7 +61,7 @@ export class OverviewView {
   }
 
   private render(d: Overview) {
-    const closed = ATTRACTION_IDS.filter((id) => !d.byRide[id].open);
+    const closed = rides(d).filter((id) => !d.byRide[id].open);
     const notices = [
       d.park.underMaintenance
         ? `<strong>🛠️ The park is under maintenance:</strong> only staff can come in. ${esc(d.park.maintenanceMessage ?? '')} <a href="#gates">Park gates →</a>`
@@ -140,8 +140,9 @@ export class OverviewView {
   }
 
   private ridesTable(d: Overview) {
-    const most = Math.max(1, ...ATTRACTION_IDS.map((id) => d.byRide[id].roundsInRange));
-    const rows = ATTRACTION_IDS.slice()
+    const shown = rides(d);
+    const most = Math.max(1, ...shown.map((id) => d.byRide[id].roundsInRange));
+    const rows = shown
       .sort((a, b) => d.byRide[b].roundsInRange - d.byRide[a].roundsInRange || d.byRide[b].rounds - d.byRide[a].rounds)
       .map((id) => {
         const r = d.byRide[id];
@@ -183,6 +184,9 @@ export class OverviewView {
     return `<div class="table-wrap"><table><thead><tr><th>Attraction</th><th>Record</th><th class="r">Best</th><th>Held by</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
   }
 }
+
+/** The attractions worth a row: Creators' Valley's plots once ridden (an empty one is just ground). */
+const rides = (d: Overview) => ATTRACTION_IDS.filter((id) => d.byRide[id] && (!isPlot(id) || d.byRide[id].rounds > 0));
 
 function readDays(): OverviewDays {
   try {

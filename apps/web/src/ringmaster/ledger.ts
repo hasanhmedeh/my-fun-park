@@ -1,5 +1,5 @@
 // Every pack picked up, every round played and everything bought at the booth's shop, newest first.
-import { api, ATTRACTION_IDS, isAttraction, ringmaster, type AttractionId, type ShopItem } from '../account/api';
+import { api, ATTRACTION_IDS, isAttraction, isPlot, PLOT_IDS, ringmaster, type AttractionId, type ShopItem } from '../account/api';
 import { formatStat, statLabel } from '../account/stats';
 import { esc, num, onApiError, pagerHtml, rideLabel, when } from './util';
 
@@ -53,11 +53,12 @@ export class LedgerView {
 
   private head() {
     const tabs = BOOKS.map(([b, label]) => `<button type="button" data-book="${b}" aria-pressed="${b === this.book}">${label}</button>`).join('');
+    const option = (id: AttractionId) => `<option value="${id}" ${id === this.ride ? 'selected' : ''}>${esc(rideLabel(id))}</option>`;
     const filter =
       this.book === 'rounds'
-        ? `<select name="ride" aria-label="Attraction"><option value="">Every attraction</option>${ATTRACTION_IDS.map(
-            (id) => `<option value="${id}" ${id === this.ride ? 'selected' : ''}>${esc(rideLabel(id))}</option>`,
-          ).join('')}</select>`
+        ? `<select name="ride" aria-label="Attraction"><option value="">Every attraction</option>${ATTRACTION_IDS.filter((id) => !isPlot(id))
+            .map(option)
+            .join('')}<optgroup label="Creators' Valley">${PLOT_IDS.map(option).join('')}</optgroup></select>`
         : '';
     return `<div class="view-head"><div><h2 id="h-ledger">Ledger</h2><p class="muted">Every round played, every pack picked up and every treat and souvenir bought at the booth, newest first.</p></div>
       <div class="view-tools"><div class="segmented" role="group" aria-label="Book">${tabs}</div>${filter}</div></div>`;

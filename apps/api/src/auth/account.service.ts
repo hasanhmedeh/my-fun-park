@@ -20,8 +20,11 @@ export class AccountService {
     } else if (confirm?.trim().toLowerCase() !== user.usernameKey) {
       throw new BadRequestException('Type your username to confirm');
     }
+    // their coasters go too: if one was running in Creators' Valley, everyone sees its plot empty
+    const released = await this.prisma.creation.count({ where: { userId: user.id, status: 'released' } });
     // deleteMany: a concurrent delete of the same account is not an error, the outcome is the same.
     await this.prisma.user.deleteMany({ where: { id: user.id } });
     await announceQuietly(this.prisma, { t: 'office', kind: 'members' });
+    if (released) await announceQuietly(this.prisma, { t: 'park' });
   }
 }

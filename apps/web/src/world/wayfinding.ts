@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { isPlot } from '../account/api';
 import { shadowed, staticCylinder, std, type Ctx } from './context';
 import { Obstacles } from './crowd/obstacles';
 import { DISTRICTS, LAYOUT, onFootprint, onPath, PLAZAS, ZONES, type DistrictId } from './layout';
@@ -10,7 +11,7 @@ type Target = DistrictId | 'hub' | 'wheel';
 
 /** The fingerposts where the main paths meet: where, and what each arm points to (top arm first). */
 const FINGERPOSTS: { at: [number, number]; r: number; arms: Target[] }[] = [
-  { at: [LAYOUT.carousel.x, LAYOUT.carousel.z], r: 15.4, arms: ['cosmos', 'falcon', 'thrill', 'midway', 'motor', 'gate'] },
+  { at: [LAYOUT.carousel.x, LAYOUT.carousel.z], r: 15.4, arms: ['cosmos', 'falcon', 'thrill', 'valley', 'midway', 'motor', 'gate'] },
   { at: [DISTRICTS.gate.plaza[0], DISTRICTS.gate.plaza[1]], r: 9.4, arms: ['hub', 'midway', 'motor', 'gate'] },
   { at: [0, -112], r: 9.4, arms: ['wheel', 'cosmos', 'thrill', 'falcon', 'hub'] },
 ];
@@ -74,7 +75,9 @@ export class Wayfinding {
     post.position.y = 3.2;
     const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 0.3, 16), std(d.color, { roughness: 0.6 }));
     foot.position.y = 0.15;
-    const names = d.zones.filter((z) => z !== 'entrance').map((z) => ZONES[z].title);
+    // (the valley's plots change hands: its sign names what's always there)
+    const names = d.zones.filter((z) => z !== 'entrance' && !isPlot(z)).map((z) => ZONES[z].title);
+    if (id === 'valley') names.push('Coasters built by members');
     const tex = signTexture(`${d.icon} ${d.name.toUpperCase()}`, { sub: names.join(' · '), border: d.color, width: 1024, height: 448 });
     const mat = signMaterial(tex);
     for (const side of [0, Math.PI]) {

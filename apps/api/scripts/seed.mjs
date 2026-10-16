@@ -4,8 +4,8 @@
 // Add --prod to run against apps/api/.env.production instead (the file `pnpm studio:prod` uses).
 // The setup is what staff edit in The Ringmaster's Office: the park's switches (park_settings, private
 // access included), the addresses let in while the fair is private (allowed_ips), each attraction's
-// price and open/closed sign (attraction_settings), and each shop item's price and stock
-// (shop_item_settings). Seeding overwrites those rows (allowed_ips becomes exactly the file's list)
+// price and open/closed sign (attraction_settings), each shop item's price and stock
+// (shop_item_settings), and each Coaster Workshop part's (coaster_part_settings). Seeding overwrites those rows (allowed_ips becomes exactly the file's list)
 // and leaves accounts, rounds and orders alone.
 // Run `pnpm db:snapshot --prod` after changing the setup, and commit prisma/seed.json.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -52,6 +52,7 @@ async function snapshot() {
   const allowed = await client.query(`SELECT ip, label, added_by FROM allowed_ips ORDER BY created_at, id`);
   const attractions = await client.query(`SELECT attraction, tickets, open, closed_message FROM attraction_settings ORDER BY attraction`);
   const shop = await client.query(`SELECT item, tickets, stock FROM shop_item_settings ORDER BY item`);
+  const workshop = await client.query(`SELECT part::text AS part, tickets, stock FROM coaster_part_settings ORDER BY part`);
 
   const data = {
     park: park.rows[0]
@@ -71,10 +72,11 @@ async function snapshot() {
       attractions.rows.map((r) => [r.attraction, { tickets: r.tickets, open: r.open, closedMessage: r.closed_message }]),
     ),
     shop: Object.fromEntries(shop.rows.map((r) => [r.item, { tickets: r.tickets, stock: r.stock }])),
+    workshop: Object.fromEntries(workshop.rows.map((r) => [r.part, { tickets: r.tickets, stock: r.stock }])),
   };
   writeFileSync(seedFile, JSON.stringify(data, null, 2) + '\n');
   console.log(
-    `Saved the park, ${allowed.rows.length} allowed addresses, ${attractions.rows.length} attractions and ${shop.rows.length} shop items to apps/api/prisma/seed.json. Commit it.`,
+    `Saved the park, ${allowed.rows.length} allowed addresses, ${attractions.rows.length} attractions, ${shop.rows.length} shop items and ${workshop.rows.length} coaster parts to apps/api/prisma/seed.json. Commit it.`,
   );
 }
 
@@ -134,6 +136,14 @@ async function seed() {
         [item, s.tickets, s.stock],
       );
     }
+    for (const [part, s] of Object.entries(data.workshop ?? {})) {
+      await client.query(
+        `INSERT INTO coaster_part_settings (part, tickets, stock, updated_at)
+         VALUES ($1::coaster_part, $2, $3, ${now})
+         ON CONFLICT (part) DO UPDATE SET tickets = $2, stock = $3, updated_at = ${now}`,
+        [part, s.tickets, s.stock],
+      );
+    }
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');
@@ -142,6 +152,6 @@ async function seed() {
 
   if (skipped.length) console.log(`Skipped attractions the schema no longer has: ${skipped.join(', ')}.`);
   console.log(
-    `Seeded ${data.park ? 'the park, ' : ''}${data.allowedIps ? `${allowedIps.length} allowed addresses, ` : ''}${attractions.length - skipped.length} attractions and ${Object.keys(data.shop ?? {}).length} shop items from apps/api/prisma/seed.json.`,
+    `Seeded ${data.park ? 'the park, ' : ''}${data.allowedIps ? `${allowedIps.length} allowed addresses, ` : ''}${attractions.length - skipped.length} attractions, ${Object.keys(data.shop ?? {}).length} shop items and ${Object.keys(data.workshop ?? {}).length} coaster parts from apps/api/prisma/seed.json.`,
   );
 }

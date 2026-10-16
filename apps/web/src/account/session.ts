@@ -7,6 +7,7 @@ import {
   DEFAULT_COSTS,
   NotEnoughTicketsError,
   PACK_SIZE,
+  PLOT_IDS,
   ParkClosedError,
   PurchaseCooldownError,
   TicketCapError,
@@ -16,7 +17,9 @@ import {
   type AttractionId,
   type FinishedRound,
   type Gender,
+  type MyCreation,
   type Park,
+  type ParkCreation,
   type Purchase,
   type RideStats,
   type RoundStats,
@@ -75,6 +78,10 @@ class Session {
   private leaderboardListeners = new Set<Listener>();
   private _suggestions: { suggestions: Suggestion[]; total: number; unread: number } | null = null;
   private suggestionListeners = new Set<Listener>();
+  private creationListeners = new Set<Listener>();
+  private workshopListeners = new Set<Listener>();
+  private _myCreations: { creations: MyCreation[]; unread: number } | null = null;
+  private myCreationListeners = new Set<Listener>();
   private _inFair = false;
   private liveHidden: ReturnType<typeof setTimeout> | null = null;
   private _blocked: { message: string; ip: string | null } | null = null;
@@ -292,6 +299,12 @@ class Session {
     });
     // staff answered one of the member's suggestions (or another of their tabs read the answer)
     live.addEventListener('suggestions', () => void this.loadSuggestions());
+    // a coaster part's price or stock changed (in the office, or someone bought the last one)
+    live.addEventListener('workshop', () => {
+      for (const fn of this.workshopListeners) fn();
+    });
+    // staff released, declined or removed one of the member's coasters (or another of their tabs read the news)
+    live.addEventListener('creations', () => void this.loadMyCreations());
     // someone posted a time on the Rally Trail (or staff took one off): the boards look again; and
     // on every (re)connect, for anything posted while the stream was down or the tab was hidden
     const boardNews = () => {
@@ -357,6 +370,7 @@ class Session {
       JSON.stringify(before?.maintenance) !== JSON.stringify(park.maintenance)
     )
       for (const fn of this.parkListeners) fn(park);
+    if (JSON.stringify(before?.creations ?? []) !== JSON.stringify(park.creations ?? [])) for (const fn of this.creationListeners) fn();
     this.emit();
   }
 
@@ -763,6 +777,68 @@ class Session {
     }
   }
 
+  // ---------- Creators' Valley and the Coaster Workshop ----------
+
+  /** The player-built coasters running in Creators' Valley (from the park's state; none until it's known). */
+  get creations(): readonly ParkCreation[] {
+    return this._park?.creations ?? [];
+  }
+
+  /** The coaster running on plot n, if any. */
+  creationOn(plot: number) {
+    return this.creations.find((c) => c.plot === plot) ?? null;
+  }
+
+  /** Calls `fn` when a coaster is released into Creators' Valley, replaced or taken out. Returns an unsubscribe. */
+  onCreations(fn: Listener) {
+    this.creationListeners.add(fn);
+    return () => void this.creationListeners.delete(fn);
+  }
+
+  /** Calls `fn` when a coaster part's price or stock changes. Returns an unsubscribe. */
+  onWorkshop(fn: Listener) {
+    this.workshopListeners.add(fn);
+    return () => void this.workshopListeners.delete(fn);
+  }
+
+  /** The coasters the member sent to staff (newest first) and how many have unseen news, once loaded. */
+  get myCreations() {
+    return this._myCreations;
+  }
+
+  /** Calls `fn` when the member's coasters change (news from staff). Returns an unsubscribe. */
+  onMyCreations(fn: Listener) {
+    this.myCreationListeners.add(fn);
+    return () => void this.myCreationListeners.delete(fn);
+  }
+
+  /** Fetches the member's coasters. Resolves to null for guests or when the server is away. */
+  async loadMyCreations() {
+    const id = this._user?.id;
+    if (!id) return null;
+    const res = await this.guard(api.myCreations());
+    if (!res || this._user?.id !== id) return null;
+    this._myCreations = res;
+    for (const fn of this.myCreationListeners) fn();
+    return res;
+  }
+
+  /** The member read staff's news about their coasters. */
+  async creationsSeen() {
+    const c = this._myCreations;
+    if (!c?.unread) return;
+    this._myCreations = { creations: c.creations.map((x) => ({ ...x, unread: false })), unread: 0 };
+    for (const fn of this.myCreationListeners) fn();
+    await this.guard(api.creationsSeen());
+  }
+
+  /** The wallet after paying for coaster parts in the Coaster Workshop. */
+  setBalance(balance: number) {
+    if (this._tickets) this._tickets = { ...this._tickets, balance };
+    else void this.loadTickets();
+    this.emit();
+  }
+
   private set(user: User | null) {
     const switched = user?.id !== this._user?.id;
     const changed = !this._known || switched || user?.username !== this._user?.username || user?.role !== this._user?.role;
@@ -773,6 +849,7 @@ class Session {
       this._souvenirs = null;
       this._orders = null;
       this._suggestions = null;
+      this._myCreations = null;
     }
     this._user = user;
     this._known = true;
@@ -785,8 +862,11 @@ class Session {
       void this.loadSouvenirs();
       // staff may have answered one of their ideas while they were away
       void this.loadSuggestions();
+      // …and released (or declined) one of their coasters
+      void this.loadMyCreations();
     }
     if (switched) this.emitSuggestions();
+    if (switched) for (const fn of this.myCreationListeners) fn();
   }
 
   private emit() {
@@ -832,7 +912,26 @@ function normalisePark(raw: Park): Park {
   const underMaintenance = raw?.underMaintenance === true;
   const maintenanceMessage =
     underMaintenance && typeof raw?.maintenanceMessage === 'string' && raw.maintenanceMessage.trim() ? raw.maintenanceMessage.trim() : null;
-  return { open, message, underMaintenance, maintenanceMessage, costs, packSize: num(raw?.packSize, PACK_SIZE), cooldownHours: num(raw?.cooldownHours, COOLDOWN_HOURS), ticketCap: cap(raw?.ticketCap), maintenance };
+  // the coasters running in Creators' Valley: one per plot, each with its id, name and creator
+  const creations: ParkCreation[] = [];
+  for (const c of Array.isArray(raw?.creations) ? raw.creations : []) {
+    const plot = c?.plot;
+    if (!Number.isInteger(plot) || plot < 1 || plot > PLOT_IDS.length || creations.some((x) => x.plot === plot)) continue;
+    if (typeof c.id !== 'string' || typeof c.name !== 'string' || typeof c.creator !== 'string') continue;
+    creations.push({ plot, id: c.id, name: c.name, creator: c.creator });
+  }
+  return {
+    open,
+    message,
+    underMaintenance,
+    maintenanceMessage,
+    costs,
+    packSize: num(raw?.packSize, PACK_SIZE),
+    cooldownHours: num(raw?.cooldownHours, COOLDOWN_HOURS),
+    ticketCap: cap(raw?.ticketCap),
+    maintenance,
+    creations,
+  };
 }
 
 /** "03:12:45" for a wait of that long (the booth's countdown to the next pack). */

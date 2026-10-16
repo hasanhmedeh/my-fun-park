@@ -17,6 +17,8 @@ datasource db {
 }
 
 /// Everything that takes a ticket: the rides and the games. Mirrors the zone ids in apps/web/src/world/layout.ts.
+/// plot1 to plot8 are Creators' Valley's plots: each runs whichever player-built coaster staff have
+/// released onto it (see Creation), and is priced and closed like any other attraction.
 enum Attraction {
   coaster
   falcon
@@ -30,6 +32,14 @@ enum Attraction {
   crates
   striker
   ducks
+  plot1
+  plot2
+  plot3
+  plot4
+  plot5
+  plot6
+  plot7
+  plot8
 
   @@map("attraction")
 }
@@ -54,38 +64,48 @@ enum Gender {
 }
 
 model User {
-  id              String           @id @default(cuid())
-  email           String           @unique
+  id               String             @id @default(cuid())
+  email            String             @unique
   /// Display spelling, as typed at signup.
-  username        String
+  username         String
   /// Lowercased username, so "Hasan" and "hasan" can't both exist.
-  usernameKey     String           @unique @map("username_key")
+  usernameKey      String             @unique @map("username_key")
   /// Null for accounts made with Google, which sign in there.
-  passwordHash    String?          @map("password_hash")
+  passwordHash     String?            @map("password_hash")
   /// The Google account's id ("sub"), once the member has continued with Google.
-  googleId        String?          @unique @map("google_id")
+  googleId         String?            @unique @map("google_id")
   /// Null for accounts created before signup asked for it: they're asked after logging in.
-  gender          Gender?
+  gender           Gender?
   /// Tickets left to spend. Never negative (a CHECK constraint backs that up).
-  ticketBalance   Int              @default(0) @map("ticket_balance")
+  ticketBalance    Int                @default(0) @map("ticket_balance")
   /// When the last pack was bought. The next one is allowed park_settings.cooldown_hours later.
-  lastPurchaseAt  DateTime?        @map("last_purchase_at")
+  lastPurchaseAt   DateTime?          @map("last_purchase_at")
   /// When the user accepted the Terms of Service and Privacy Policy, and which version.
   /// Null for accounts created before signup asked for it.
-  termsAcceptedAt DateTime?        @map("terms_accepted_at")
-  termsVersion    String?          @map("terms_version")
-  role            Role             @default(player)
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @updatedAt @map("updated_at")
-  purchases       TicketPurchase[]
-  rounds          RideRound[]
-  adminActions    AdminAction[]
-  shopOrders      ShopOrder[]
-  souvenirs       Souvenir[]
-  suggestions     Suggestion[]     @relation("SuggestionAuthor")
-  trailRuns       TrailRun[]
+  termsAcceptedAt  DateTime?          @map("terms_accepted_at")
+  termsVersion     String?            @map("terms_version")
+  role             Role               @default(player)
+  /// When the member took their free Coaster Workshop starter kit (once only). Null until then.
+  starterKitAt     DateTime?          @map("starter_kit_at")
+  /// Saved coaster designs bought beyond the free ones (src/workshop/design.ts). Not on sale yet.
+  extraDesignSlots Int                @default(0) @map("extra_design_slots")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  purchases        TicketPurchase[]
+  rounds           RideRound[]
+  adminActions     AdminAction[]
+  shopOrders       ShopOrder[]
+  souvenirs        Souvenir[]
+  suggestions      Suggestion[]       @relation("SuggestionAuthor")
+  trailRuns        TrailRun[]
   /// Staff only: the suggestions they answered.
-  repliedTo       Suggestion[]     @relation("SuggestionReplier")
+  repliedTo        Suggestion[]       @relation("SuggestionReplier")
+  coasterParts     CoasterParts[]
+  partOrders       CoasterPartOrder[]
+  designs          CoasterDesign[]
+  creations        Creation[]         @relation("CreationCreator")
+  /// Staff only: the coasters they released or declined.
+  reviewed         Creation[]         @relation("CreationReviewer")
 
   @@index([createdAt])
   @@map("users")
@@ -174,6 +194,12 @@ model RideRound {
   stats        Json?
   /// A Rally Trail round that crossed the line: its run on the daily leaderboard.
   trailRun     TrailRun?
+  /// On a Creators' Valley plot: the player-built coaster it ran then (null once that's deleted).
+  creationId   String?    @map("creation_id")
+  creation     Creation?  @relation(fields: [creationId], references: [id], onDelete: SetNull)
+  /// Tickets paid to that coaster's creator for this round (0 on their own rides). Kept when the
+  /// round is refunded.
+  royalty      Int        @default(0)
 
   @@index([userId, ride])
   @@index([userId, endedAt])
@@ -192,10 +218,12 @@ model AdminAction {
   /// What happened: park.open, park.close, park.maintenance.on, park.maintenance.off, settings.update,
   /// access.on, access.off, access.ip.add, access.ip.remove, attraction.open, attraction.close,
   /// price.update, attraction.update, shop.price, shop.stock, shop.update, user.tickets, user.role,
-  /// user.cooldown, user.delete, suggestion.reply, suggestion.status, trail.disqualify or trail.reinstate.
+  /// user.cooldown, user.delete, suggestion.reply, suggestion.status, trail.disqualify, trail.reinstate,
+  /// creation.release, creation.decline, creation.remove, workshop.price, workshop.stock or workshop.update.
   action    String
-  /// What it happened to: an attraction id, a shop item id, an allowed address or a user's email (for
-  /// a suggestion, its author's; for a Rally Trail run, its driver's). Null for the park's settings.
+  /// What it happened to: an attraction id, a shop item id, a coaster part, an allowed address or a
+  /// user's email (for a suggestion, its author's; for a Rally Trail run, its driver's; for a coaster,
+  /// its creator's). Null for the park's settings.
   target    String?
   /// Before and after, e.g. { "before": { "tickets": 5 }, "after": { "tickets": 3 } }.
   details   Json?
@@ -369,4 +397,153 @@ model TrailRun {
   @@index([userId, day])
   @@index([createdAt])
   @@map("trail_runs")
+}
+
+/// What player-built coasters are made of, sold in the Coaster Workshop (src/workshop/design.ts says
+/// what each is, its default price, and how much of each a design uses).
+enum CoasterPart {
+  /// 10 m of plain track (straights, curves, slopes, helices, and the way home to the station).
+  steel
+  /// 10 m of lift hill.
+  lift
+  /// 10 m of launch track.
+  launch
+  /// 10 m of brake run.
+  brakes
+  /// One vertical loop, steel included.
+  loop
+  /// One corkscrew roll, steel included.
+  corkscrew
+  station
+  /// One car of a train.
+  car
+
+  @@map("coaster_part")
+}
+
+/// The coaster parts a member owns: bought in the Coaster Workshop, or from their free starter kit.
+/// Saved designs hold them: what's free to build with is this, less what the member's designs use
+/// (coaster_designs.parts).
+model CoasterParts {
+  userId   String      @map("user_id")
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  part     CoasterPart
+  /// Never negative (a CHECK constraint in the migration).
+  quantity Int
+
+  @@id([userId, part])
+  @@map("coaster_parts")
+}
+
+/// Each coaster part's price and stock in the Coaster Workshop, edited in The Ringmaster's Office. A
+/// part without a row sells at its default price (src/workshop/design.ts) with no stock limit.
+model CoasterPartSettings {
+  part      CoasterPart @id
+  /// Tickets per unit, 1 to 1000 (a CHECK constraint in the migration).
+  tickets   Int
+  /// Units left to sell; null means no limit. Never negative (a CHECK constraint).
+  stock     Int?
+  updatedAt DateTime    @default(now()) @updatedAt @map("updated_at")
+
+  @@map("coaster_part_settings")
+}
+
+/// Parts bought in the Coaster Workshop, paid for in tickets (the starter kit isn't an order).
+model CoasterPartOrder {
+  id           String      @id @default(cuid())
+  userId       String      @map("user_id")
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  part         CoasterPart
+  /// 1 to 50 units (a CHECK constraint in the migration).
+  quantity     Int
+  ticketsSpent Int         @map("tickets_spent")
+  /// The member's ticket balance right after paying.
+  balanceAfter Int         @map("balance_after")
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@map("coaster_part_orders")
+}
+
+/// A coaster a member is building in the Coaster Workshop's Builder's Yard. A few are free, more
+/// are bought (users.extra_design_slots). It holds the parts it uses while it's saved.
+model CoasterDesign {
+  id        String     @id @default(cuid())
+  userId    String     @map("user_id")
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// 1 to 24 characters (a CHECK constraint in the migration).
+  name      String
+  /// The design itself: pieces, colours, cars and ride mode, as cleanDesign (src/workshop/design.ts) left it.
+  data      Json
+  /// The parts it holds, by part (partsUsed in src/workshop/design.ts).
+  parts     Json
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+  creations Creation[]
+
+  @@index([userId, updatedAt])
+  @@map("coaster_designs")
+}
+
+/// Where a submitted coaster stands.
+enum CreationStatus {
+  /// Waiting for staff to look at it.
+  pending
+  /// Running on a plot in Creators' Valley.
+  released
+  /// Staff said no (with a reply). The design stays the member's to change and send again.
+  declined
+  /// Taken out of the park by staff.
+  removed
+  /// A newer version of the same design took its plot.
+  replaced
+
+  @@map("creation_status")
+}
+
+/// A coaster sent to staff from the Coaster Workshop: a snapshot of a design as it was then (the
+/// member can carry on changing the design), with its numbers worked out here and a picture taken in
+/// the game. Staff test-ride it, then release it onto a free plot of Creators' Valley or decline it
+/// with a reply; a released coaster can be taken out again. The member sees where each stands, and
+/// `unread` until they look. Its creator earns a royalty each time someone else rides it.
+model Creation {
+  id              String         @id @default(cuid())
+  /// The design it was sent from (null once that's deleted; the snapshot stays).
+  designId        String?        @map("design_id")
+  design          CoasterDesign? @relation(fields: [designId], references: [id], onDelete: SetNull)
+  userId          String         @map("user_id")
+  user            User           @relation("CreationCreator", fields: [userId], references: [id], onDelete: Cascade)
+  /// 1 to 24 characters (a CHECK constraint in the migration).
+  name            String
+  /// The design as it was sent (src/workshop/design.ts).
+  data            Json
+  /// Its numbers, worked out on the server: length, height, top speed, G-forces, whether it makes it round.
+  stats           Json
+  /// A small picture of it, taken in the game (WebP or PNG, at most 120 kB).
+  picture         Bytes?
+  pictureType     String?        @map("picture_type")
+  status          CreationStatus @default(pending)
+  statusChangedAt DateTime?      @map("status_changed_at")
+  /// The plot it stands on while released (1 to 8; one coaster per plot, a partial unique index), and
+  /// where it stood once it's gone.
+  plot            Int?
+  /// Staff's answer when they declined it (1 to 500 characters, a CHECK constraint).
+  reply           String?
+  /// Who released or declined it. Set to null when that account is deleted; reviewedByName stays.
+  reviewedById    String?        @map("reviewed_by_id")
+  reviewedBy      User?          @relation("CreationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedByName  String?        @map("reviewed_by_name")
+  releasedAt      DateTime?      @map("released_at")
+  removedAt       DateTime?      @map("removed_at")
+  /// Staff changed where it stands since the member last looked.
+  unread          Boolean        @default(false)
+  createdAt       DateTime       @default(now()) @map("created_at")
+  rounds          RideRound[]
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+  @@index([designId])
+  @@index([createdAt])
+  @@map("creations")
 }

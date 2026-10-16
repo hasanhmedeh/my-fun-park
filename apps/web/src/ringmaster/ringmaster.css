@@ -762,12 +762,14 @@ tr.is-current td {
   font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
 }
-.ideas-filter {
+.ideas-filter,
+.creations-filter {
   flex-wrap: wrap;
   margin-bottom: 16px;
   border-radius: 18px;
 }
-.ideas-filter .num {
+.ideas-filter .num,
+.creations-filter .num {
   margin-left: 2px;
   opacity: 0.75;
 }
@@ -847,6 +849,196 @@ tr.is-current td {
   flex: 1;
 }
 
+/* ---------- Creations (the Coaster Workshop's coasters) ---------- */
+.plots-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.plots-head h3 {
+  font-size: 1.1rem;
+}
+.plots-head a {
+  color: var(--heading);
+}
+.plots {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 132px), 1fr));
+  margin: 0 0 20px;
+  padding: 0;
+  list-style: none;
+}
+.plot {
+  display: grid;
+  gap: 2px;
+  align-content: start;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  border-top: 3px solid var(--good);
+  font-size: 0.8rem;
+}
+.plot.is-empty {
+  border-top-color: var(--line);
+  box-shadow: inset 0 0 0 1px var(--line);
+  background: transparent;
+}
+.plot.is-closed {
+  border-top-color: var(--bad);
+}
+.plot-no {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.plot-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+button.plot-name {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--heading);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+button.plot-name:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.plot.is-empty .plot-name {
+  color: var(--faint);
+}
+.plot-by,
+.plot-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--faint);
+}
+.plot-open {
+  color: var(--good);
+  font-weight: 700;
+}
+.plot-closed {
+  color: var(--bad);
+  font-weight: 700;
+}
+.creations {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+}
+/* a card is one big button: its name's ::after covers the whole card */
+.creation {
+  position: relative;
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  border-top: 4px solid var(--heading);
+}
+.creation:hover {
+  background: var(--card-2);
+}
+.creation:has(.creation-open:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.creation.is-released {
+  border-top-color: var(--good);
+}
+.creation.is-declined {
+  border-top-color: var(--bad);
+}
+.creation.is-removed,
+.creation.is-replaced {
+  border-top-color: var(--faint);
+}
+.creation-pic {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: var(--card-2);
+  font-size: 2.6rem;
+}
+.creation:hover .creation-pic {
+  background: var(--card);
+}
+.creation-pic img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.creation-body {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px 14px;
+}
+.creation h3 {
+  font-size: 1.15rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.creation-open {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.creation-open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.creation-open:focus-visible {
+  outline: none;
+}
+.creation-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+.creation-stats dt {
+  color: var(--faint);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.creation-stats dd {
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.creation-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
 /* ---------- Park gates ---------- */
 .gates-form {
   display: grid;
@@ -898,12 +1090,14 @@ tr.is-current td {
   display: grid;
   gap: 16px;
 }
-.member-actions {
+.member-actions,
+.creation-actions {
   display: grid;
   gap: 14px;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
 }
-.member-action {
+.member-action,
+.creation-action {
   display: grid;
   gap: 8px;
   align-content: start;
@@ -911,7 +1105,8 @@ tr.is-current td {
   border-radius: 12px;
   background: var(--card-2);
 }
-.member-action h4 {
+.member-action h4,
+.creation-action h4 {
   margin: 0;
   font-size: 0.95rem;
 }
@@ -1017,6 +1212,126 @@ tr.is-current td {
   }
 }
 
+/* A coaster's dialog (creations.ts): wider, and it scrolls */
+.creation-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.creation-sheet {
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+}
+.creation-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.creation-sheet-head p {
+  margin-top: 4px;
+}
+.creation-sheet-head a {
+  color: var(--heading);
+}
+.creation-hero {
+  border-radius: 12px;
+  font-size: 4rem;
+}
+.creation-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 140px), 1fr));
+  gap: 8px;
+  margin: 0;
+}
+.creation-facts > div {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--card-2);
+}
+.creation-facts.is-quiet > div {
+  padding: 0 2px;
+  background: none;
+}
+.creation-facts dt {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.creation-facts dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.creation-dialog .notice {
+  margin: 0;
+}
+.creation-dialog .idea-text {
+  color: var(--text);
+}
+/* forms in it are action boxes, not the padded form of an ask() */
+.creation-dialog .creation-action {
+  gap: 10px;
+  padding: 14px;
+}
+.creation-choice {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.creation-choice legend {
+  margin-bottom: 4px;
+  padding: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 400;
+  cursor: pointer;
+}
+.radio input {
+  flex: none;
+  width: auto;
+  margin: 3px 0 0;
+  accent-color: var(--accent);
+}
+.creation-release-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.creation-release-row label:first-child {
+  flex: 2 1 200px;
+}
+.creation-release-row label:last-child {
+  flex: 1 1 110px;
+}
+.creation-release-row select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.creation-dialog .creation-note {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--good) 14%, transparent);
+  color: var(--good);
+  font-weight: 700;
+}
+.creation-dialog .creation-note.is-error {
+  background: color-mix(in srgb, var(--bad) 14%, transparent);
+  color: var(--bad);
+}
+
 .toast {
   position: fixed;
   left: 50%;
@@ -1048,6 +1363,9 @@ tr.is-current td {
   }
   .tile-value {
     font-size: 1.55rem;
+  }
+  .creation-sheet {
+    padding: 16px;
   }
 }
 

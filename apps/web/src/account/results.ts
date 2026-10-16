@@ -14,6 +14,8 @@ export interface RoundResult {
   /** True when the round ran to its end; false when the visitor left early. */
   completed: boolean;
   stats: RoundStats;
+  /** How the round ended, when it ended some other way than finishing or hopping off (a coaster that stalled). */
+  ending?: { headline: string; lead: string };
 }
 
 type Saved = { state: 'saving' } | { state: 'saved'; res: FinishedRound } | { state: 'failed'; message: string };
@@ -139,12 +141,14 @@ class ResultsDialog {
       })
       .join('');
     const pbs = r.completed ? keys.filter((k) => isPersonalBest(k, r.stats[k], best)).length : 0;
-    const headline = !rows ? 'Thanks for riding! 🎪' : !r.completed ? 'You hopped off early' : pbs ? 'New personal best! 🏆' : 'Round complete! 🎉';
-    const lead = !r.completed
-      ? `You left before the end, so this round counts as used.${rows ? ' Here’s how far you got.' : ' Come back any time!'}`
-      : rows
-        ? 'Here’s how your round went.'
-        : 'Hope you enjoyed it. Come back any time!';
+    const headline = r.ending ? escapeHtml(r.ending.headline) : !rows ? 'Thanks for riding! 🎪' : !r.completed ? 'You hopped off early' : pbs ? 'New personal best! 🏆' : 'Round complete! 🎉';
+    const lead = r.ending
+      ? escapeHtml(r.ending.lead)
+      : !r.completed
+        ? `You left before the end, so this round counts as used.${rows ? ' Here’s how far you got.' : ' Come back any time!'}`
+        : rows
+          ? 'Here’s how your round went.'
+          : 'Hope you enjoyed it. Come back any time!';
     // redrawn in place when the round is saved: keep the focus on the same button
     const buttons = () => [...this.body.querySelectorAll<HTMLElement>('[data-results]')];
     const focused = buttons().indexOf(document.activeElement as HTMLElement);

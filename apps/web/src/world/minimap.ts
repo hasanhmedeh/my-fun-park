@@ -1,4 +1,5 @@
-import { DISTRICTS, FLIP_YAW, LAYOUT, MUSEUM, museumPoint, PARK, parkBounds, PATHS, PLAZAS, ZONES, type DistrictId, type ZoneId } from './layout';
+import { isPlot, PLOT_IDS, plotNumber, type PlotId } from '../account/api';
+import { DISTRICTS, FLIP_YAW, LAYOUT, MUSEUM, museumPoint, PARK, parkBounds, PATHS, PLAZAS, plotPoint, VALLEY, ZONES, type DistrictId, type ZoneId } from './layout';
 import { FALCON_TRACK, STACK_TRACK } from './rides';
 import { CIRCUIT, CIRCUIT_BOUNDS, circuitPoint, ROAD_HALF, START_S, WALL } from './attractions/speedway-track';
 import { START_S as TRAIL_START, TRAIL, TRAIL_BOUNDS, TRAIL_HALF, trailPoint, WALL as TRAIL_WALL } from './attractions/trail-track';
@@ -24,11 +25,36 @@ const PLACES: Record<ZoneId, Place> = {
   booth: { icon: '🎟️', label: 'Ticket Booth', blurb: 'Free tickets, treats and souvenirs at Rosa’s counter' },
   ideas: { icon: '💡', label: 'Idea Box', blurb: 'Tell us what you’d love to see in the fair' },
   museum: { icon: '🏛️', label: 'Career Museum', blurb: 'Hasan Hmedeh’s work from 2019 to today, in framed pictures' },
+  workshop: { icon: '🛠️', label: 'Coaster Workshop', blurb: 'Build your own coaster, and send it in to run here in the valley' },
+  // each plot is named after the coaster running on it (see setPlotPlace)
+  ...(Object.fromEntries(PLOT_IDS.map((id) => [id, { icon: '🎢', label: `Plot ${plotNumber(id)}`, blurb: 'Waiting for a coaster' }])) as Record<PlotId, Place>),
 };
 /** The places in the order the map's legend lists them: district by district, each with its district. */
 export const MAP_PLACES = (Object.entries(DISTRICTS) as [DistrictId, (typeof DISTRICTS)[DistrictId]][]).flatMap(([district, d]) =>
   d.zones.map((id) => ({ id, district, ...PLACES[id] })),
 );
+
+/** The plots with a coaster running on them: the empty ones stay off the maps and the lists. */
+const runningPlots = new Set<PlotId>();
+/** True for every place the maps show (a plot only while a coaster runs there). */
+export const onMap = (id: ZoneId) => !isPlot(id) || runningPlots.has(id);
+
+/** The released coasters' tracks, seen from above (world x, z), by plot. */
+const valleyTracks = new Map<PlotId, { pts: [number, number][]; color: string }>();
+
+/** A coaster opened on a plot (or the plot emptied): its place on the maps and its track from above. */
+export function setPlotPlace(id: PlotId, coaster: { name: string; creator: string; track: [number, number][]; color: string } | null) {
+  const p = MAP_PLACES.find((m) => m.id === id)!;
+  p.label = coaster?.name ?? `Plot ${plotNumber(id)}`;
+  p.blurb = coaster ? `A coaster by @${coaster.creator}, built in the Coaster Workshop` : 'Waiting for a coaster';
+  if (coaster) {
+    runningPlots.add(id);
+    valleyTracks.set(id, { pts: coaster.track, color: coaster.color });
+  } else {
+    runningPlots.delete(id);
+    valleyTracks.delete(id);
+  }
+}
 if (import.meta.env.DEV && new Set(MAP_PLACES.map((p) => p.id)).size !== Object.keys(PLACES).length)
   console.warn('Every zone belongs in exactly one district (DISTRICTS in layout.ts), or the map leaves it out.');
 
@@ -37,12 +63,13 @@ const SHEET_SCALE = 3;
 /** Metres visible from the centre to the edge of the minimap. */
 const VIEW = 55;
 
-/** The area worth mapping: the park itself plus both coaster tracks, the kart circuit and the Rally Trail. */
+/** The area worth mapping: the park itself plus both coaster tracks, the kart circuit, the Rally Trail and Creators' Valley. */
 export function fairBounds() {
   const c = CIRCUIT_BOUNDS;
   const t = TRAIL_BOUNDS;
   const p = parkBounds();
-  let x0 = Math.min(p.x0, c.x0, t.x0), x1 = Math.max(p.x1, c.x1, t.x1), z0 = Math.min(p.z0, c.z0, t.z0), z1 = Math.max(p.z1, c.z1, t.z1);
+  const [v] = VALLEY.lawns;
+  let x0 = Math.min(p.x0, c.x0, t.x0, v.x0), x1 = Math.max(p.x1, c.x1, t.x1), z0 = Math.min(p.z0, c.z0, t.z0, v.z0), z1 = Math.max(p.z1, c.z1, t.z1, v.z1);
   for (const d of [STACK_TRACK, FALCON_TRACK])
     for (const p of d.pos) {
       x0 = Math.min(x0, p.x);
@@ -59,6 +86,21 @@ export function fairBounds() {
  * The caller fills the desert background first.
  */
 export function paintFair(g: CanvasRenderingContext2D, X: (x: number) => number, Z: (z: number) => number, s: number) {
+  // Creators' Valley's lawn out past the west fence, and its eight plots (the road is one of the paths)
+  g.fillStyle = '#5c9a4e';
+  for (const v of VALLEY.lawns) g.fillRect(X(v.x0), Z(v.z0), (v.x1 - v.x0) * s, (v.z1 - v.z0) * s);
+  for (let n = 1; n <= PLOT_IDS.length; n++) {
+    const a = plotPoint(n, -VALLEY.size / 2, -VALLEY.size / 2);
+    const b = plotPoint(n, VALLEY.size / 2, VALLEY.size / 2);
+    g.fillStyle = 'rgba(29, 18, 56, 0.12)';
+    g.fillRect(X(Math.min(a.x, b.x)), Z(Math.min(a.z, b.z)), VALLEY.size * s, VALLEY.size * s);
+    g.strokeStyle = 'rgba(224, 90, 168, 0.7)';
+    g.lineWidth = Math.max(1, 0.8 * s);
+    g.setLineDash([3 * s, 2 * s]);
+    g.strokeRect(X(Math.min(a.x, b.x)), Z(Math.min(a.z, b.z)), VALLEY.size * s, VALLEY.size * s);
+    g.setLineDash([]);
+  }
+
   // the fair's lawn
   g.fillStyle = '#5c9a4e';
   g.beginPath();
@@ -174,6 +216,19 @@ export function paintFair(g: CanvasRenderingContext2D, X: (x: number) => number,
       g.stroke();
     }
   }
+  // …and the coasters members built, on their plots in the valley
+  for (const { pts, color } of valleyTracks.values())
+    for (const [stroke, width] of [
+      ['rgba(29, 18, 56, 0.6)', 2.2],
+      [color, 1.1],
+    ] as const) {
+      g.strokeStyle = stroke;
+      g.lineWidth = Math.max(width * s, width);
+      g.beginPath();
+      pts.forEach(([x, z], i) => (i ? g.lineTo(X(x), Z(z)) : g.moveTo(X(x), Z(z))));
+      g.closePath();
+      g.stroke();
+    }
 
   // the giant wheel seen from above: the rim edge-on, the hub, and its two A-frames
   const wz = LAYOUT.ferris.z;
@@ -296,6 +351,11 @@ export class Minimap {
     root.addEventListener('click', () => this.onOpen?.());
   }
 
+  /** Paints the fair again (a coaster opened or closed in Creators' Valley). */
+  redraw() {
+    this.drawSheet();
+  }
+
   private drawSheet() {
     const b = fairBounds();
     const pad = VIEW;
@@ -364,6 +424,7 @@ export class Minimap {
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     for (const { id, icon } of MAP_PLACES) {
+      if (!onMap(id)) continue;
       const p = this.toMap(ZONES[id].x, ZONES[id].z);
       if (p.x < -10 || p.y < -10 || p.x > S + 10 || p.y > S + 10) continue;
       const shut = this.closed.has(id);

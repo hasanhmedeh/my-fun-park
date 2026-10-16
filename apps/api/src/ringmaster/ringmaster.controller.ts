@@ -4,11 +4,13 @@ import { CurrentUser } from '../auth/current-user.decorator.js';
 import { SessionGuard } from '../auth/session.guard.js';
 import { ParseLimitPipe } from '../common/parse-limit.pipe.js';
 import { ParseOffsetPipe } from '../common/parse-offset.pipe.js';
-import { SuggestionStatus, type Attraction, type User } from '../generated/prisma/client.js';
+import { CreationStatus, SuggestionStatus, type Attraction, type User } from '../generated/prisma/client.js';
 import { ParseRidePipe } from '../rides/parse-ride.pipe.js';
 import { boardDay, isDay } from '../trail/board-day.js';
 import { TrailService, type TrailOfficeJson } from '../trail/trail.service.js';
+import { CreationsOfficeService, type AdminCreationJson, type AdminPartJson, type PlotJson } from '../workshop/creations-office.service.js';
 import { ANALYTICS_DAYS, AnalyticsService, type AnalyticsDays, type Overview } from './analytics.service.js';
+import { DeclineCreationDto, ReleaseCreationDto } from './dto/creation.dto.js';
 import { AddAllowedIpDto, UpdateAccessDto } from './dto/update-access.dto.js';
 import { UpdateAttractionDto } from './dto/update-attraction.dto.js';
 import { UpdateParkDto } from './dto/update-park.dto.js';
@@ -45,6 +47,7 @@ export class RingmasterController {
     private readonly office: RingmasterService,
     private readonly analytics: AnalyticsService,
     private readonly trail: TrailService,
+    private readonly creations: CreationsOfficeService,
   ) {}
 
   /** The numbers: members, tickets, rounds, per attraction and per day. `?days=` 7, 30 (default) or 90. */
@@ -199,6 +202,54 @@ export class RingmasterController {
     return this.office.updateTrailRun(actor, id, body.disqualified);
   }
 
+  /** Coasters sent from the Coaster Workshop, newest first (`?status=` for one status), with the counts and Creators' Valley's plots. */
+  @Get('creations')
+  creationList(
+    @Query('status') status: string | undefined,
+    @Query('limit', new ParseLimitPipe(24, 96)) limit: number,
+    @Query('offset', ParseOffsetPipe) offset: number,
+  ): Promise<{ creations: AdminCreationJson[]; total: number; counts: Record<CreationStatus, number>; plots: PlotJson[] }> {
+    return this.creations.list({ status: parseCreationStatus(status), limit, offset });
+  }
+
+  @Get('creations/:id')
+  creation(@Param('id') id: string): Promise<AdminCreationJson> {
+    return this.creations.one(id);
+  }
+
+  /** Puts a coaster in the park: onto a free plot, or in place of the version of it running now (`replace`). */
+  @Post('creations/:id/release')
+  @HttpCode(HttpStatus.OK)
+  releaseCreation(@CurrentUser() actor: User, @Param('id') id: string, @Body() body: ReleaseCreationDto): Promise<AdminCreationJson> {
+    return this.creations.release(actor, id, body);
+  }
+
+  /** Says no to a waiting coaster, with a reply for its creator. */
+  @Post('creations/:id/decline')
+  @HttpCode(HttpStatus.OK)
+  declineCreation(@CurrentUser() actor: User, @Param('id') id: string, @Body() body: DeclineCreationDto): Promise<AdminCreationJson> {
+    return this.creations.decline(actor, id, body.reply);
+  }
+
+  /** Takes a coaster out of the park. */
+  @Post('creations/:id/remove')
+  @HttpCode(HttpStatus.OK)
+  removeCreation(@CurrentUser() actor: User, @Param('id') id: string): Promise<AdminCreationJson> {
+    return this.creations.remove(actor, id);
+  }
+
+  /** The Coaster Workshop's parts: price, stock and what's sold. */
+  @Get('workshop/parts')
+  workshopParts(): Promise<{ parts: AdminPartJson[] }> {
+    return this.creations.parts();
+  }
+
+  /** Sets a part's price, or how many are left to sell (null for no limit). */
+  @Patch('workshop/parts/:part')
+  updateWorkshopPart(@CurrentUser() actor: User, @Param('part') part: string, @Body() body: UpdateShopItemDto): Promise<AdminPartJson> {
+    return this.creations.updatePart(actor, part, body);
+  }
+
   @Get('actions')
   actions(
     @Query('limit', new ParseLimitPipe(25, 100)) limit: number,
@@ -221,6 +272,14 @@ function parseStatus(value: string | undefined): SuggestionStatus | undefined {
   const statuses = Object.values(SuggestionStatus) as string[];
   if (!statuses.includes(value)) throw new BadRequestException(`status must be one of ${statuses.join(', ')}`);
   return value as SuggestionStatus;
+}
+
+/** `?status=` for the coasters' grid: one of the statuses, or nothing for all of them. */
+function parseCreationStatus(value: string | undefined): CreationStatus | undefined {
+  if (value === undefined || value === '') return undefined;
+  const statuses = Object.values(CreationStatus) as string[];
+  if (!statuses.includes(value)) throw new BadRequestException(`status must be one of ${statuses.join(', ')}`);
+  return value as CreationStatus;
 }
 
 /** `?day=`: a board's day, YYYY-MM-DD, no later than today's board; nothing for today's. */

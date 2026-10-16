@@ -18,6 +18,8 @@ export async function createApp() {
   app.set('trust proxy', config.get('TRUST_PROXY', { infer: true }));
   app.setGlobalPrefix('api');
   app.use(cookieParser());
+  // a coaster sent from the Coaster Workshop comes with its picture (up to 120 kB, as base64)
+  app.useBodyParser('json', { limit: '400kb' });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
   // In dev and on Vercel the web app reaches the API on its own origin (/api); CORS covers
   // deployments where the two live on different origins.

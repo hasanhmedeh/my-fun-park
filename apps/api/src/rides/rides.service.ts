@@ -1,7 +1,9 @@
 import { ConflictException, HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, type Attraction, type User } from '../generated/prisma/client.js';
 import { isStaff, ParkService } from '../park/park.service.js';
-import { announce, announceQuietly } from '../live/announce.js';
+import { accountNews, announce, announceQuietly } from '../live/announce.js';
+import { plotOf } from '../workshop/creations-office.service.js';
+import { royalty as royaltyOf } from '../workshop/design.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { TrailService, type TrailPlacement } from '../trail/trail.service.js';
 import { ATTRACTIONS } from './attractions.js';
@@ -89,14 +91,29 @@ export class RidesService {
     const userId = user.id;
     const cost = attraction.tickets;
     const now = new Date();
+    // a Creators' Valley plot runs whichever player-built coaster is released onto it, if any; its
+    // creator earns a royalty from everyone else's rides
+    const plot = plotOf(ride);
+    const creation = plot ? await this.prisma.creation.findFirst({ where: { plot, status: 'released' }, select: { id: true, userId: true } }) : null;
+    if (plot && !creation) {
+      throw new HttpException({ ...HttpException.createBody('Nothing is running on this plot yet', 'Conflict', HttpStatus.CONFLICT), code: 'plot_empty' }, HttpStatus.CONFLICT);
+    }
+    const royalty = creation && creation.userId !== userId ? royaltyOf(cost) : 0;
     const result = await this.prisma.$transaction(async (tx) => {
+      // both wallets locked in one order, so two creators riding each other's coasters can't deadlock
+      if (royalty) await tx.$queryRaw`SELECT id FROM users WHERE id IN (${userId}, ${creation!.userId}) ORDER BY id FOR UPDATE`;
       const { count } = await tx.user.updateMany({
         where: { id: userId, ticketBalance: { gte: cost } },
         data: { ticketBalance: { decrement: cost } },
       });
       if (count === 0) return null;
       await tx.rideRound.updateMany({ where: { userId, endedAt: null }, data: { endedAt: now, completed: false } });
-      const round = await tx.rideRound.create({ data: { userId, ride, ticketsSpent: cost, startedAt: now } });
+      const round = await tx.rideRound.create({ data: { userId, ride, ticketsSpent: cost, startedAt: now, creationId: creation?.id ?? null, royalty } });
+      if (royalty) {
+        const creator = await tx.user.update({ where: { id: creation!.userId }, data: { ticketBalance: { increment: royalty } } });
+        // the creator sees their wallet go up, if they're in the fair
+        await announce(tx, { t: 'user', id: creator.id, ...accountNews(creator) });
+      }
       const { ticketBalance } = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { ticketBalance: true } });
       return { round, balance: ticketBalance };
     });
@@ -161,8 +178,14 @@ export class RidesService {
     const round = await this.prisma.rideRound.findFirst({ where: { id: roundId, userId: user.id } });
     if (!round) throw new NotFoundException('Round not found');
     if (round.endedAt) throw new ConflictException('This round is already over');
-    const [park, attraction] = await Promise.all([this.park.rules(), this.park.attraction(round.ride)]);
-    if (isStaff(user) || (park.open && !park.underMaintenance && attraction.open) || Date.now() - round.startedAt.getTime() > REFUND_WINDOW_MS) {
+    const [park, attraction, creation] = await Promise.all([
+      this.park.rules(),
+      this.park.attraction(round.ride),
+      round.creationId ? this.prisma.creation.findUnique({ where: { id: round.creationId }, select: { status: true } }) : null,
+    ]);
+    // a player-built coaster taken out of the park mid-ride counts as closed (its royalty stays paid)
+    const removed = !!round.creationId && creation?.status !== 'released';
+    if (isStaff(user) || (park.open && !park.underMaintenance && attraction.open && !removed) || Date.now() - round.startedAt.getTime() > REFUND_WINDOW_MS) {
       throw new ConflictException('This round can only be finished, not refunded');
     }
     return this.prisma.$transaction(async (tx) => {

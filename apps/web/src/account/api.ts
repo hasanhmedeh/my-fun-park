@@ -1,14 +1,24 @@
 // A small typed client for the fair's accounts API. The session lives in an httpOnly cookie,
 // so every request goes out with credentials and the page never sees the token.
+import type { Design, Issue, Part, Parts, RideStats as CoasterStats } from '../workshop/rules';
+
+/** Creators' Valley's plots: each runs the player-built coaster staff released onto it (if any). */
+export const PLOT_IDS = ['plot1', 'plot2', 'plot3', 'plot4', 'plot5', 'plot6', 'plot7', 'plot8'] as const;
+export type PlotId = (typeof PLOT_IDS)[number];
 
 /** Every attraction that costs tickets (they match the zone ids in world/layout.ts). */
-export const ATTRACTION_IDS = ['coaster', 'falcon', 'rocket', 'ferris', 'flip', 'ship', 'speedway', 'trail', 'drone', 'crates', 'striker', 'ducks'] as const;
+export const ATTRACTION_IDS = ['coaster', 'falcon', 'rocket', 'ferris', 'flip', 'ship', 'speedway', 'trail', 'drone', 'crates', 'striker', 'ducks', ...PLOT_IDS] as const;
 export type AttractionId = (typeof ATTRACTION_IDS)[number];
 
 export const isAttraction = (id: string | null | undefined): id is AttractionId => !!id && (ATTRACTION_IDS as readonly string[]).includes(id);
 
 /** The Midway's games (played, rather than ridden). */
 export const isGame = (id: AttractionId) => id === 'crates' || id === 'striker' || id === 'ducks';
+
+export const isPlot = (id: string | null | undefined): id is PlotId => !!id && (PLOT_IDS as readonly string[]).includes(id);
+/** plot3 → 3. */
+export const plotNumber = (id: PlotId) => Number(id.slice(4));
+export const plotId = (n: number) => `plot${n}` as PlotId;
 
 /** Tickets per round, until the server's own table arrives (GET /tickets sends the live one). */
 export const DEFAULT_COSTS: Record<AttractionId, number> = {
@@ -24,6 +34,14 @@ export const DEFAULT_COSTS: Record<AttractionId, number> = {
   crates: 1,
   striker: 1,
   ducks: 1,
+  plot1: 1,
+  plot2: 1,
+  plot3: 1,
+  plot4: 1,
+  plot5: 1,
+  plot6: 1,
+  plot7: 1,
+  plot8: 1,
 };
 /** One free pack per purchase, and one purchase per cool-down (until GET /park sends the live rules). */
 export const PACK_SIZE = 20;
@@ -85,6 +103,138 @@ export interface Park {
   ticketCap: number | null;
   /** Attractions closed for maintenance, each with its sign (null for the default wording). Open ones are left out. */
   maintenance: Partial<Record<AttractionId, string | null>>;
+  /** The player-built coasters running in Creators' Valley, by plot. Missing from an older server: none. */
+  creations?: ParkCreation[];
+}
+
+/** A player-built coaster running on one of Creators' Valley's plots (GET /creations/:id has its design). */
+export interface ParkCreation {
+  plot: number;
+  id: string;
+  name: string;
+  /** The creator's username. */
+  creator: string;
+}
+
+// ---------- The Coaster Workshop ----------
+
+/** Where a coaster sent to staff stands. `replaced`: a newer version of it took its plot. */
+export type CreationStatus = 'pending' | 'released' | 'declined' | 'removed' | 'replaced';
+export const CREATION_STATUSES: readonly CreationStatus[] = ['pending', 'released', 'declined', 'removed', 'replaced'];
+
+/** A coaster part as it sells today (apps/api/src/workshop/workshop.service.ts). */
+export interface CoasterPartItem {
+  id: Part;
+  name: string;
+  unit: string;
+  icon: string;
+  blurb: string;
+  tickets: number;
+  /** Units left to sell: 0 is sold out, null is no limit. */
+  stock: number | null;
+}
+
+/** A saved design in the list: what it is, the parts it holds, and its latest submission. */
+export interface DesignSummary {
+  id: string;
+  name: string;
+  pieces: number;
+  parts: Parts;
+  updatedAt: string;
+  latest: { id: string; status: CreationStatus; plot: number | null } | null;
+}
+
+export interface SavedDesign extends DesignSummary {
+  data: Design;
+  createdAt: string;
+}
+
+/** Everything the Coaster Workshop shows a member. */
+export interface Workshop {
+  parts: CoasterPartItem[];
+  /** Parts the member owns, and how many of them their saved designs hold. */
+  owned: Parts;
+  held: Parts;
+  starterKit: { claimed: boolean; contents: Partial<Parts> };
+  /** Free design slots, extra ones bought, how many are in use; extra slots aren't on sale yet. */
+  slots: { free: number; extra: number; used: number; extraPriceUsd: number; onSale: boolean };
+  submissions: { perDay: number; last24h: number; nextAt: string | null };
+  designs: DesignSummary[];
+  /** Submissions with news from staff the member hasn't seen. */
+  unread: number;
+}
+
+/** A coaster the member sent to staff, and what became of it. */
+export interface MyCreation {
+  id: string;
+  designId: string | null;
+  name: string;
+  status: CreationStatus;
+  statusChangedAt: string | null;
+  plot: number | null;
+  reply: string | null;
+  reviewedBy: string | null;
+  stats: CoasterStats;
+  /** Other guests' rides on it, and the tickets they've earned the member. */
+  rides: number;
+  earned: number;
+  unread: boolean;
+  createdAt: string;
+}
+
+/** A player-built coaster, enough to build and ride it (GET /creations/:id). */
+export interface CreationDetail {
+  id: string;
+  name: string;
+  creator: string;
+  status: CreationStatus;
+  plot: number | null;
+  data: Design;
+  stats: CoasterStats;
+  hasPicture: boolean;
+  createdAt: string;
+}
+
+/** A submitted coaster as staff see it in the office's grid. */
+export interface AdminCreation {
+  id: string;
+  name: string;
+  user: { id: string; username: string };
+  designId: string | null;
+  status: CreationStatus;
+  statusChangedAt: string | null;
+  plot: number | null;
+  reply: string | null;
+  reviewedBy: string | null;
+  stats: CoasterStats;
+  mode: Design['mode'];
+  cars: number;
+  pieces: number;
+  hasPicture: boolean;
+  createdAt: string;
+  releasedAt: string | null;
+  removedAt: string | null;
+  rides: number;
+  earned: number;
+  /** Another version of the same design running in the park now: releasing this one can take its plot. */
+  live: { id: string; name: string; plot: number } | null;
+}
+
+/** One of Creators' Valley's plots, as staff see it. */
+export interface AdminPlot {
+  plot: number;
+  attraction: PlotId;
+  creation: { id: string; name: string; creator: string } | null;
+  tickets: number;
+  open: boolean;
+}
+
+/** A coaster part as the office edits it. */
+export interface AdminCoasterPart extends CoasterPartItem {
+  defaultTickets: number;
+  /** Units sold, ever. */
+  sold: number;
+  updatedAt: string | null;
 }
 
 // ---------- The Ticket Booth's shop ----------
@@ -519,6 +669,24 @@ export class ApiError extends Error {
   get unavailable() {
     return this.status === 0 || this.status === 404 || this.status >= 500;
   }
+
+  /** The error body's `code`, when the server gave one (e.g. 'no_slot', 'parts', 'not_buildable'). */
+  get code() {
+    const c = (this.data as { code?: unknown } | null)?.code;
+    return typeof c === 'string' ? c : null;
+  }
+
+  /** 409 'parts': what's missing to save the design. */
+  get missingParts(): Partial<Parts> | null {
+    const m = (this.data as { missing?: unknown } | null)?.missing;
+    return this.code === 'parts' && m && typeof m === 'object' ? (m as Partial<Parts>) : null;
+  }
+
+  /** 422 'not_buildable': why the circuit can't be built. */
+  get issues(): Issue[] {
+    const list = (this.data as { issues?: unknown } | null)?.issues;
+    return this.code === 'not_buildable' && Array.isArray(list) ? (list as Issue[]) : [];
+  }
 }
 
 const numberIn = (data: unknown, key: string) => {
@@ -698,6 +866,8 @@ async function request<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', p
     if (code === 'ride_closed') throw new RideClosedError(rawMessage(data) ?? 'Under maintenance. Back soon!', data);
     if (res.status === 429 && (data as { code?: unknown } | null)?.code === 'suggestion_limit')
       throw new SuggestionLimitError(rawMessage(data) ?? 'That’s enough ideas for today. Come back tomorrow!', data);
+    if (res.status === 429 && (data as { code?: unknown } | null)?.code === 'submission_limit')
+      throw new ApiError(429, rawMessage(data) ?? 'That’s enough coasters sent for today. Come back tomorrow!', data);
     const message = messageOf(data, res.status);
     if (res.status === 409 && (data as { code?: unknown } | null)?.code === 'sold_out') throw new SoldOutError(message, data);
     throw res.status === 402 ? new NotEnoughTicketsError(message, data) : new ApiError(res.status, message, data);
@@ -771,7 +941,32 @@ export const api = {
   /** Throws a SuggestionLimitError after a few in a day. */
   suggest: (body: { topic: SuggestionTopic; message: string }) => request<Suggestion>('POST', '/suggestions', body),
   suggestionsSeen: () => request<void>('POST', '/suggestions/seen'),
+
+  /** The Coaster Workshop: parts, inventory, design slots, the day's submissions and the member's designs. */
+  workshop: () => request<Workshop>('GET', '/workshop'),
+  /** Every coaster part at today's price (anyone). */
+  coasterParts: () => request<{ parts: CoasterPartItem[] }>('GET', '/workshop/parts'),
+  /** The free starter kit, once (a 409 after that). */
+  claimStarterKit: () => request<Workshop>('POST', '/workshop/starter-kit'),
+  /** 402 when short of tickets, 409 'sold_out' (a SoldOutError). */
+  buyParts: (part: Part, quantity: number) => request<{ balance: number; owned: Parts; part: CoasterPartItem }>('POST', '/workshop/parts/buy', { part, quantity }),
+  design: (id: string) => request<SavedDesign>('GET', `/workshop/designs/${encodeURIComponent(id)}`),
+  /** 409 'no_slot' (every slot taken) or 'parts' (see ApiError.missingParts). */
+  createDesign: (design: Design) => request<SavedDesign>('POST', '/workshop/designs', { design }),
+  updateDesign: (id: string, design: Design) => request<SavedDesign>('PUT', `/workshop/designs/${encodeURIComponent(id)}`, { design }),
+  deleteDesign: (id: string) => request<void>('DELETE', `/workshop/designs/${encodeURIComponent(id)}`),
+  /** Sends the saved design to staff with its picture (a data: URL). 422 'not_buildable', 409 'pending', 429 'submission_limit'. */
+  submitDesign: (id: string, picture?: string) => request<MyCreation>('POST', `/workshop/designs/${encodeURIComponent(id)}/submit`, picture ? { picture } : {}),
+  myCreations: () => request<{ creations: MyCreation[]; unread: number }>('GET', '/workshop/creations'),
+  creationsSeen: () => request<void>('POST', '/workshop/creations/seen'),
+  /** Withdraws a submission staff haven't answered yet. */
+  withdrawCreation: (id: string) => request<void>('DELETE', `/workshop/creations/${encodeURIComponent(id)}`),
+  /** A player-built coaster's design: released ones for anyone, any for its creator and for staff. */
+  creation: (id: string) => request<CreationDetail>('GET', `/creations/${encodeURIComponent(id)}`),
 };
+
+/** A submitted coaster's picture (an <img> src). */
+export const creationPictureUrl = (id: string) => `${BASE}/creations/${encodeURIComponent(id)}/picture`;
 
 /** `?a=1&b=x` from the values that are set. */
 const query = (params: Record<string, string | number | undefined | null>) => {
@@ -824,4 +1019,20 @@ export const ringmaster = {
   /** Takes a run off its board, or puts it back. */
   updateTrailRun: (id: string, disqualified: boolean) =>
     request<{ id: string; disqualified: boolean }>('PATCH', `/ringmaster/trail/runs/${encodeURIComponent(id)}`, { disqualified }),
+  /** The coasters members sent, newest first, with how many there are of each status and Creators' Valley's plots. */
+  creations: (p: Page & { status?: CreationStatus | null }) =>
+    request<{ creations: AdminCreation[]; total: number; counts: Record<CreationStatus, number>; plots: AdminPlot[] }>(
+      'GET',
+      `/ringmaster/creations${query({ status: p.status, limit: p.limit, offset: p.offset })}`,
+    ),
+  creation: (id: string) => request<AdminCreation>('GET', `/ringmaster/creations/${encodeURIComponent(id)}`),
+  /** Onto a free `plot`, or (`replace`) in place of the version of the same design running now; at `tickets` a ride. */
+  releaseCreation: (id: string, body: { plot?: number; tickets?: number; replace?: boolean }) =>
+    request<AdminCreation>('POST', `/ringmaster/creations/${encodeURIComponent(id)}/release`, body),
+  declineCreation: (id: string, reply: string) => request<AdminCreation>('POST', `/ringmaster/creations/${encodeURIComponent(id)}/decline`, { reply }),
+  /** Takes a released coaster out of the park: its riders are stopped and refunded. */
+  removeCreation: (id: string) => request<AdminCreation>('POST', `/ringmaster/creations/${encodeURIComponent(id)}/remove`),
+  coasterParts: () => request<{ parts: AdminCoasterPart[] }>('GET', '/ringmaster/workshop/parts'),
+  updateCoasterPart: (part: Part, body: { tickets?: number; stock?: number | null }) =>
+    request<AdminCoasterPart>('PATCH', `/ringmaster/workshop/parts/${encodeURIComponent(part)}`, body),
 };

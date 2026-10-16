@@ -23,6 +23,15 @@ export const DEFAULT_TICKET_COSTS: Readonly<Record<Attraction, number>> = {
   crates: 1,
   striker: 1,
   ducks: 1,
+  // Creators' Valley: staff set each plot's price when they release a coaster onto it
+  plot1: 1,
+  plot2: 1,
+  plot3: 1,
+  plot4: 1,
+  plot5: 1,
+  plot6: 1,
+  plot7: 1,
+  plot8: 1,
 };
 
 /** Tickets in one pack, and hours between two purchases, when park_settings has no row. */

@@ -4193,3 +4193,780 @@ kbd {
     transform: none;
   }
 }
+
+/* ---------- The Coaster Workshop's Builder's Yard (workshop/builder.ts): the shop's sheet, in pink ---------- */
+.workshop {
+  --ws: #e05aa8;
+  --ws-dark: #b8357f;
+}
+.workshop-sheet {
+  width: min(480px, 44vw);
+  border-top-color: var(--ws);
+}
+.workshop .shop-head {
+  grid-template-columns: 1fr auto;
+  gap: 8px 12px;
+}
+.workshop .shop-leave {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  justify-self: end;
+}
+.workshop .shop-title .eyebrow {
+  color: var(--ws-dark);
+}
+.workshop .shop-title h2 {
+  font-size: 1.45rem;
+  overflow-wrap: anywhere;
+}
+.workshop .shop-aisles button {
+  padding: 8px 12px;
+  font-size: 0.86rem;
+}
+.workshop .shop-aisles button[aria-selected='true'] {
+  background: var(--ws);
+}
+.is-inspecting .ws-tabs {
+  display: none;
+}
+/* how to steer the yard's camera, over the 3D view */
+.ws-hint {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top));
+  left: max(16px, env(safe-area-inset-left));
+  max-width: calc(100% - min(480px, 44vw) - 56px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 0;
+  padding: 7px 8px 7px 14px;
+  border-radius: 18px;
+  background: rgba(29, 18, 56, 0.78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: var(--cream);
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+.ws-hint:empty {
+  display: none;
+}
+.ws-reset {
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: inherit;
+  font: 700 0.78rem/1 var(--body);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ws-reset:hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+/* undo, redo, saved or not, and the big three: test ride, save, send */
+.ws-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 18px 12px;
+}
+.ws-bar:empty {
+  display: none;
+}
+.ws-history,
+.ws-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.ws-icon {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(34, 22, 63, 0.07);
+  color: var(--ink);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+.ws-icon:hover:not(:disabled) {
+  background: rgba(34, 22, 63, 0.13);
+}
+.ws-icon:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.ws-state {
+  margin-left: 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.ws-state.is-dirty {
+  color: var(--candy-dark);
+}
+.ws-section {
+  margin: 0 0 18px;
+}
+.ws-section h3 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 8px;
+  font: 400 1.05rem/1.15 var(--display);
+  color: var(--ink);
+}
+.ws-section h3 small {
+  font: 700 0.74rem/1 var(--body);
+  color: var(--muted);
+}
+/* the piece palette */
+.ws-palette {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.ws-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 9px 4px;
+  border: 0;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: inset 0 0 0 2px rgba(34, 22, 63, 0.08);
+  color: var(--ink);
+  font: 700 0.8rem/1.1 var(--body);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.ws-add span {
+  font-size: 1.4rem;
+}
+.ws-add:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: inset 0 0 0 2px var(--ws);
+}
+.ws-add:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+/* the track, piece by piece */
+.ws-pieces {
+  display: grid;
+  gap: 3px;
+  max-height: 260px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  overscroll-behavior: contain;
+}
+.ws-piece {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(34, 22, 63, 0.05);
+  color: var(--text);
+  font: 600 0.86rem/1.2 var(--body);
+  text-align: left;
+}
+button.ws-piece {
+  cursor: pointer;
+}
+button.ws-piece:hover {
+  background: rgba(224, 90, 168, 0.12);
+}
+.ws-piece small {
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+.ws-piece.is-selected,
+button.ws-piece.is-selected:hover {
+  background: var(--mustard);
+  color: var(--ink);
+}
+.ws-piece.is-selected small {
+  color: rgba(29, 18, 56, 0.72);
+}
+.ws-piece.is-bad {
+  box-shadow: inset 3px 0 0 var(--candy);
+}
+.ws-piece.is-fixed {
+  background: rgba(46, 196, 182, 0.1);
+}
+.ws-piece.is-empty {
+  color: var(--muted);
+  font-weight: 400;
+}
+.ws-piece-no {
+  min-width: 1.6em;
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.ws-piece-icon {
+  font-size: 1.1rem;
+}
+.ws-piece-warn {
+  margin-left: auto;
+}
+/* the selected piece's sliders and switches */
+.ws-editor {
+  padding: 12px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: inset 0 0 0 2px var(--mustard);
+}
+.ws-editor.is-empty {
+  box-shadow: inset 0 0 0 2px rgba(34, 22, 63, 0.06);
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+.ws-editor.is-empty p {
+  margin: 0;
+}
+.ws-row,
+.ws-slider {
+  display: grid;
+  grid-template-columns: 84px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+}
+.ws-row {
+  grid-template-columns: 84px 1fr;
+}
+.ws-row-name,
+.ws-slider > span {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.ws-slider input {
+  width: 100%;
+  accent-color: var(--ws);
+}
+.ws-slider output {
+  min-width: 5.5em;
+  font-size: 0.86rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.ws-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ws-seg button {
+  padding: 7px 11px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(34, 22, 63, 0.07);
+  color: var(--text);
+  font: 700 0.8rem/1 var(--body);
+  cursor: pointer;
+}
+.ws-seg button:hover {
+  background: rgba(34, 22, 63, 0.13);
+}
+.ws-seg button[aria-pressed='true'] {
+  background: var(--ws);
+  color: #fff;
+}
+.ws-seg button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.ws-help {
+  margin: 4px 0 8px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.ws-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.ws-danger {
+  color: var(--candy-dark) !important;
+}
+/* can it be built? */
+.ws-issues {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+.ws-issues button {
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 77, 109, 0.1);
+  color: var(--candy-dark);
+  font: 700 0.82rem/1.35 var(--body);
+  text-align: left;
+  cursor: pointer;
+}
+.ws-issues button:hover {
+  background: rgba(255, 77, 109, 0.18);
+}
+.ws-ok {
+  margin: 0 0 10px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #138a52;
+}
+.ws-warn {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 194, 61, 0.22);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.ws-needs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 0 6px;
+  padding: 0;
+  list-style: none;
+}
+.ws-needs li {
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(34, 22, 63, 0.05);
+  font-size: 0.78rem;
+}
+.ws-needs li.is-short {
+  background: rgba(255, 77, 109, 0.12);
+  color: var(--candy-dark);
+}
+.ws-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ws-dark);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+/* the ride's numbers */
+.ws-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 0 0 8px;
+}
+.ws-stats div {
+  min-width: 0;
+  padding: 8px;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: inset 0 0 0 2px rgba(34, 22, 63, 0.06);
+}
+.ws-stats div.is-hot {
+  box-shadow: inset 0 0 0 2px var(--candy);
+}
+.ws-stats dt {
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ws-stats dd {
+  margin: 2px 0 0;
+  font: 400 1.05rem/1.1 var(--display);
+  color: var(--ink);
+}
+.ws-note {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(46, 196, 182, 0.14);
+  color: #0d6b62;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.4;
+  animation: shop-in 0.3s ease;
+}
+.ws-note.is-error {
+  background: rgba(255, 77, 109, 0.12);
+  color: var(--candy-dark);
+}
+.ws-confirm {
+  margin: 0 0 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #fff3d6;
+  box-shadow: inset 0 0 0 2px var(--mustard);
+}
+.ws-confirm p {
+  margin: 0 0 10px;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+.ws-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+/* the free starter kit, and the extra design slot */
+.ws-kit,
+.ws-slot {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin: 0 0 16px;
+  padding: 14px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #ffe3f1, #fff1d6);
+  box-shadow: inset 0 0 0 2px rgba(224, 90, 168, 0.25);
+}
+.ws-kit h3,
+.ws-slot h3 {
+  margin: 0 0 4px;
+  font: 400 1.1rem/1.1 var(--display);
+  color: var(--ink);
+}
+.ws-kit p,
+.ws-slot p {
+  margin: 0 0 8px;
+  font-size: 0.84rem;
+}
+.ws-kit-art {
+  font-size: 2.4rem;
+  line-height: 1;
+  transform: rotate(-8deg);
+}
+.ws-slot-price b {
+  font: 400 1.3rem/1 var(--display);
+  color: var(--ink);
+}
+/* the Style tab */
+.ws-name input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid rgba(34, 22, 63, 0.15);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  font: 700 1rem/1.2 var(--body);
+}
+.ws-name input:focus {
+  border-color: var(--ws);
+  outline: none;
+}
+.ws-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ws-color {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 4px 4px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: inset 0 0 0 2px rgba(34, 22, 63, 0.08);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ws-color:focus-within {
+  box-shadow: inset 0 0 0 2px var(--ws);
+}
+.ws-color input {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+.ws-color input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.ws-color input::-webkit-color-swatch {
+  border: 2px solid rgba(0, 0, 0, 0.12);
+  border-radius: 50%;
+}
+.ws-color input::-moz-color-swatch {
+  border: 2px solid rgba(0, 0, 0, 0.12);
+  border-radius: 50%;
+}
+.ws-cars {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  font: 400 1.3rem/1 var(--display);
+}
+.ws-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.ws-mode {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 12px;
+  border: 0;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: inset 0 0 0 2px rgba(34, 22, 63, 0.08);
+  color: var(--text);
+  font: 400 0.8rem/1.35 var(--body);
+  text-align: left;
+  cursor: pointer;
+}
+.ws-mode b {
+  font: 400 1rem/1.1 var(--display);
+  color: var(--ink);
+}
+.ws-mode-icon {
+  font-size: 1.6rem;
+}
+.ws-mode[aria-pressed='true'] {
+  background: #fff5fa;
+  box-shadow: inset 0 0 0 3px var(--ws);
+}
+/* the Parts tab: the shop's shelves, in parts */
+.ws-parts {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.ws-part.is-needed {
+  box-shadow: inset 0 0 0 2px var(--candy);
+}
+.ws-own {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.ws-need {
+  color: var(--candy-dark);
+}
+.ws-qty {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ws-qty button {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(34, 22, 63, 0.08);
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+.ws-qty button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+/* the Designs tab */
+.ws-design {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: inset 0 0 0 2px rgba(34, 22, 63, 0.06);
+}
+.ws-design.is-open {
+  box-shadow: inset 0 0 0 2px var(--ws);
+}
+.ws-design h3 {
+  margin: 0 0 2px;
+  font: 400 1.05rem/1.1 var(--display);
+  color: var(--ink);
+}
+.ws-design h3 small {
+  font: 700 0.72rem/1 var(--body);
+  color: var(--ws-dark);
+}
+.ws-design .ws-help {
+  margin: 0 0 4px;
+}
+.ws-design-actions {
+  display: flex;
+  gap: 6px;
+}
+.ws-pill {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(34, 22, 63, 0.07);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+.ws-pill.is-wait {
+  background: rgba(255, 194, 61, 0.3);
+}
+.ws-pill.is-good {
+  background: rgba(46, 196, 182, 0.2);
+  color: #0d6b62;
+}
+.ws-pill.is-bad {
+  background: rgba(255, 77, 109, 0.14);
+  color: var(--candy-dark);
+}
+/* the Sent tab: what staff made of each one */
+.ws-sent {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0 0 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: inset 0 0 0 2px rgba(34, 22, 63, 0.06);
+}
+.ws-sent.is-unread {
+  box-shadow: inset 0 0 0 2px var(--ws);
+}
+.ws-sent img {
+  flex: none;
+  width: 120px;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: 10px;
+  background: rgba(34, 22, 63, 0.06);
+}
+.ws-sent > div {
+  flex: 1;
+  min-width: 0;
+}
+.ws-sent h3 {
+  margin: 0 0 4px;
+  font: 400 1.05rem/1.1 var(--display);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.ws-sent p {
+  margin: 0 0 6px;
+  font-size: 0.82rem;
+}
+.ws-reply {
+  margin: 6px 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--ws);
+  border-radius: 0 10px 10px 0;
+  background: rgba(224, 90, 168, 0.08);
+  font-size: 0.84rem;
+}
+.ws-reply p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.ws-reply cite {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.74rem;
+  font-style: normal;
+  font-weight: 700;
+  color: var(--muted);
+}
+.ws-card {
+  padding: 16px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: inset 0 0 0 2px rgba(34, 22, 63, 0.06);
+}
+.ws-card h3 {
+  margin: 0 0 6px;
+  font: 400 1.1rem/1.1 var(--display);
+  color: var(--ink);
+}
+.ws-card p {
+  margin: 0 0 8px;
+  font-size: 0.86rem;
+}
+/* a coaster that rides itself: no power or brakes to show (only the camera to turn) */
+.is-passive-coaster .rh-bar,
+.is-passive-coaster.is-riding-coaster .stick {
+  display: none;
+}
+@media (max-width: 720px) {
+  /* phones: the sheet at the bottom, the yard above it */
+  .workshop-sheet {
+    width: auto;
+    height: 56%;
+  }
+  .workshop .shop-leave {
+    grid-row: auto;
+    justify-self: start;
+  }
+  .ws-hint {
+    top: max(8px, env(safe-area-inset-top));
+    left: 8px;
+    right: 8px;
+    max-width: none;
+    padding: 6px 6px 6px 12px;
+    font-size: 0.72rem;
+    border-radius: 14px;
+  }
+  .ws-bar {
+    padding: 0 12px 10px;
+  }
+  .ws-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .ws-row,
+  .ws-slider {
+    grid-template-columns: 70px 1fr auto;
+  }
+  .ws-row {
+    grid-template-columns: 70px 1fr;
+  }
+  .ws-sent {
+    flex-direction: column;
+  }
+  .ws-sent img {
+    width: 100%;
+  }
+  .ws-modes {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-note {
+    animation: none;
+  }
+  .ws-add,
+  .ws-add:hover:not(:disabled) {
+    transition: none;
+    transform: none;
+  }
+}

@@ -1,5 +1,5 @@
 import { DISTRICTS, ZONES, type ZoneId } from './layout';
-import { MAP_PLACES, fairBounds, paintFair, paintTrain, paintVisitor } from './minimap';
+import { MAP_PLACES, fairBounds, onMap, paintFair, paintTrain, paintVisitor } from './minimap';
 import { PALETTE } from './textures';
 import { escapeHtml } from './ui';
 
@@ -65,6 +65,7 @@ export class WorldMap {
     this.scaleBar = root.querySelector('.wm-scale i')!;
     this.scaleLabel = root.querySelector('.wm-scale span')!;
     this.buildPlaces();
+    this.refreshPlaces();
 
     root.querySelector('.wm-close')!.addEventListener('click', () => this.close());
     root.querySelector('[data-wm-locate]')!.addEventListener('click', () => this.flyTo(this.visitor.x, this.visitor.z));
@@ -120,6 +121,30 @@ export class WorldMap {
       list.appendChild(li);
       this.items.set(p.id, item);
     }
+  }
+
+  /**
+   * Creators' Valley changed (a coaster opened or closed on a plot): each place's name, the plots
+   * on the map and in the legend (only those with a coaster), and the valley painted again.
+   */
+  refreshPlaces() {
+    for (const p of MAP_PLACES) {
+      const shown = onMap(p.id);
+      const pin = this.pins.get(p.id);
+      const item = this.items.get(p.id);
+      if (pin) {
+        pin.hidden = !shown;
+        pin.querySelector('.wm-pin-label')!.textContent = p.label;
+        pin.setAttribute('aria-label', this.closed.has(p.id) ? `${p.label}, under maintenance` : p.label);
+      }
+      if (item) {
+        item.parentElement!.hidden = !shown;
+        item.querySelector('.wm-item-label')!.textContent = p.label;
+      }
+    }
+    if (this.selected && !onMap(this.selected)) this.select(null, false);
+    this.baseKey = '';
+    if (this.isOpen) this.renderCard();
   }
 
   open() {

@@ -314,6 +314,30 @@
         </section>
       </div>
 
+      <!-- the Coaster Workshop's Builder's Yard: build a coaster piece by piece (workshop/builder.ts) -->
+      <div id="workshop" class="shop workshop" hidden>
+        <p class="ws-hint" data-ws-hint></p>
+        <section class="shop-sheet workshop-sheet" role="dialog" aria-modal="false" aria-labelledby="workshop-title">
+          <header class="shop-head">
+            <div class="shop-title">
+              <p class="eyebrow" data-ws-eyebrow>Coaster Workshop · Builder's Yard</p>
+              <h2 id="workshop-title" data-ws-title>My Coaster</h2>
+            </div>
+            <div class="shop-wallet" data-ws-wallet></div>
+            <button type="button" class="shop-leave" data-ws-leave>Back to the fair <kbd>Esc</kbd></button>
+          </header>
+          <div class="ws-bar" data-ws-bar></div>
+          <div class="shop-aisles ws-tabs" role="tablist" aria-label="Coaster Workshop" data-ws-tabs>
+            <button type="button" role="tab" id="ws-tab-build" aria-controls="workshop-panel" data-ws-tab="build">🧱 Build</button>
+            <button type="button" role="tab" id="ws-tab-style" aria-controls="workshop-panel" data-ws-tab="style">🎨 Style</button>
+            <button type="button" role="tab" id="ws-tab-parts" aria-controls="workshop-panel" data-ws-tab="parts">🧰 Parts</button>
+            <button type="button" role="tab" id="ws-tab-designs" aria-controls="workshop-panel" data-ws-tab="designs">💾 Designs</button>
+            <button type="button" role="tab" id="ws-tab-sent" aria-controls="workshop-panel" data-ws-tab="sent">📬 Sent <span class="ideas-count" data-ws-unread hidden></span></button>
+          </div>
+          <div class="shop-shelf ws-panel" id="workshop-panel" role="tabpanel" tabindex="0" data-ws-panel></div>
+        </section>
+      </div>
+
       <div id="minimap" class="minimap" title="Open the park map (M)">
         <canvas aria-hidden="true"></canvas>
         <button type="button" class="minimap-open" aria-label="Open the park map" aria-haspopup="dialog" aria-controls="world-map">⤢</button>

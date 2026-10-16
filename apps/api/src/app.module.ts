@@ -14,6 +14,7 @@ import { ShopModule } from './shop/shop.module.js';
 import { SuggestionsModule } from './suggestions/suggestions.module.js';
 import { TicketsModule } from './tickets/tickets.module.js';
 import { TrailModule } from './trail/trail.module.js';
+import { WorkshopModule } from './workshop/workshop.module.js';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { TrailModule } from './trail/trail.module.js';
     TrailModule,
     ShopModule,
     SuggestionsModule,
+    WorkshopModule,
     RingmasterModule,
     LiveModule,
     HealthModule,
