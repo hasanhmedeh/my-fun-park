@@ -169,4 +169,6 @@ const rules = (after: Record<string, unknown>) =>
     'packSize' in after ? ` Packs now hold ${esc(after.packSize)} tickets.` : '',
     'cooldownHours' in after ? ` One pack every ${esc(after.cooldownHours)} h.` : '',
     'ticketCap' in after ? (after.ticketCap === null ? ' No limit on free tickets.' : ` Free packs top up to ${esc(after.ticketCap)} tickets at most.`) : '',
+    'adTickets' in after ? (after.adTickets === 0 ? ' Ads switched off.' : ` An ad now gives ${esc(after.adTickets)} tickets.`) : '',
+    'adsPerDay' in after ? ` Up to ${esc(after.adsPerDay)} ads a member a day.` : '',
   ].join('');

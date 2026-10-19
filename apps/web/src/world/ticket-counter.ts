@@ -1,5 +1,6 @@
 // Bits of the ticket counter shared by the game's cards and the booth's shop (shop.ts): ticket
 // wording, the sign-up buttons, the countdown to the next pack, the price list and a member's history.
+import { adsEnabled } from '../account/ads';
 import { ATTRACTION_IDS, type AttractionId } from '../account/api';
 import { everyHours, formatWait, session } from '../account/session';
 import { MAP_PLACES, onMap } from './minimap';
@@ -33,6 +34,12 @@ export function waitHtml(ms: number, id = '') {
       : `<p ${attrs}>Your free pack of ${session.packNow} is ready at the Ticket Booth.</p>`;
 }
 
+/** "Watch an ad · +5 🎟️" for a card's actions, while an ad is on offer (see session.adState); '' otherwise. */
+export function adButtonHtml(ride: AttractionId) {
+  if (!adsEnabled || session.adState !== 'ready') return '';
+  return `<button class="btn btn-primary btn-small" type="button" data-watch-ad data-ride="${ride}">Watch an ad · +${session.adTickets} 🎟️</button>`;
+}
+
 /** Every attraction and what a round costs (the server's prices once they're in); a plot only while a coaster runs there. */
 export function priceListHtml() {
   const rows = ATTRACTION_IDS.filter(onMap).map((id) => {
@@ -58,7 +65,7 @@ export function historyHtml() {
       ? '<p class="sub">Looking up your purchases…</p>'
       : purchases.length
         ? `<ul class="ticket-list">${purchases
-            .map((p) => `<li><span>${escapeHtml(when(p.createdAt))}</span><b>+${ticketsText(p.quantity)}${p.priceCents ? '' : ' · free'}</b></li>`)
+            .map((p) => `<li><span>${escapeHtml(when(p.createdAt))}</span><b>+${ticketsText(p.quantity)}${p.provider === 'ad' ? ' · 📺 ad' : p.priceCents ? '' : ' · free'}</b></li>`)
             .join('')}</ul>`
         : '<p>No purchases yet: your first pack is on the house.</p>';
   return `<h3>Your fair so far</h3><p>🎢 ${rounds}</p><h3>Latest purchases</h3>${list}`;

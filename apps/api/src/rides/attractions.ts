@@ -38,11 +38,17 @@ export const DEFAULT_TICKET_COSTS: Readonly<Record<Attraction, number>> = {
 export const DEFAULT_PACK_SIZE = 20;
 export const DEFAULT_COOLDOWN_HOURS = 5;
 
+/** Tickets one rewarded ad gives (0: no ads), and how many ads a member is paid for in 24 hours, when park_settings has no row. */
+export const DEFAULT_AD_TICKETS = 5;
+export const DEFAULT_ADS_PER_DAY = 5;
+
 /** The limits the migrations' CHECK constraints enforce, so a bad value is a 400 rather than a 500. */
 export const PACK_SIZE_RANGE = { min: 1, max: 1000 } as const;
 export const COOLDOWN_HOURS_RANGE = { min: 0, max: 168 } as const;
 export const TICKET_CAP_RANGE = { min: 1, max: 100000 } as const;
 export const TICKETS_RANGE = { min: 1, max: 1000 } as const;
+export const AD_TICKETS_RANGE = { min: 0, max: 1000 } as const;
+export const ADS_PER_DAY_RANGE = { min: 1, max: 100 } as const;
 /** The longest closed sign, for the park and for an attraction. */
 export const CLOSED_MESSAGE_MAX = 200;
 
@@ -50,3 +56,5 @@ export const CLOSED_MESSAGE_MAX = 200;
 export const PACK_PRICE_CENTS = 0;
 export const PACK_CURRENCY = 'EUR';
 export const PACK_PROVIDER = 'free';
+/** What tickets paid for watching an ad are recorded as (also free to the member). */
+export const AD_PROVIDER = 'ad';

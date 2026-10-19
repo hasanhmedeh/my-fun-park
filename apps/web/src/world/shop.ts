@@ -4,6 +4,7 @@
 // Rosa talks you through it: what you look at, what you buy, and what you can't afford yet.
 import * as THREE from 'three';
 import { ApiError, NotEnoughTicketsError, ParkClosedError, PurchaseCooldownError, SoldOutError, TicketCapError, type ShopItem } from '../account/api';
+import { adMessage, adsEnabled, watchAd } from '../account/ads';
 import type { AuthMode } from '../account/auth-dialog';
 import { everyHours, formatWait, session } from '../account/session';
 import type { Sfx } from './audio';
@@ -90,11 +91,12 @@ export class Shop {
 
     r.addEventListener('click', (e) => {
       const t = e.target as HTMLElement;
-      const b = t.closest<HTMLElement>('[data-aisle], [data-shop-buy], [data-shop-pack], [data-shop-wear], [data-shop-leave], [data-auth]');
+      const b = t.closest<HTMLElement>('[data-aisle], [data-shop-buy], [data-shop-pack], [data-shop-ad], [data-shop-wear], [data-shop-leave], [data-auth]');
       if (!b) return;
       if (b.dataset.aisle) this.choose(b.dataset.aisle as Aisle, true);
       else if (b.dataset.shopBuy) void this.buy(b.dataset.shopBuy);
       else if (b.hasAttribute('data-shop-pack')) void this.takePack();
+      else if (b.hasAttribute('data-shop-ad')) void this.watchAd();
       else if (b.dataset.shopWear) void this.wear(b.dataset.shopWear, b.dataset.on === '1');
       else if (b.hasAttribute('data-shop-leave')) this.o.onLeave();
       else if (b.dataset.auth) this.o.onAuth(b.dataset.auth as AuthMode);
@@ -245,6 +247,12 @@ export class Shop {
               : `${ticketsText(session.packNow)}, on the house. Go on, take them!`,
       );
     }
+    if (id === 'ad')
+      return this.say(
+        session.adState === 'ready'
+          ? `Can't wait for the next pack? Watch a little ad to the end and the sponsors treat you to ${ticketsText(session.adTickets)}.`
+          : "That's all the ads for today, love. The sponsors need a rest too!",
+      );
     const line = PITCH[id];
     if (line) this.say(line);
   }
@@ -325,11 +333,35 @@ export class Shop {
         <div class="shop-pack-art" aria-hidden="true">🎟️</div>
         <div class="shop-pack-body"><h3>Free ticket pack</h3>${pack}${flash}</div>
       </article>
+      ${this.adHtml()}
       <div class="shop-columns">
         <div class="shop-block">${priceListHtml()}</div>
         ${user ? `<div class="shop-block">${historyHtml()}</div>` : ''}
       </div>
       ${legalLinksHtml()}`;
+  }
+
+  /** Tickets for watching an ad: offered once the free pack isn't ready (see session.adState). */
+  private adHtml() {
+    const state = adsEnabled ? session.adState : null;
+    if (!state) return '';
+    const n = session.adTickets;
+    let body: string;
+    if (state === 'ready') {
+      const left = session.adsLeft ?? 0;
+      const capNote = session.ticketCap === null ? '' : ' They count even past the free-ticket limit.';
+      const label = this.busy === 'ad' ? 'Playing the ad…' : `Watch an ad · +${n} 🎟️`;
+      body = `<p>Can't wait for the next pack? Watch a short ad to the end and get <strong>${ticketsText(n)}</strong>.${capNote} ${left === 1 ? '1 more' : `${left} more`} today.</p>
+        <p class="shop-actions"><button type="button" class="btn btn-primary" data-shop-ad ${this.closed || (this.busy && this.busy !== 'ad') ? 'disabled' : ''} ${this.busy === 'ad' ? 'aria-busy="true" disabled' : ''}>${label}</button></p>`;
+    } else {
+      const wait = session.msUntilAd();
+      body = `<p>You've watched all of today's ads.${wait ? ` The next one's ready in <span data-ad-clock>${formatWait(wait)}</span>.` : ''}</p>`;
+    }
+    const flash = this.flash?.id === 'ad' ? `<p class="shop-flash" role="status">${escapeHtml(this.flash.text)}</p>` : '';
+    return `<article class="shop-pack" data-card="ad">
+        <div class="shop-pack-art" aria-hidden="true">📺</div>
+        <div class="shop-pack-body"><h3>Tickets for an ad</h3>${body}${flash}</div>
+      </article>`;
   }
 
   private itemsHtml(kind: ShopItem['kind']) {
@@ -378,6 +410,13 @@ export class Shop {
   }
 
   private tickClock() {
+    const adClock = this.shelf.querySelector('[data-ad-clock]');
+    const adWait = adClock ? session.msUntilAd() : null;
+    if (adClock && adWait !== null) {
+      if (adWait > 0) adClock.textContent = formatWait(adWait);
+      // a day's ad has freed up: the server says how many
+      else void session.loadTickets();
+    }
     const clock = this.shelf.querySelector('[data-clock]');
     if (!clock) return;
     const wait = session.msUntilPurchase();
@@ -405,6 +444,30 @@ export class Shop {
     } catch (err) {
       this.o.sfx.beep();
       this.say(this.problem(err, 'pack'));
+    } finally {
+      this.busy = null;
+      this.render();
+      this.bump();
+    }
+  }
+
+  private async watchAd() {
+    if (this.busy || !session.user || session.adState !== 'ready') return;
+    this.busy = 'ad';
+    this.flash = null;
+    this.render();
+    this.say('Lights down, here comes the ad. Watch it to the end and the tickets are yours!');
+    try {
+      const r = await watchAd({ hush: (on) => this.o.sfx.hush(on), muted: this.o.sfx.muted });
+      if (r.kind === 'paid') {
+        this.o.booth.vendorRig?.play('Interact', 1.1);
+        this.o.sfx.ding();
+        this.flash = { id: 'ad', text: `+${ticketsText(r.tickets)}! You now have ${r.balance}.` };
+        this.say(`Thanks for watching! ${ticketsText(r.tickets)}, courtesy of our sponsors. Enjoy!`);
+      } else {
+        this.o.sfx.beep();
+        this.say(adMessage(r));
+      }
     } finally {
       this.busy = null;
       this.render();

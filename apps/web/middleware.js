@@ -11,7 +11,10 @@ export const config = {
 };
 
 export default async function middleware(request) {
-  if (new URL(request.url).pathname.startsWith('/api/')) return pass();
+  const path = new URL(request.url).pathname;
+  if (path.startsWith('/api/')) return pass();
+  // AdSense's crawler reads it from anywhere; it only names the site's ad seller
+  if (path === '/ads.txt') return pass();
   // set by Vercel's edge (anything the browser sent is overwritten), and read the same way by the API
   const { allowed, ip } = await admits(request.headers.get('x-real-ip'));
   if (allowed) return pass();

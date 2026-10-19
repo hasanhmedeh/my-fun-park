@@ -266,6 +266,8 @@ export class Builder {
   /** A submitted coaster being looked at (staff, or its creator): nothing can be changed. */
   inspecting: CreationDetail | null = null;
   private lastTest: TestResult | null = null;
+  /** Where the member's coasters stood last time we heard (see creationsSig). */
+  private creationsSig: string | null = null;
   private panel: HTMLElement;
   private bar: HTMLElement;
   private title: HTMLElement;
@@ -334,7 +336,16 @@ export class Builder {
     });
     // the shop's prices and stock changed (staff, or another member buying)
     session.onWorkshop(() => this.isOpen && !this.inspecting && void this.load());
-    session.onMyCreations(() => this.isOpen && this.render());
+    // staff released, declined or removed one of the member's coasters: the saved designs show its
+    // new status (and what it frees up), so the workshop is fetched again, not just redrawn
+    session.onMyCreations(() => {
+      const sig = creationsSig();
+      const moved = this.creationsSig !== null && sig !== this.creationsSig;
+      this.creationsSig = sig;
+      if (!this.isOpen) return;
+      if (moved && !this.inspecting) void this.load();
+      else this.render();
+    });
   }
 
   // ------------------------------------------------------------------ opening and leaving
@@ -1456,6 +1467,12 @@ export class Builder {
 }
 
 /** A draft from storage, made safe: whatever doesn't check out is replaced (a draft can be half-done). */
+/** The member's coasters as status and plot only (null before they're known): reading the news doesn't change it. */
+function creationsSig() {
+  const c = session.myCreations;
+  return c ? c.creations.map((x) => `${x.id}:${x.status}:${x.plot ?? ''}`).join('|') : null;
+}
+
 function cleanDesignLoose(raw: unknown): Design {
   try {
     return cleanDesign(raw);

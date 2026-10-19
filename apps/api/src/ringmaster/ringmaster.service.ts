@@ -28,6 +28,10 @@ export interface ParkSettingsJson {
   cooldownHours: number;
   /** The most a free pack tops a balance up to; null for no ceiling. */
   ticketCap: number | null;
+  /** Tickets one rewarded ad gives (0: ads are off). */
+  adTickets: number;
+  /** How many ads one member is paid for in 24 hours. */
+  adsPerDay: number;
   updatedAt: string | null;
 }
 
@@ -173,6 +177,8 @@ export class RingmasterService {
       packSize: dto.packSize,
       cooldownHours: dto.cooldownHours,
       ticketCap: dto.ticketCap,
+      adTickets: dto.adTickets,
+      adsPerDay: dto.adsPerDay,
     });
     const changed = changes(before, data);
     if (!changed) return toParkJson(before);
@@ -580,7 +586,7 @@ export class RingmasterService {
 }
 
 function toParkJson(
-  rules: Pick<ParkRules, 'open' | 'closedMessage' | 'underMaintenance' | 'maintenanceMessage' | 'packSize' | 'cooldownHours' | 'ticketCap' | 'updatedAt'>,
+  rules: Pick<ParkRules, 'open' | 'closedMessage' | 'underMaintenance' | 'maintenanceMessage' | 'packSize' | 'cooldownHours' | 'ticketCap' | 'adTickets' | 'adsPerDay' | 'updatedAt'>,
 ): ParkSettingsJson {
   return {
     open: rules.open,
@@ -590,6 +596,8 @@ function toParkJson(
     packSize: rules.packSize,
     cooldownHours: rules.cooldownHours,
     ticketCap: rules.ticketCap,
+    adTickets: rules.adTickets,
+    adsPerDay: rules.adsPerDay,
     updatedAt: rules.updatedAt?.toISOString() ?? null,
   };
 }

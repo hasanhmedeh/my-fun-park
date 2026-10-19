@@ -1,7 +1,7 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import type { Attraction, AttractionSettings, User } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { ATTRACTIONS, DEFAULT_COOLDOWN_HOURS, DEFAULT_PACK_SIZE, DEFAULT_TICKET_COSTS } from '../rides/attractions.js';
+import { ATTRACTIONS, DEFAULT_AD_TICKETS, DEFAULT_ADS_PER_DAY, DEFAULT_COOLDOWN_HOURS, DEFAULT_PACK_SIZE, DEFAULT_TICKET_COSTS } from '../rides/attractions.js';
 
 /** The park's switches (the park_settings row, or its defaults when the row is missing). */
 export interface ParkRules {
@@ -14,6 +14,10 @@ export interface ParkRules {
   cooldownHours: number;
   /** The most a free pack tops a balance up to; null for no ceiling. */
   ticketCap: number | null;
+  /** Tickets one rewarded ad gives (0: ads are off). */
+  adTickets: number;
+  /** How many ads one member is paid for in 24 hours. */
+  adsPerDay: number;
   updatedAt: Date | null;
 }
 
@@ -40,6 +44,9 @@ export interface PublicPark {
   cooldownHours: number;
   /** The most a free pack tops a balance up to; null for no ceiling. */
   ticketCap: number | null;
+  /** Tickets one rewarded ad gives (0: ads are off), and how many a member is paid for in 24 hours. */
+  adTickets: number;
+  adsPerDay: number;
   /** The attractions closed for maintenance, each with its sign (null for the default wording). Open ones are left out. */
   maintenance: Partial<Record<Attraction, string | null>>;
   /** The player-built coasters running in Creators' Valley, by plot (GET /creations/:id has each one's design). */
@@ -71,6 +78,8 @@ export class ParkService {
       packSize: row?.packSize ?? DEFAULT_PACK_SIZE,
       cooldownHours: row?.cooldownHours ?? DEFAULT_COOLDOWN_HOURS,
       ticketCap: row?.ticketCap ?? null,
+      adTickets: row?.adTickets ?? DEFAULT_AD_TICKETS,
+      adsPerDay: row?.adsPerDay ?? DEFAULT_ADS_PER_DAY,
       updatedAt: row?.updatedAt ?? null,
     };
   }
@@ -108,6 +117,8 @@ export class ParkService {
       packSize: rules.packSize,
       cooldownHours: rules.cooldownHours,
       ticketCap: rules.ticketCap,
+      adTickets: rules.adTickets,
+      adsPerDay: rules.adsPerDay,
       maintenance,
       creations: released.map((c) => ({ plot: c.plot!, id: c.id, name: c.name, creator: c.user.username })),
     };

@@ -86,6 +86,7 @@ export class OverviewView {
       tile('Tickets handed out', num(d.tickets.ticketsSoldInRange), `${plural(d.tickets.purchasesInRange, 'pack', 'packs')} · ${num(d.tickets.purchasesToday)} today`),
       tile('Tickets spent', num(d.tickets.ticketsSpentInRange), `${num(d.tickets.ticketsSpent)} all time`),
       tile('In wallets', num(d.tickets.inCirculation), 'Unspent, across every member'),
+      tile('Ads watched', num(d.tickets.adsWatchedInRange ?? 0), `${num(d.tickets.adsWatchedToday ?? 0)} today · ${num(d.tickets.adsWatched ?? 0)} all time`),
       tile('Staff', num(d.users.admins), 'Can open this office'),
     ].join('');
 

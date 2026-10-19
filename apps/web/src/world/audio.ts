@@ -56,7 +56,19 @@ export class Sfx {
     } catch {
       /* storage unavailable */
     }
-    if (this.master && this.ctx) this.master.gain.setTargetAtTime(m ? 0 : 0.55, this.ctx.currentTime, 0.05);
+    this.applyVolume();
+  }
+
+  /** Silences the fair for a while (an ad is playing), leaving the visitor's own mute alone. */
+  hush(on: boolean) {
+    this.hushed = on;
+    this.applyVolume();
+  }
+
+  private hushed = false;
+
+  private applyVolume() {
+    if (this.master && this.ctx) this.master.gain.setTargetAtTime(this.muted || this.hushed ? 0 : 0.55, this.ctx.currentTime, 0.05);
   }
 
   /** speed01: 0..1 */

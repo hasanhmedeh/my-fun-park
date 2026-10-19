@@ -1,6 +1,6 @@
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
-import { CLOSED_MESSAGE_MAX, COOLDOWN_HOURS_RANGE, PACK_SIZE_RANGE, TICKET_CAP_RANGE } from '../../rides/attractions.js';
+import { AD_TICKETS_RANGE, ADS_PER_DAY_RANGE, CLOSED_MESSAGE_MAX, COOLDOWN_HOURS_RANGE, PACK_SIZE_RANGE, TICKET_CAP_RANGE } from '../../rides/attractions.js';
 import { closedMessage } from './closed-message.js';
 
 /** PATCH /ringmaster/park: any of the park's switches. Left out means unchanged. */
@@ -46,4 +46,18 @@ export class UpdateParkDto {
   @Min(TICKET_CAP_RANGE.min)
   @Max(TICKET_CAP_RANGE.max)
   ticketCap?: number | null;
+
+  /** Tickets one rewarded ad gives. 0 switches the ads off. */
+  @IsOptional()
+  @IsInt()
+  @Min(AD_TICKETS_RANGE.min)
+  @Max(AD_TICKETS_RANGE.max)
+  adTickets?: number;
+
+  /** How many ads one member is paid for in 24 hours. */
+  @IsOptional()
+  @IsInt()
+  @Min(ADS_PER_DAY_RANGE.min)
+  @Max(ADS_PER_DAY_RANGE.max)
+  adsPerDay?: number;
 }

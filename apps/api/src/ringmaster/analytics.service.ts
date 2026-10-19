@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma, type Attraction } from '../generated/prisma/client.js';
 import { ParkService } from '../park/park.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { ATTRACTIONS } from '../rides/attractions.js';
+import { AD_PROVIDER, ATTRACTIONS } from '../rides/attractions.js';
 import type { ParkSettingsJson } from './ringmaster.service.js';
 
 /** Days the overview can look back over. */
@@ -50,6 +50,10 @@ export interface Overview {
     ticketsSoldInRange: number;
     ticketsSpent: number;
     ticketsSpentInRange: number;
+    /** Rewarded ads watched to the end (each one a purchase with provider "ad", counted in `purchases` too). */
+    adsWatched: number;
+    adsWatchedToday: number;
+    adsWatchedInRange: number;
     /** Sum of every member's balance: tickets bought (or granted) and not spent yet. */
     inCirculation: number;
   };
@@ -140,12 +144,15 @@ export class AnalyticsService {
         SELECT (COUNT(DISTINCT user_id) FILTER (WHERE started_at >= ${todayTs}::timestamp))::int AS today,
                (COUNT(DISTINCT user_id))::int AS "inRange"
         FROM ride_rounds WHERE started_at >= ${since}::timestamp`,
-      db.$queryRaw<[{ purchases: number; today: number; inRange: number; sold: number; soldInRange: number }]>`
+      db.$queryRaw<[{ purchases: number; today: number; inRange: number; sold: number; soldInRange: number; ads: number; adsToday: number; adsInRange: number }]>`
         SELECT (COUNT(*))::int AS purchases,
                (COUNT(*) FILTER (WHERE created_at >= ${todayTs}::timestamp))::int AS today,
                (COUNT(*) FILTER (WHERE created_at >= ${since}::timestamp))::int AS "inRange",
                (COALESCE(SUM(quantity), 0))::int AS sold,
-               (COALESCE(SUM(quantity) FILTER (WHERE created_at >= ${since}::timestamp), 0))::int AS "soldInRange"
+               (COALESCE(SUM(quantity) FILTER (WHERE created_at >= ${since}::timestamp), 0))::int AS "soldInRange",
+               (COUNT(*) FILTER (WHERE provider = ${AD_PROVIDER}))::int AS ads,
+               (COUNT(*) FILTER (WHERE provider = ${AD_PROVIDER} AND created_at >= ${todayTs}::timestamp))::int AS "adsToday",
+               (COUNT(*) FILTER (WHERE provider = ${AD_PROVIDER} AND created_at >= ${since}::timestamp))::int AS "adsInRange"
         FROM ticket_purchases`,
       db.user.aggregate({ _sum: { ticketBalance: true } }),
       db.$queryRaw<RideRow[]>`
@@ -264,6 +271,9 @@ export class AnalyticsService {
         ticketsSoldInRange: totals.soldInRange,
         ticketsSpent,
         ticketsSpentInRange,
+        adsWatched: totals.ads,
+        adsWatchedToday: totals.adsToday,
+        adsWatchedInRange: totals.adsInRange,
         inCirculation: balances._sum.ticketBalance ?? 0,
       },
       rounds,
@@ -280,6 +290,8 @@ export class AnalyticsService {
         packSize: rules.packSize,
         cooldownHours: rules.cooldownHours,
         ticketCap: rules.ticketCap,
+        adTickets: rules.adTickets,
+        adsPerDay: rules.adsPerDay,
         updatedAt: rules.updatedAt?.toISOString() ?? null,
       },
     };

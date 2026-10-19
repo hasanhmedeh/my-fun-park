@@ -101,6 +101,9 @@ export interface Park {
   cooldownHours: number;
   /** The most a free pack tops a balance up to (null for no ceiling). */
   ticketCap: number | null;
+  /** Tickets one rewarded ad gives (0: ads are off), and how many a member is paid for in 24 hours. */
+  adTickets: number;
+  adsPerDay: number;
   /** Attractions closed for maintenance, each with its sign (null for the default wording). Open ones are left out. */
   maintenance: Partial<Record<AttractionId, string | null>>;
   /** The player-built coasters running in Creators' Valley, by plot. Missing from an older server: none. */
@@ -312,6 +315,13 @@ export interface Tickets {
   nextPurchaseAt: string | null;
   canBuy: boolean;
   costs: Record<AttractionId, number>;
+  /** Tickets one rewarded ad gives (0: ads are off), and how many a member is paid for in 24 hours. Missing from an older server. */
+  adTickets?: number;
+  adsPerDay?: number;
+  /** Ads the member can still be paid for in the last 24 hours. */
+  adsLeft?: number;
+  /** While none are left: when the next one frees up. */
+  nextAdAt?: string | null;
 }
 
 export interface Purchase {
@@ -319,6 +329,8 @@ export interface Purchase {
   quantity: number;
   priceCents: number;
   currency: string;
+  /** "free" for a pack, "ad" for tickets given for watching an ad. Missing from an older server. */
+  provider?: string;
   /** Only in the purchase history (GET /tickets/purchases). */
   balanceAfter?: number;
   createdAt: string;
@@ -432,6 +444,10 @@ export interface ParkSettings {
   cooldownHours: number;
   /** The most a free pack tops a balance up to; null for no ceiling. */
   ticketCap: number | null;
+  /** Tickets one rewarded ad gives (0: ads are off). */
+  adTickets: number;
+  /** How many ads one member is paid for in 24 hours. */
+  adsPerDay: number;
   updatedAt: string | null;
 }
 
@@ -493,6 +509,10 @@ export interface Overview {
     ticketsSoldInRange: number;
     ticketsSpent: number;
     ticketsSpentInRange: number;
+    /** Rewarded ads watched to the end (counted in `purchases` too). Missing from an older server. */
+    adsWatched?: number;
+    adsWatchedToday?: number;
+    adsWatchedInRange?: number;
     inCirculation: number;
   };
   rounds: { total: number; today: number; inRange: number; completed: number; abandoned: number; open: number };
@@ -732,6 +752,23 @@ export class TicketCapError extends ApiError {
   }
 }
 
+/** 429 with code 'ad_limit': the member has watched the most ads they're paid for in 24 hours. */
+export class AdLimitError extends ApiError {
+  readonly nextAt: string | null;
+
+  constructor(message: string, data: unknown) {
+    super(429, message, data);
+    this.name = 'AdLimitError';
+    const at = (data as { nextAt?: unknown } | null)?.nextAt;
+    this.nextAt = typeof at === 'string' && !Number.isNaN(Date.parse(at)) ? at : null;
+  }
+}
+
+const adLimit = (err: unknown): never => {
+  if (err instanceof ApiError && err.status === 429 && (err.data as { code?: unknown } | null)?.code === 'ad_limit') throw new AdLimitError(err.message, err.data);
+  throw err;
+};
+
 /**
  * 503 with code 'park_closed' (the park is closed, so no boarding and no packs) or, with
  * `underMaintenance`, 'park_maintenance' (nobody in the fair at all). Staff are let through both.
@@ -904,6 +941,11 @@ export const api = {
       throw (err.data as { code?: unknown } | null)?.code === 'ticket_cap' ? new TicketCapError(err.message, err.data) : new PurchaseCooldownError(err.message, err.data);
     }),
   purchases: (limit = 50) => request<{ purchases: Purchase[] }>('GET', `/tickets/purchases?limit=${limit}`),
+  /** About to play a rewarded ad: 409 'ads_off' or 'pack_ready', 429 'ad_limit' (an AdLimitError). */
+  startAd: () => request<{ id: string; tickets: number }>('POST', '/tickets/ads').catch(adLimit),
+  /** The ad was watched to the end: its tickets. 404 once expired, 409 'ad_paid' or 'ad_too_soon', 429 'ad_limit'. */
+  rewardAd: (id: string) =>
+    request<{ balance: number; purchase: Purchase; adsLeft: number; nextAdAt: string | null }>('POST', `/tickets/ads/${encodeURIComponent(id)}/reward`).catch(adLimit),
 
   /** Pays for one round (the tickets are spent now) and opens it. */
   board: (ride: AttractionId) => request<{ round: Round; balance: number }>('POST', `/rides/${ride}/board`),
@@ -981,7 +1023,8 @@ export const ringmaster = {
   overview: (days: OverviewDays) => request<Overview>('GET', `/ringmaster/overview${query({ days })}`),
   park: () => request<ParkSettings>('GET', '/ringmaster/park'),
   visitors: () => request<Visitors>('GET', '/ringmaster/visitors'),
-  updatePark: (body: Partial<Pick<ParkSettings, 'open' | 'closedMessage' | 'underMaintenance' | 'maintenanceMessage' | 'packSize' | 'cooldownHours' | 'ticketCap'>>) => request<ParkSettings>('PATCH', '/ringmaster/park', body),
+  updatePark: (body: Partial<Pick<ParkSettings, 'open' | 'closedMessage' | 'underMaintenance' | 'maintenanceMessage' | 'packSize' | 'cooldownHours' | 'ticketCap' | 'adTickets' | 'adsPerDay'>>) =>
+    request<ParkSettings>('PATCH', '/ringmaster/park', body),
   /** Private access: the switch, the list, and the caller's own address. */
   access: () => request<Access>('GET', '/ringmaster/access'),
   /** Switching it on adds the caller's own address (their IPv6 network) if the list doesn't let them in yet. */

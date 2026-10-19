@@ -70,7 +70,8 @@ import { results, type ResultsChoice, type RoundResult } from '../account/result
 import { leaveEarly } from '../account/leave-early';
 import { cleanStats } from '../account/stats';
 import { STATUSES } from '../account/ideas';
-import { accountButtons, legalLinksHtml, packText, ticketsText, waitHtml } from './ticket-counter';
+import { accountButtons, adButtonHtml, legalLinksHtml, packText, ticketsText, waitHtml } from './ticket-counter';
+import { adMessage, watchAd } from '../account/ads';
 import { Valley } from '../workshop/valley';
 import { Yard, YARD_LAYER } from '../workshop/yard';
 import { Builder } from '../workshop/builder';
@@ -111,6 +112,8 @@ export class Game {
   private input!: Input;
   private ui!: UI;
   private sfx = new Sfx();
+  /** A rewarded ad is playing (from a "not enough tickets" card). */
+  private adPlaying = false;
   private env!: Environment;
   private player!: Player;
   private crowd: Crowd | null = null;
@@ -571,10 +574,13 @@ export class Game {
     // the cards' buttons: sign up / log in (from an attraction's gate, boarding it after), pay for a
     // round (or retry), buy tickets, head to the booth, stop the crates round
     this.ui.panelElement.addEventListener('click', (e) => {
-      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-auth], [data-board], [data-goto], [data-stop]');
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-auth], [data-board], [data-goto], [data-stop], [data-watch-ad]');
       if (!b) return;
       const ride = isAttraction(b.dataset.ride) ? b.dataset.ride : null;
       if (b.dataset.auth) void this.signIn(b.dataset.auth as AuthMode, ride);
+      else if (b.hasAttribute('data-watch-ad')) {
+        if (ride) void this.watchAdFor(ride);
+      }
       else if (b.dataset.goto === 'booth') this.goToBooth();
       else if (b.dataset.goto === 'ideas') this.goToIdeas();
       else if (b.hasAttribute('data-stop')) this.askToLeave();
@@ -1171,22 +1177,55 @@ export class Game {
     );
   }
 
-  /** A member without enough tickets for this round: how many they're short, and the way to the booth. */
-  private showShort(ride: AttractionId, cost: number, balance: number) {
+  /**
+   * A member without enough tickets for this round: how many they're short, an ad to watch for some
+   * (once the free pack isn't ready), and the way to the booth. `note` says why the last ad didn't pay.
+   */
+  private showShort(ride: AttractionId, cost: number, balance: number, note?: string) {
     const z = ZONES[ride];
     this.player.interact();
     this.sfx.beep();
     this.panelZone = ride;
     const wait = session.msUntilPurchase();
+    const ad = adButtonHtml(ride);
     this.ui.panel(
       `short-${ride}-${Date.now()}`,
-      `<p class="eyebrow">${escapeHtml(z.title)} · ${ticketsText(cost)}</p><h2>Not enough tickets</h2><p>${escapeHtml(z.title)} costs <strong>${ticketsText(cost)}</strong> a round, and you have <strong>${balance}</strong>.</p>${
+      `<p class="eyebrow">${escapeHtml(z.title)} · ${ticketsText(cost)}</p><h2>Not enough tickets</h2>${note ? `<p class="ticket-flash" role="status">${escapeHtml(note)}</p>` : ''}<p>${escapeHtml(z.title)} costs <strong>${ticketsText(cost)}</strong> a round, and you have <strong>${balance}</strong>.</p>${
         wait === null ? '' : waitHtml(wait)
-      }<p class="panel-actions"><button class="btn btn-primary btn-small" type="button" data-goto="booth">Go to the Ticket Booth 🎟️</button></p>`,
+      }<p class="panel-actions">${ad}<button class="btn ${ad ? 'btn-outline' : 'btn-primary'} btn-small" type="button" data-goto="booth">Go to the Ticket Booth 🎟️</button></p>`,
       { accent: PALETTE.mustard },
     );
     // the countdown needs the wallet: it fills in once it's here
     if (wait === null) void session.loadTickets();
+  }
+
+  /** "Not enough tickets" → an ad: then straight back in if that's enough, or the card again with the new balance. */
+  private async watchAdFor(ride: AttractionId) {
+    if (this.adPlaying) return;
+    this.adPlaying = true;
+    const button = this.ui.panelElement.querySelector<HTMLButtonElement>('[data-watch-ad]');
+    if (button) {
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      button.textContent = 'Playing the ad…';
+    }
+    try {
+      const r = await watchAd({ hush: (on) => this.sfx.hush(on), muted: this.sfx.muted });
+      // walked off (or the fair closed) while it played: the tickets are in the wallet either way
+      if (this.mode !== 'drive' || !this.inFair || this.panelZone !== ride) return;
+      const cost = session.cost(ride);
+      if (r.kind !== 'paid') return this.showShort(ride, cost, session.balance ?? 0, adMessage(r));
+      if (r.balance < cost) return this.showShort(ride, cost, r.balance, `+${ticketsText(r.tickets)}, thanks for watching! A few more to go.`);
+      const z = ZONES[ride];
+      this.sfx.ding();
+      this.ui.panel(
+        `ad-paid-${ride}-${Date.now()}`,
+        `<p class="eyebrow">${escapeHtml(z.title)} · ${ticketsText(cost)}</p><h2>+${ticketsText(r.tickets)} 🎉</h2><p>Thanks for watching! You now have <strong>${r.balance}</strong>.</p><p class="panel-actions"><button class="btn btn-primary btn-small" type="button" data-board data-ride="${ride}">Play ${escapeHtml(z.title)} · ${cost} 🎟️</button></p>`,
+        { accent: PALETTE.mustard },
+      );
+    } finally {
+      this.adPlaying = false;
+    }
   }
 
   /** Opens the sign-up / log-in dialog. From an attraction's gate, it boards that one once they're in. */
@@ -1222,9 +1261,12 @@ export class Game {
     } else if (switched && (key.startsWith('drone-offer') || (key.startsWith('crates') && !this.round))) this.showZonePanel(key.startsWith('drone') ? 'drone' : 'crates');
     else if (key.startsWith('trail-board') && this.panelZone === 'trail') this.showZonePanel('trail');
     else if (key.startsWith('short-') && !this.ui.panelElement.querySelector('.ticket-wait')) {
-      // the wallet arrived: add the countdown to the next pack
+      // the wallet arrived: add the countdown to the next pack, and the ad (if one's on offer)
       const wait = session.msUntilPurchase();
       if (wait !== null) this.ui.panelElement.querySelector('.panel-actions')?.insertAdjacentHTML('beforebegin', waitHtml(wait));
+      const ride = this.panelZone;
+      if (ride && isAttraction(ride) && !this.ui.panelElement.querySelector('[data-watch-ad]'))
+        this.ui.panelElement.querySelector('.panel-actions')?.insertAdjacentHTML('afterbegin', adButtonHtml(ride));
     }
   }
 

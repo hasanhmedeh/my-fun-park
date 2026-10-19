@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 
 const page = (file: string) => fileURLToPath(new URL(file, import.meta.url));
 
@@ -52,6 +52,21 @@ function seo(): Plugin {
 }
 
 /**
+ * /ads.txt, which AdSense checks before it serves ads here: it names the publisher id (from
+ * VITE_ADSENSE_CLIENT, ca-pub-…) as the site's seller. Left out without one.
+ */
+function adsTxt(client: string): Plugin {
+  const publisher = client.trim().replace(/^ca-/, '');
+  return {
+    name: 'ads-txt',
+    generateBundle() {
+      if (!/^pub-\d+$/.test(publisher)) return;
+      this.emitFile({ type: 'asset', fileName: 'ads.txt', source: `google.com, ${publisher}, DIRECT, f08c47fec0942fa0\n` });
+    },
+  };
+}
+
+/**
  * The Ringmaster's Office answers at /ringmaster in dev too, as it does on Vercel (where cleanUrls
  * in vercel.json serves ringmaster.html).
  */
@@ -78,8 +93,9 @@ const proxy = {
   '/api': { target: 'http://localhost:3000', changeOrigin: true, xfwd: true },
 };
 
-export default defineConfig({
-  plugins: [seo(), cleanUrls()],
+export default defineConfig(({ mode }) => ({
+  // VITE_ADSENSE_CLIENT from apps/web/.env* or the environment (Vercel's project settings)
+  plugins: [seo(), cleanUrls(), adsTxt(loadEnv(mode, process.cwd(), 'VITE_').VITE_ADSENSE_CLIENT ?? '')],
   // `open` launches the browser on `pnpm dev` (BROWSER=none skips it)
   server: { allowedHosts: tunnelHosts, open: true, proxy },
   preview: { allowedHosts: tunnelHosts, proxy },
@@ -92,4 +108,4 @@ export default defineConfig({
       input: { index: page('./index.html'), terms: page('./terms.html'), privacy: page('./privacy.html'), ringmaster: page('./ringmaster.html') },
     },
   },
-});
+}));

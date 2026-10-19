@@ -92,6 +92,7 @@ model User {
   createdAt        DateTime           @default(now()) @map("created_at")
   updatedAt        DateTime           @updatedAt @map("updated_at")
   purchases        TicketPurchase[]
+  adViews          AdView[]
   rounds           RideRound[]
   adminActions     AdminAction[]
   shopOrders       ShopOrder[]
@@ -128,6 +129,25 @@ model TicketPurchase {
   @@index([userId, createdAt])
   @@index([createdAt])
   @@map("ticket_purchases")
+}
+
+/// One rewarded ad a member started watching for free tickets. The row is made just before the ad
+/// plays and paid out once (rewardedAt), at least a few seconds later, when the ad was watched to
+/// the end; the tickets themselves are recorded as a ticket_purchases row with provider "ad".
+/// Unpaid rows are cleared out after an hour.
+model AdView {
+  id         String    @id @default(cuid())
+  userId     String    @map("user_id")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startedAt  DateTime  @default(now()) @map("started_at")
+  /// When its tickets were paid out. Null while the ad is playing (or was never finished).
+  rewardedAt DateTime? @map("rewarded_at")
+  /// The tickets it gave (park_settings.ad_tickets at the time).
+  tickets    Int?
+
+  @@index([userId, rewardedAt])
+  @@index([rewardedAt])
+  @@map("ad_views")
 }
 
 /// Each attraction's price and whether it is running. The migrations seed every attraction; edit a
@@ -169,6 +189,12 @@ model ParkSettings {
   /// The most tickets a free pack tops a balance up to, 1 to 100000 (a CHECK constraint): with 45,
   /// a member holding 40 gets 5, one holding 45 or more gets none. Null means no ceiling.
   ticketCap          Int?     @map("ticket_cap")
+  /// Tickets one rewarded ad gives, 0 to 1000 (a CHECK constraint); 0 switches the ads off. They go on
+  /// top of ticket_cap: a member at the cap can still watch an ad. Only offered while the free pack
+  /// isn't ready (still cooling down, or the cap reached).
+  adTickets          Int      @default(5) @map("ad_tickets")
+  /// How many ads one member is paid for in 24 hours, 1 to 100 (a CHECK constraint).
+  adsPerDay          Int      @default(5) @map("ads_per_day")
   /// Private access: only the addresses in allowed_ips can reach the site at all (the pages, the
   /// API, staff included). Locked out? Switch it off here with `pnpm studio:prod`.
   allowlistOnly      Boolean  @default(false) @map("allowlist_only")

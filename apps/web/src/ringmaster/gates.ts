@@ -1,5 +1,6 @@
-// The whole park's switches (open or closed, and maintenance), their signs, the free-ticket rules,
-// and private access (only the addresses on a list can reach the site).
+// The whole park's switches (open or closed, and maintenance), their signs, the free-ticket rules
+// (packs, and tickets for watching ads), and private access (only the addresses on a list can reach the site).
+import { adsEnabled } from '../account/ads-config';
 import { ringmaster, type Access, type ParkSettings } from '../account/api';
 import { ask } from './dialog';
 import { busy, esc, onApiError, toast, when } from './util';
@@ -80,6 +81,16 @@ export class GatesView {
       </div>
       <label>Most free tickets a member can hold <input type="number" name="ticketCap" min="1" max="100000" step="1" inputmode="numeric" placeholder="No limit" value="${p.ticketCap ?? ''}" />
         <span class="hint">A pack only tops a member up to this: with 45, someone holding 40 gets 5, and someone at 45 gets none until they spend some. Leave blank for no limit.</span></label>
+      <h3>Tickets for ads</h3>
+      <p class="hint">While their free pack isn't ready, members can watch a short ad for tickets, at the Ticket Booth or when they're short at a ride. Ad tickets go on top of the limit above.${
+        p.adTickets > 0 && !adsEnabled ? ' <strong>This build has no AdSense publisher ID (VITE_ADSENSE_CLIENT), so players don’t see the ads yet.</strong>' : ''
+      }</p>
+      <div class="gates-pair">
+        <label>Tickets per ad <input type="number" name="adTickets" min="0" max="1000" step="1" inputmode="numeric" value="${p.adTickets}" />
+          <span class="hint">0 switches the ads off.</span></label>
+        <label>Ads per member a day <input type="number" name="adsPerDay" min="1" max="100" step="1" inputmode="numeric" value="${p.adsPerDay}" />
+          <span class="hint">Counted over the last 24 hours.</span></label>
+      </div>
       <div class="form-actions"><button type="submit" class="btn btn-primary">Save</button></div>
     </form></div><div class="card" id="access-card"></div>`;
     this.renderAccess();
@@ -208,6 +219,10 @@ export class GatesView {
     const ticketCap = capText ? Number(capText) : null;
     if (ticketCap !== null && (!Number.isInteger(ticketCap) || ticketCap < 1 || ticketCap > 100000))
       return toast('The most a member can hold is 1 to 100000 tickets, or blank for no limit.', true);
+    const adTickets = Number(data.get('adTickets'));
+    const adsPerDay = Number(data.get('adsPerDay'));
+    if (!Number.isInteger(adTickets) || adTickets < 0 || adTickets > 1000) return toast('An ad gives 0 to 1000 tickets (0 switches ads off).', true);
+    if (!Number.isInteger(adsPerDay) || adsPerDay < 1 || adsPerDay > 100) return toast('A member can watch 1 to 100 ads a day.', true);
 
     const body: Parameters<typeof ringmaster.updatePark>[0] = {};
     if (open !== p.open) body.open = open;
@@ -217,6 +232,8 @@ export class GatesView {
     if (packSize !== p.packSize) body.packSize = packSize;
     if (cooldownHours !== p.cooldownHours) body.cooldownHours = cooldownHours;
     if (ticketCap !== (p.ticketCap ?? null)) body.ticketCap = ticketCap;
+    if (adTickets !== p.adTickets) body.adTickets = adTickets;
+    if (adsPerDay !== p.adsPerDay) body.adsPerDay = adsPerDay;
     if (!Object.keys(body).length) return toast('Nothing to save.');
     if (
       body.underMaintenance === true &&
@@ -258,4 +275,4 @@ export class GatesView {
 }
 
 const head = () =>
-  `<div class="view-head"><div><h2 id="h-gates">Park gates</h2><p class="muted">Open or close the whole fair, put it under maintenance, set the free-ticket rules, and make the fair private. Visitors see changes at once.</p></div></div>`;
+  `<div class="view-head"><div><h2 id="h-gates">Park gates</h2><p class="muted">Open or close the whole fair, put it under maintenance, set the free-ticket rules (packs and ads), and make the fair private. Visitors see changes at once.</p></div></div>`;

@@ -1,4 +1,5 @@
 import {
+  AdLimitError,
   api,
   ApiError,
   LIVE_URL,
@@ -168,6 +169,39 @@ class Session {
     return Math.max(0, Math.min(this.packSize, cap - balance));
   }
 
+  /** Tickets one rewarded ad gives (the live rule once known); 0 while ads are off. */
+  get adTickets() {
+    return this._tickets?.adTickets ?? this._park?.adTickets ?? 0;
+  }
+
+  /** Ads the member can still be paid for in the last 24 hours (null until the wallet is in). */
+  get adsLeft() {
+    return this._tickets?.adsLeft ?? null;
+  }
+
+  /** Milliseconds until another ad can be paid for, once all of the day's are used up; null otherwise. */
+  msUntilAd(now = Date.now()) {
+    const t = this._tickets;
+    if (!t || t.adsLeft !== 0) return null;
+    const next = Date.parse(t.nextAdAt ?? '');
+    return Number.isNaN(next) ? null : Math.max(0, next - now);
+  }
+
+  /**
+   * Where watching an ad for tickets stands: 'ready' when the member can watch one now, 'used-up'
+   * once the day's are watched, or null when ads aren't offered: they're off, the wallet isn't in,
+   * the park is closed, or the free pack is ready (that comes first). Whether an ad is actually
+   * there to play is up to the ad network (see ads.ts).
+   */
+  get adState(): 'ready' | 'used-up' | null {
+    const t = this._tickets;
+    if (!this._user || !t || this.adTickets <= 0 || t.adsLeft === undefined) return null;
+    if (!this.isStaff && (!this.parkOpen || this.parkUnderMaintenance)) return null;
+    const packReady = (this.msUntilPurchase() ?? 0) === 0 && this.packNow > 0;
+    if (packReady) return null;
+    return t.adsLeft > 0 ? 'ready' : 'used-up';
+  }
+
   /** False until the first check against the server has settled (either way). */
   get known() {
     return this._known;
@@ -246,7 +280,21 @@ class Session {
   }
 
   private parkOrDefaults(): Park {
-    return this._park ?? { open: true, message: null, underMaintenance: false, maintenanceMessage: null, costs: {}, packSize: this.packSize, cooldownHours: this.cooldownHours, ticketCap: this.ticketCap, maintenance: {} };
+    return (
+      this._park ?? {
+        open: true,
+        message: null,
+        underMaintenance: false,
+        maintenanceMessage: null,
+        costs: {},
+        packSize: this.packSize,
+        cooldownHours: this.cooldownHours,
+        ticketCap: this.ticketCap,
+        adTickets: this.adTickets,
+        adsPerDay: this._tickets?.adsPerDay ?? 0,
+        maintenance: {},
+      }
+    );
   }
 
   /**
@@ -358,10 +406,12 @@ class Session {
         packSize: park.packSize,
         cooldownHours: park.cooldownHours,
         ticketCap: park.ticketCap,
+        adTickets: park.adTickets,
+        adsPerDay: park.adsPerDay,
       };
     if (JSON.stringify(before) === JSON.stringify(park)) return;
-    // a new cool-down moves the member's next pack: the server works out when
-    if (before && before.cooldownHours !== park.cooldownHours && this._tickets) void this.loadTickets();
+    // a new cool-down moves the member's next pack, and a new day's limit their ads left: the server works out both
+    if (before && (before.cooldownHours !== park.cooldownHours || before.adsPerDay !== park.adsPerDay) && this._tickets) void this.loadTickets();
     if (
       before?.open !== park.open ||
       before?.message !== park.message ||
@@ -682,6 +732,8 @@ class Session {
       const res = await api.purchase();
       const prev = this._tickets;
       this._tickets = {
+        // the ads' rules and count
+        ...prev,
         balance: res.balance,
         packSize: prev?.packSize ?? this._park?.packSize ?? res.purchase.quantity,
         cooldownHours: prev?.cooldownHours ?? this.cooldownHours,
@@ -707,6 +759,42 @@ class Session {
       if (err instanceof ApiError && err.status === 401) this.expire();
       throw err;
     }
+  }
+
+  /** Tells the server a rewarded ad is about to play (ads.ts plays it). Throws an ApiError (an AdLimitError once the day's are used up). */
+  async startAd() {
+    try {
+      return await api.startAd();
+    } catch (err) {
+      this.noteAdError(err);
+      throw err;
+    }
+  }
+
+  /** The ad was watched to the end: its tickets go on the balance. Throws an ApiError. */
+  async rewardAd(id: string) {
+    try {
+      const res = await api.rewardAd(id);
+      if (this._tickets) this._tickets = { ...this._tickets, balance: res.balance, adsLeft: res.adsLeft, nextAdAt: res.nextAdAt };
+      else void this.loadTickets();
+      this._purchases = [{ ...res.purchase, balanceAfter: res.balance }, ...(this._purchases ?? [])].slice(0, RECENT_PURCHASES);
+      this.emit();
+      return res;
+    } catch (err) {
+      this.noteAdError(err);
+      throw err;
+    }
+  }
+
+  private noteAdError(err: unknown) {
+    if (err instanceof ParkClosedError) this.noteParkClosed(err);
+    if (err instanceof AdLimitError && this._tickets) {
+      this._tickets = { ...this._tickets, adsLeft: 0, nextAdAt: err.nextAt };
+      this.emit();
+    }
+    // the free pack came ready, or ads were switched off, since we last looked
+    else if (err instanceof ApiError && err.status === 409) void this.loadTickets();
+    if (err instanceof ApiError && err.status === 401) this.expire();
   }
 
   /**
@@ -929,6 +1017,9 @@ function normalisePark(raw: Park): Park {
     packSize: num(raw?.packSize, PACK_SIZE),
     cooldownHours: num(raw?.cooldownHours, COOLDOWN_HOURS),
     ticketCap: cap(raw?.ticketCap),
+    // an older server without ads: none
+    adTickets: Math.floor(num(raw?.adTickets, 0)),
+    adsPerDay: Math.floor(num(raw?.adsPerDay, 0)),
     maintenance,
     creations,
   };

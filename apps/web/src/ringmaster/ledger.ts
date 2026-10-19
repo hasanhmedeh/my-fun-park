@@ -101,12 +101,12 @@ export class LedgerView {
         const rows = purchases
           .map(
             (p) =>
-              `<tr><td>${esc(when(p.createdAt))}</td><td><a href="#members/${encodeURIComponent(p.user.id)}">${esc(p.user.username)}</a><span class="cell-sub">${esc(p.user.email)}</span></td><td class="r">+${num(p.quantity)}</td><td class="r">${p.balanceAfter === undefined ? '—' : num(p.balanceAfter)}</td><td>${p.priceCents ? `${(p.priceCents / 100).toFixed(2)} ${esc(p.currency)}` : 'Free'}</td></tr>`,
+              `<tr><td>${esc(when(p.createdAt))}</td><td><a href="#members/${encodeURIComponent(p.user.id)}">${esc(p.user.username)}</a><span class="cell-sub">${esc(p.user.email)}</span></td><td class="r">+${num(p.quantity)}</td><td class="r">${p.balanceAfter === undefined ? '—' : num(p.balanceAfter)}</td><td>${p.priceCents ? `${(p.priceCents / 100).toFixed(2)} ${esc(p.currency)}` : p.provider === 'ad' ? 'Free · 📺 ad' : 'Free'}</td></tr>`,
           )
           .join('');
         body.innerHTML = rows
           ? `<div class="table-wrap"><table><thead><tr><th>When</th><th>Member</th><th class="r">Tickets</th><th class="r">Balance after</th><th>Price</th></tr></thead><tbody>${rows}</tbody></table></div>${pagerHtml(this.offset, LIMIT, total)}`
-          : '<p class="empty">No packs picked up yet.</p>';
+          : '<p class="empty">No packs picked up (or ads watched) yet.</p>';
       }
     } catch (err) {
       onApiError(err);
