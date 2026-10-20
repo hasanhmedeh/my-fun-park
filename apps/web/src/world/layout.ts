@@ -13,8 +13,21 @@
 //   Main Gate (south)        the entrance plaza, the Ticket Booth and the Idea Box
 //   Creators' Valley (west)  out of the west gate: the Coaster Workshop and eight plots for the
 //                            coasters members build there
+//
+// Beyond the fair (see geo.ts) the world has one more district on the mainland's south coast and
+// two on Palm Cay, 40 km out to sea:
+//
+//   Funfair International    the airport: Funfair Air's gate 3 desk and the SkyLink's airport station
+//   Palm Cay Airport         the island's terminal: the flight home and the arrivals plaza
+//   Lagoon Beach             the island's games: the jet-skis, the slides, the cannons and the volleyball
+//
+// The two landmasses are regions: the visitor walks, fast travels and is kept on the ground within
+// the region they stand in, and only a flight takes them across the sea.
 
 import { PLOT_IDS, plotNumber, type PlotId } from '../account/api';
+import { AIRPORT_SPOTS, AIRPORTS, ISLAND, ISLAND_SPOTS, SKYLINK, regionAt, type Region } from './geo';
+
+export type { Region };
 
 /** The park's lawn: a circle of radius `r` around (x, z), inside a fence just beyond it. */
 export const PARK = { x: 0, z: -50, r: 140 };
@@ -110,9 +123,24 @@ export type ZoneId =
   | 'trail'
   | 'museum'
   | 'workshop'
+  | 'flight'
+  | 'flightBack'
+  | 'airport'
+  | 'skylink'
+  | 'skylinkBack'
+  | 'palmcay'
+  | 'jetski'
+  | 'slides'
+  | 'cannons'
+  | 'volley'
   | PlotId;
 
-type Zone = { x: number; z: number; radius: number; title: string; action: string; heading: number };
+/**
+ * A place: where the visitor is put when they fast travel there (facing `heading`), and the ring
+ * they step into to use it (`radius` 0: a destination with no ring). `y` is the floor the ring
+ * lies on where that isn't the ground (a terminal's floor sits a little above it).
+ */
+export type Zone = { x: number; z: number; radius: number; title: string; action: string; heading: number; y?: number };
 
 /**
  * Creators' Valley, west of the park: the Valley Road leaves the Promenade, runs out of the west
@@ -179,6 +207,10 @@ const plotZone = (n: number): Zone => {
 /** A zone `dx`, `dz` from an attraction's anchor: each one keeps its place beside its attraction wherever that stands. */
 const near = (a: { x: number; z: number }, dx: number, dz: number, rest: Omit<Zone, 'x' | 'z'>): Zone => ({ x: a.x + dx, z: a.z + dz, ...rest });
 
+/** The terminals' floors: the home terminal's and the SkyLink halls' finish, and Palm Cay's tiles. */
+const HOME_FLOOR = 0.02;
+const ISLAND_FLOOR = 0.035;
+
 /** Where the visitor is placed when teleporting to a zone, and the zone trigger. */
 export const ZONES: Record<ZoneId, Zone> = {
   entrance: near(LAYOUT.spawn, 0, -2, { radius: 0, title: 'Entrance', action: '', heading: 0 }),
@@ -209,6 +241,26 @@ export const ZONES: Record<ZoneId, Zone> = {
   museum: near(LAYOUT.museum, -14.1, 0, { radius: 1.6, title: 'Career Museum', action: 'Take the guided tour', heading: -Math.PI / 2 }),
   // at the Coaster Workshop's counter, facing north at the kiosk
   workshop: near(VALLEY.kiosk, 0, 7, { radius: 3.4, title: 'Coaster Workshop', action: 'Build your own coaster', heading: 0 }),
+  // at gate 3's desk in the home terminal, facing it (south: the apron, and FA101 beyond the glass)
+  flight: near(AIRPORT_SPOTS.home.gateDesk, 0, 0, { radius: 3, title: 'Funfair Air · Gate 3', action: 'Book a flight', heading: AIRPORT_SPOTS.home.gateDesk.yaw, y: HOME_FLOOR }),
+  // at gate 2's desk in Palm Cay's terminal, facing it (north, towards the apron)
+  flightBack: near(AIRPORT_SPOTS.island.gateDesk, 0, 0, { radius: 3, title: 'Funfair Air · Palm Cay', action: 'Book the flight home', heading: AIRPORT_SPOTS.island.gateDesk.yaw, y: ISLAND_FLOOR }),
+  // just inside the terminal's departures doors (the ones the SkyLink's passengers use), facing into the hall
+  airport: { x: SKYLINK.airport.x, z: AIRPORTS.home.terminal.z0 + 12, radius: 0, title: 'Funfair International', action: '', heading: Math.PI },
+  // in each SkyLink station's hall, between the lifts: the train to the airport, and the one back to the fair
+  skylink: near(SKYLINK.park, 0, 0, { radius: 3, title: 'SkyLink', action: 'Ride to the airport', heading: Math.PI, y: HOME_FLOOR }),
+  skylinkBack: near(SKYLINK.airport, 0, 0, { radius: 3, title: 'SkyLink', action: 'Ride back to the fair', heading: 0, y: HOME_FLOOR }),
+  // out of the island terminal's arrivals doors, facing the promenade
+  palmcay: near(AIRPORT_SPOTS.island.arrivals, 0, 0, { radius: 0, title: 'Palm Cay', action: '', heading: AIRPORT_SPOTS.island.arrivals.yaw }),
+  // the island's games, each where its path from the Beach Plaza arrives (see island.ts):
+  // the jet-skis at the head of the dock, facing the lagoon
+  jetski: near(ISLAND_SPOTS.jetski, -2, -29, { radius: 3.4, title: 'Jet-Ski Race', action: 'Race round the lagoon', heading: Math.PI }),
+  // the Splash Tower's gate, at the end of the paved path in from the east, facing the tower
+  slides: near(ISLAND_SPOTS.slides, 45, 2, { radius: 3.4, title: 'Splash Tower', action: 'Ride the water slides', heading: Math.PI / 2 }),
+  // the pirate fort's gate, at the end of the dune boardwalk, facing the fort (west)
+  cannons: near(ISLAND_SPOTS.cannons, 62, -2, { radius: 3.4, title: 'Pirate Cannons', action: 'Sink the pirate ships', heading: Math.PI / 2 }),
+  // beside the volleyball court, at the end of its boardwalk, facing the court (east)
+  volley: near(ISLAND_SPOTS.volley, -48, -9, { radius: 3.4, title: 'Beach Volley', action: 'Serve, spike and hit the coconuts', heading: -Math.PI / 2 }),
   // each plot's title is its coaster's name while one runs there (see setPlotTitle)
   ...(Object.fromEntries(PLOT_IDS.map((id, i) => [id, plotZone(i + 1)])) as Record<PlotId, Zone>),
 };
@@ -225,17 +277,44 @@ const WHEEL_END = LAYOUT.ferris.z + 22;
  * The districts, in the order the map lists them: each with its plaza (and the colour of its signs
  * and paving), its attractions, and where the zoomed-out map writes its name (clear of the pins).
  */
-export type DistrictId = 'gate' | 'midway' | 'falcon' | 'cosmos' | 'thrill' | 'motor' | 'valley';
-type District = { name: string; icon: string; color: string; plaza: [number, number]; label: [number, number]; zones: ZoneId[] };
+export type DistrictId = 'gate' | 'midway' | 'falcon' | 'cosmos' | 'thrill' | 'motor' | 'valley' | 'airport' | 'palmport' | 'lagoon';
+/** A district: the region (landmass) it's on, its plaza (where its sign stands), where the map writes its name, and its places. */
+export type District = { name: string; icon: string; color: string; region: Region; plaza: [number, number]; label: [number, number]; zones: ZoneId[] };
 export const DISTRICTS: Record<DistrictId, District> = {
-  gate: { name: 'Main Gate', icon: '🎪', color: '#ff4d6d', plaza: [0, 18], label: [0, 6], zones: ['entrance', 'booth', 'ideas'] },
-  midway: { name: 'The Midway', icon: '🎯', color: '#ffb627', plaza: [79, 18], label: [79, 2], zones: ['crates', 'striker', 'ducks'] },
-  falcon: { name: 'Falcon Gate', icon: '🦅', color: '#2ec4b6', plaza: [64, -50], label: [84, -66], zones: ['falcon', 'museum'] },
-  cosmos: { name: 'Cosmos', icon: '🚀', color: '#7b5cd6', plaza: [0, -138], label: [-24, -140], zones: ['rocket', 'ship', 'drone', 'ferris'] },
-  thrill: { name: 'Thrill Ridge', icon: '🎢', color: '#ff8a3d', plaza: [-56, -50], label: [-34, -62], zones: ['coaster', 'flip'] },
-  motor: { name: 'Motor Town', icon: '🏁', color: '#4a90d9', plaza: [-50, 18], label: [-52, 34], zones: ['speedway', 'trail'] },
-  valley: { name: "Creators' Valley", icon: '🛠️', color: '#e05aa8', plaza: VALLEY.plaza, label: [-382, -100], zones: ['workshop', ...PLOT_IDS] },
+  gate: { name: 'Main Gate', icon: '🎪', color: '#ff4d6d', region: 'home', plaza: [0, 18], label: [0, 6], zones: ['entrance', 'booth', 'ideas', 'skylink'] },
+  midway: { name: 'The Midway', icon: '🎯', color: '#ffb627', region: 'home', plaza: [79, 18], label: [79, 2], zones: ['crates', 'striker', 'ducks'] },
+  falcon: { name: 'Falcon Gate', icon: '🦅', color: '#2ec4b6', region: 'home', plaza: [64, -50], label: [84, -66], zones: ['falcon', 'museum'] },
+  cosmos: { name: 'Cosmos', icon: '🚀', color: '#7b5cd6', region: 'home', plaza: [0, -138], label: [-24, -140], zones: ['rocket', 'ship', 'drone', 'ferris'] },
+  thrill: { name: 'Thrill Ridge', icon: '🎢', color: '#ff8a3d', region: 'home', plaza: [-56, -50], label: [-34, -62], zones: ['coaster', 'flip'] },
+  motor: { name: 'Motor Town', icon: '🏁', color: '#4a90d9', region: 'home', plaza: [-50, 18], label: [-52, 34], zones: ['speedway', 'trail'] },
+  valley: { name: "Creators' Valley", icon: '🛠️', color: '#e05aa8', region: 'home', plaza: VALLEY.plaza, label: [-382, -100], zones: ['workshop', ...PLOT_IDS] },
+  // the airport on the coast: its "plaza" is the terminal's public hall
+  airport: { name: 'Funfair International', icon: '✈️', color: '#5b6cff', region: 'home', plaza: [SKYLINK.airport.x, AIRPORTS.home.terminal.z0 + 12], label: [0, 640], zones: ['flight', 'airport', 'skylinkBack'] },
+  // Palm Cay: the terminal and its arrivals plaza; then the beach park's games round the Beach Plaza
+  palmport: { name: 'Palm Cay Airport', icon: '🌴', color: '#1fb36b', region: 'island', plaza: [0, 40708], label: [0, 40420], zones: ['flightBack', 'palmcay'] },
+  lagoon: { name: 'Lagoon Beach', icon: '🏖️', color: '#00a6d6', region: 'island', plaza: [ISLAND_SPOTS.plaza.x, ISLAND_SPOTS.plaza.z], label: [0, 41290], zones: ['jetski', 'slides', 'cannons', 'volley'] },
 };
+
+/**
+ * The districts inside the fair itself (on the mainland, on the park's ground): the ones whose
+ * plazas are paved into the park's lawn, get benches and idle guests, and join the walkers'
+ * network. The airport's and the island's districts have buildings and people of their own.
+ */
+export const FAIR_DISTRICTS: District[] = Object.values(DISTRICTS).filter(
+  (d) => d.region === 'home' && Math.abs(d.plaza[0] - GROUND.x) < GROUND.size / 2 && Math.abs(d.plaza[1] - GROUND.z) < GROUND.size / 2,
+);
+
+/** Which region each place is on (its district's). */
+export const ZONE_REGION = Object.fromEntries(Object.values(DISTRICTS).flatMap((d) => d.zones.map((id) => [id, d.region]))) as Record<ZoneId, Region>;
+
+/** Each region's name, and the places the flights across the sea leave from and arrive at. */
+export const REGION_INFO: Record<Region, { name: string; departure: ZoneId; arrival: ZoneId }> = {
+  home: { name: 'The Funfair', departure: 'flight', arrival: 'airport' },
+  island: { name: ISLAND.name, departure: 'flightBack', arrival: 'palmcay' },
+};
+
+/** Fast travel stays on the landmass the visitor stands on: across the sea, you fly. */
+export const canTravel = (from: Region, zone: ZoneId) => ZONE_REGION[zone] === from;
 
 /** The Promenade: the loop round the park's heart, past every district (back round to where it starts). */
 export const PROMENADE: [number, number][] = [
@@ -272,8 +351,8 @@ export const PLAZAS: [number, number, number][] = [
   [0, -50, 14], // the Hub, round the carousel
   [0, -112, 8], // where North Avenue crosses the Promenade
   [0, WHEEL_END, 10], // in front of the giant wheel's terminal
-  // the districts' plazas
-  ...Object.values(DISTRICTS).map(({ plaza: [x, z] }) => [x, z, 8] as [number, number, number]),
+  // the districts' plazas (the fair's own: the airport and the island have paving of their own)
+  ...FAIR_DISTRICTS.map(({ plaza: [x, z] }) => [x, z, 8] as [number, number, number]),
   [68, 12, 8], // Crate Smash
   [90, 14, 5.5], // the High Striker
   [79, 23, 4], // the Duck Shoot's counter
@@ -318,6 +397,7 @@ export const FOOTPRINTS: [number, number, number][] = [
   [LAYOUT.coaster.x + 3, LAYOUT.coaster.z + 10, 12], // the Thunder Loop's station
   FALCON_STATION,
   [VALLEY.kiosk.x, VALLEY.kiosk.z, 6], // the Coaster Workshop
+  [SKYLINK.park.x, SKYLINK.park.z, 19], // the SkyLink's park station, with the escalators along its sides
 ];
 
 /** True if (x, z) is on an attraction's ground (see FOOTPRINTS), grown by `margin`. */
