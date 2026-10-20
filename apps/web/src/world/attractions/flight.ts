@@ -15,7 +15,7 @@ import { AIRFIELDS } from '../../aviation/airports';
 import { Speech } from '../../aviation/speech';
 import { phaseIndex } from '../../aviation/nav';
 import { SCHEDULE_PAD_S } from '../../aviation/scoring';
-import type { AircraftState, GroundQuery, PlaneModel, PlaneVisual, ScoreItem, TimeOfDay } from '../../aviation/types';
+import { TIME_OF_DAY_HOUR, type AircraftState, type GroundQuery, type PlaneModel, type PlaneVisual, type ScoreItem, type TimeOfDay } from '../../aviation/types';
 import type { Traffic } from '../../aviation/traffic';
 import { createA320, LIVERIES, restVisual } from '../airport/a320-model';
 import type { Airfield } from '../airport/airfield';
@@ -68,9 +68,13 @@ const TODS: { id: TimeOfDay; label: string }[] = [
 ];
 /** Passengers the visitor watches walk on and off (the rest are already aboard, or leave behind them). */
 const WALKERS = 16;
-/** The boarding and deplaning shots end by themselves after this long (E skips sooner). */
-const BOARDING_MAX_S = 22;
-const DEPLANING_MAX_S = 12;
+/**
+ * The boarding and deplaning shots end by themselves after this long (E skips sooner): a safety net
+ * for a stuck run, longer than the runs themselves (about 42 s to board 16 at home, 26 to 32 s to
+ * deplane), so the whole queue is seen walking on and off.
+ */
+const BOARDING_MAX_S = 55;
+const DEPLANING_MAX_S = 45;
 /** The door closes this fast (s), then the bridge pulls back. */
 const DOOR_S = 2.5;
 /** Engines off on the stand, then this long before the bridge or the stairs come to the door. */
@@ -134,9 +138,17 @@ export class Flight implements Attraction {
   private readonly speech: Speech;
   /** The last round ended without arriving (Esc before landing): its stats score nothing. */
   private abandoned = false;
+  /** Whether the flight that last ended (exit()) had crashed or ditched: Game reads it however the round was left. */
+  lastFailed = false;
   /** Where the hero waits between flights. */
   private parkedAt: Region = 'home';
   private tod: TimeOfDay = 'day';
+  /** The time of day the booking card offers (its default, or the visitor's pick): the boards show that departure. */
+  get timeOfDay(): TimeOfDay {
+    return this.tod;
+  }
+  /** Called when the visitor picks another time of day on the card (Game repaints the terminals' boards). */
+  onTimeOfDay: ((tod: TimeOfDay) => void) | null = null;
   private offerCost = FLIGHT_COST;
   private offerGate: string | null = null;
   private offerFrom: Region = 'home';
@@ -158,7 +170,7 @@ export class Flight implements Attraction {
   private lastFlaps = 0;
   private ilsOn = true;
   private aftermathT = 0;
-  private readonly saved = { hours: 0, timeMode: 'paused' as Environment['timeMode'], swellFrom: 0, swellKt: 0, fov: 42 };
+  private readonly saved = { hours: 0, timeMode: 'paused' as Environment['timeMode'], swellFrom: 0, swellKt: 0 };
 
   // preallocated
   private data: CockpitData | null = null;
@@ -236,7 +248,8 @@ export class Flight implements Attraction {
     const m = metars(f);
     const stand = AIRFIELDS[from].stands.find((s) => s.id === AIRFIELDS[from].playerStand);
     const tickets = `${cost} ${cost === 1 ? 'ticket' : 'tickets'}`;
-    const tod = TODS.map((t) => `<button type="button" data-fl-tod="${t.id}" aria-pressed="${t.id === this.tod}">${t.label}</button>`).join('');
+    // each with its departure time: the same times the terminal's boards list (boards.ts scheduleBoards)
+    const tod = TODS.map((t) => `<button type="button" data-fl-tod="${t.id}" aria-pressed="${t.id === this.tod}">${t.label}<span class="fl-tod-time">${f.flightNo} · ${clockText(TIME_OF_DAY_HOUR[t.id])}</span></button>`).join('');
     const controls = this.ctx.mobile
       ? 'The stick flies it, the lever on the right is the thrust, the buttons do the rest; <kbd>E</kbd> talks to ATC.'
       : '<kbd>W</kbd><kbd>S</kbd> pitch, <kbd>A</kbd><kbd>D</kbd> roll and steer, <kbd>Y</kbd> TOGA, <kbd>P</kbd> autopilot, <kbd>E</kbd> talks to ATC. The full list is on screen.';
@@ -271,6 +284,7 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
     card.querySelectorAll<HTMLButtonElement>('[data-fl-tod]').forEach((b) =>
       b.addEventListener('click', () => {
         this.tod = b.dataset.flTod as TimeOfDay;
+        this.onTimeOfDay?.(this.tod);
         this.ctx.sfx.pop();
         card.outerHTML = this.offerHtml(this.offerFrom, this.offerCost, this.offerGate);
         this.wireOffer(panel, onBook);
@@ -291,6 +305,7 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
     this.active = true;
     this.completed = false;
     this.abandoned = false;
+    this.lastFailed = false;
     this.arrival = null;
     this.reportShown = false;
     this.completeFired = false;
@@ -310,7 +325,6 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
     this.saved.timeMode = env.timeMode;
     this.saved.swellFrom = SWELL.fromDeg;
     this.saved.swellKt = SWELL.kt;
-    this.saved.fov = this.ctx.camera.fov;
     env.timeMode = 'paused';
     env.setHour(info.hour);
     env.clouds.setLayers(info.weather.clouds.map((c) => ({ cover: c.cover, baseFt: c.baseFt })));
@@ -328,6 +342,11 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
       this.sim?.hear(u, region, station);
     };
     sim.speech.onLine = (u) => this.hud.line(u);
+    // the cabin (the PA and the passengers) is its own channel: its own card, never the radio log
+    // (and none once the flight has failed or its report is up: no "we've started our descent" over the sea)
+    sim.speech.onCabin = (u) => {
+      if (!sim.failed && !this.reportShown) this.hud.cabin(u);
+    };
     sim.onScore = (it: ScoreItem) => this.hud.score(it);
     sim.onNote = (t) => this.hud.toast(t);
     sim.onStage = (st, prev) => this.stageChanged(st, prev);
@@ -447,10 +466,13 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
     // visitor gets off at the destination and the aircraft stays there
     const done = sim.arrived;
     this.completed = done;
+    this.lastFailed = sim.failed;
     this.abandoned = !done && !sim.failed;
     if (!sim.finished) sim.abandon();
     sim.speech.cancel();
     sim.speech.onLine = null;
+    sim.speech.onCabin = null;
+    this.hud.cabin(null);
     d.traffic.onRadioAt = this.prevRadio;
     this.prevRadio = null;
     this.run?.skip();
@@ -486,7 +508,8 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
     d.post.setAOEnabled(true);
     const cam = this.ctx.camera;
     cam.up.set(0, 1, 0);
-    cam.fov = this.saved.fov;
+    // (from the aspect, as on foot: a phone may have turned during the flight)
+    cam.fov = cam.aspect < 0.8 ? 58 : 42;
     cam.updateProjectionMatrix();
 
     // the screen
@@ -507,12 +530,17 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
 
   /**
    * This flight's numbers (see account/stats.ts); valid mid-round. A flight left before arriving
-   * scores nothing (as a failed one): only what was flown counts, not the points not yet lost.
+   * scores nothing (as a failed one): only what was flown counts, not the points not yet lost; one
+   * left before the takeoff reports its 0 score and nothing else.
    */
   roundStats(): Record<string, number> {
     if (!this.sim) return {};
+    // left early: after exit(), or still under way when the page closes (Game's pagehide)
+    const left = this.abandoned || (this.active && !this.sim.arrived && !this.sim.failed);
+    // left before the takeoff (boarding, pushback, taxi): nothing was flown, so nothing but the 0
+    if (left && !this.sim.scorer.tookOff) return { score: 0 };
     const st = this.sim.scorer.stats();
-    if (this.abandoned) {
+    if (left) {
       st.score = 0;
       st.stars = 1;
       for (const k of ['landingFpm', 'landingG', 'centrelineM', 'touchdownM']) delete st[k];
@@ -523,6 +551,11 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
   /** Landed and off the runway (Game's Esc then leaves as completed, at the destination). */
   get arrived(): boolean {
     return this.active && !!this.sim && this.sim.arrived;
+  }
+
+  /** The flight crashed or ditched (its aftermath, or its report): the round is over, Esc just closes it. */
+  get failed(): boolean {
+    return this.active && !!this.sim && this.sim.failed;
   }
 
   /** The flight while it's flown; between flights the getters read the parked hero. */
@@ -750,6 +783,8 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
         const ditched = sim.failure === 'ditching' || (sim.state.pos.y < 2 && d.ground(sim.state.pos.x, sim.state.pos.z).surface === 'water');
         this.slides.visible = ditched;
         this.hud.camera('Aftermath');
+        // the cabin's routine announcements are over: the card goes with them
+        this.hud.cabin(null);
         this.hud.toast('Passengers evacuated safely', 'bad');
         this.ctx.sfx.stopAircraft();
         break;
@@ -761,6 +796,7 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
   private report() {
     const sim = this.sim!;
     this.reportShown = true;
+    this.hud.cabin(null);
     const r = sim.scorer.debrief();
     const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
     const lines = r.lines

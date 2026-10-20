@@ -154,6 +154,7 @@ export function runSimChecks(): SimCheck[] {
   climb(add);
   takeoff(add);
   shortTakeoff(add);
+  rejectedTakeoff(add);
   turnAndHeading(add);
   altitudeCapture(add);
   approaches(add);
@@ -309,6 +310,44 @@ function shortTakeoff(add: Add) {
   const res = flyTakeoff(r, start.x, vr);
   const spare = entry.toraM - res.liftoffM;
   add(`Palm Cay A4 (TORA ${entry.toraM} m) at 70 t`, spare >= 300 && !res.tailstrike && !res.crashed, `liftoff after ${f0(res.liftoffM)} m at ${f0(res.liftoffKt)} kt (VR ${vr}), ${f0(spare)} m to spare`, '≥ 300 m to spare');
+}
+
+/**
+ * A rejected takeoff at Palm Cay 27: CONF 1+F, ground spoilers armed, AUTO BRK MAX, FLX to 110 kt,
+ * then the levers to idle. MAX stays armed through the roll and brakes once the spoilers deploy.
+ */
+function rejectedTakeoff(add: Add) {
+  const r = rig();
+  loadTo(r.fm, T.mass);
+  const { fm, c } = r;
+  const x0 = RW27.threshold.x - 50;
+  fm.placeOnGround(x0, RW27.threshold.z, 270, { enginesRunning: true });
+  c.flapLever = 1;
+  c.gearDown = true;
+  c.spoilersArmed = true;
+  c.autobrake = 'max';
+  c.throttle = A320.detents.flx;
+  let rejected = false;
+  let active = false;
+  let peak = 0;
+  let prevGs = 0;
+  let rejectX = 0;
+  fly(r, 120, (st, t) => {
+    if (!rejected && st.ias >= 110) {
+      rejected = true;
+      rejectX = st.pos.x;
+      c.throttle = 0;
+    }
+    if (rejected) {
+      active ||= fm.sys.autobrakeActive;
+      if (t > 0) peak = Math.max(peak, ((prevGs - st.gs) * KT) / DT);
+    }
+    prevGs = st.gs;
+    return rejected && st.gs < 1;
+  }, false);
+  const stopM = x0 - fm.state.pos.x;
+  const left = RW27.lengthM - 50 - stopM;
+  add('Rejected takeoff at 110 kt: AUTO BRK MAX brakes', active && peak > 4 && fm.state.gs < 1 && left > 300, `autobrake ${active ? 'on' : 'OFF'}, peak ${f1(peak)} m/s², stopped ${f0(rejectX - fm.state.pos.x)} m after the reject at ${f0(x0 - rejectX)} m, ${f0(left)} m to spare`, 'MAX on, > 4 m/s², ≥ 300 m to spare');
 }
 
 /** A 25° coordinated turn with ALT held, and HDG captures. */
@@ -610,6 +649,7 @@ function gateToGate(add: Add) {
   let maxBank = 0;
   let maxNz = 1;
   let minNz = 1;
+  let maxLowIas = 0;
   let stopped = false;
   const phases = new Set<FlightPhase>();
   ap.onEvent = (e) => {
@@ -675,6 +715,7 @@ function gateToGate(add: Add) {
       maxBank = Math.max(maxBank, Math.abs(s.bank));
       maxNz = Math.max(maxNz, s.nz);
       minNz = Math.min(minNz, s.nz);
+      if (s.altFt < 10000) maxLowIas = Math.max(maxLowIas, s.ias);
     }
   }
   const td = lander.td;
@@ -684,7 +725,7 @@ function gateToGate(add: Add) {
   add(
     'FA101 runway to runway: AP NAV, CLB, DES, APPR, hand landing',
     ok,
-    td ? `${Math.floor(airS / 60)} min ${f0(airS % 60)} s airborne, max ${f0(maxAlt)} ft, bank ≤ ${f1(maxBank)}°, ${f2(minNz)}–${f2(maxNz)} g; touchdown ${td.vsFpm} fpm ${f0(lander.tdM)} m in${fm.crashed ? `, ${fm.crashed}` : ''}` : `no landing (${fm.crashed ?? `${nav.phase}, ${ap.fcu.fma.lateral}/${ap.fcu.fma.vertical}`})`,
+    td ? `${Math.floor(airS / 60)} min ${f0(airS % 60)} s airborne, max ${f0(maxAlt)} ft, ${f0(maxLowIas)} kt, bank ≤ ${f1(maxBank)}°, ${f2(minNz)}–${f2(maxNz)} g; touchdown ${td.vsFpm} fpm ${f0(lander.tdM)} m in${fm.crashed ? `, ${fm.crashed}` : ''}` : `no landing (${fm.crashed ?? `${nav.phase}, ${ap.fcu.fma.lateral}/${ap.fcu.fma.vertical}`})`,
     `cruise ${plan.cruiseFt} ft, TDZ ${tdz.from}–${tdz.to} m, ≤ 360 fpm`,
   );
 }
@@ -877,7 +918,7 @@ function weather(add: Add) {
     maxG = Math.max(maxG, w.gustKt);
     if (w.gustKt) {
       gusty++;
-      if (w.gustKt < w.windKt + 8) gapOk = false;
+      if (w.gustKt < w.windKt + 10) gapOk = false;
     }
     if (tod !== 'dawn') minV = Math.min(minV, w.visibilityM);
     maxV = Math.max(maxV, w.visibilityM);

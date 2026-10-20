@@ -140,6 +140,8 @@ export class UI {
     this.panelEl.classList.toggle('panel-left', !!opts.left);
     this.panelEl.style.borderTopColor = opts.accent ?? '';
     this.panelEl.hidden = false;
+    // a new card starts at its top (the last one may have been scrolled down, on a short screen)
+    this.panelEl.scrollTop = 0;
     this.infoEl.setAttribute('aria-expanded', String(key === (this.intro ?? this.guide)?.key));
     // restart entry animation
     this.panelEl.style.animation = 'none';

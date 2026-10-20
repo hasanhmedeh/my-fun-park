@@ -164,7 +164,8 @@
 @media (orientation: landscape) and (max-height: 540px) {
   .sl-pick {
     top: auto;
-    bottom: calc(var(--gut-b, 12px) + 8px);
+    /* above the bottom row (Exit, the account and tools pills) */
+    bottom: calc(var(--gut-b, 12px) + 52px);
     width: min(620px, calc(100% - 300px));
     padding: 10px 12px 8px;
   }

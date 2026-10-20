@@ -75,7 +75,8 @@ const tunnelHosts = ['.ngrok-free.app', '.ngrok-free.dev', '.ngrok.app', '.ngrok
 // origin, so the session cookie just works. `xfwd` passes the browser's host along (X-Forwarded-Host),
 // so "Continue with Google" sends people back here rather than to the API's own port.
 const proxy = {
-  '/api': { target: 'http://localhost:3000', changeOrigin: true, xfwd: true },
+  // (API_PORT points a second dev server at a second API, e.g. for a test run beside your own)
+  '/api': { target: `http://localhost:${process.env.API_PORT ?? 3000}`, changeOrigin: true, xfwd: true },
 };
 
 export default defineConfig({
@@ -90,6 +91,15 @@ export default defineConfig({
     // /ringmaster thanks to cleanUrls in vercel.json)
     rolldownOptions: {
       input: { index: page('./index.html'), terms: page('./terms.html'), privacy: page('./privacy.html'), ringmaster: page('./ringmaster.html') },
+      // The engines (three.js with its addons, cannon-es) get a chunk of their own: they load with
+      // the Game chunk (in parallel, the same import), and stay cached across releases of the game.
+      // The airport, the A320neo and Palm Cay are split off by Game's dynamic import of
+      // world/flight/world-kit.ts, which downloads while the fair builds.
+      output: {
+        codeSplitting: {
+          groups: [{ name: 'engines', test: /[\\/]node_modules[\\/](\.pnpm[\\/])?(three|cannon-es)[@\\/]/ }],
+        },
+      },
     },
   },
 });

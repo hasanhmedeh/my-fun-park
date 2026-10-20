@@ -1,0 +1,100 @@
+/* ---------- Additions to flight.css: the HUD's cabin card (flight-hud.ts, FlightHud.cabin) and the
+   booking card's departure times (attractions/flight.ts, offerHtml) ----------
+   The cabin is its own channel (Speech.onCabin): the purser's and the captain's PA and the
+   passengers. It sits in the middle column under the progress line, apart from the radio log on
+   the left, as one warm cream card with an amber "CABIN" tag, so a PA never reads as ATC. */
+
+.fl-pa-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 100%;
+  padding: 7px 14px 7px 8px;
+  border-radius: 12px;
+  background: rgba(255, 245, 227, 0.92);
+  color: #2a1d10;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  font-size: 0.86rem;
+  line-height: 1.35;
+  transition: opacity 0.4s;
+  animation: fl-pa-in 0.3s ease-out;
+}
+.fl-pa-tag {
+  flex: none;
+  margin-top: 1px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: #e09a1f;
+  color: #fff;
+  font: 800 0.66rem/1.4 var(--body, system-ui, sans-serif);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.fl-pa-box.is-pa .fl-pa-tag::before {
+  content: '📢 ';
+}
+.fl-pa-body {
+  min-width: 0;
+}
+.fl-pa-from {
+  display: block;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8a5a0e;
+}
+@keyframes fl-pa-in {
+  from {
+    transform: translateY(-4px);
+    opacity: 0;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+  .fl-pa-box {
+    padding: 3px 10px 3px 6px;
+    gap: 6px;
+    font-size: 0.7rem;
+  }
+  .fl-pa-tag {
+    font-size: 0.56rem;
+  }
+  .fl-pa-from {
+    display: inline;
+    margin-right: 6px;
+    font-size: 0.6rem;
+  }
+}
+
+@media (orientation: portrait) and (max-width: 720px) {
+  .fl-pa-box {
+    padding: 3px 8px 3px 5px;
+    gap: 6px;
+    font-size: 0.68rem;
+  }
+  .fl-pa-tag {
+    font-size: 0.54rem;
+  }
+  .fl-pa-from {
+    display: inline;
+    margin-right: 6px;
+    font-size: 0.58rem;
+  }
+  /* three lines at most, so the card ends above the camera name and the toggles (.fl-side); the whole
+     PA is still read out (Voices) and in the aria-live node */
+  .fl-pa-body {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* the booking card's time-of-day picker: each departure's time under its name (the same times the
+   terminal boards list, FA101 at gate 3 and FA102 on the island) */
+.fl-offer-tod .fl-tod-time {
+  display: block;
+  font: 600 0.72rem/1.2 ui-monospace, monospace;
+  opacity: 0.75;
+}

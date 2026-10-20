@@ -226,7 +226,7 @@ export class Slides implements Attraction {
   private camDir = new THREE.Vector3();
   private camUp = new THREE.Vector3(0, 1, 0);
   private camReset = true;
-  private saved = { fov: 42, near: 0.5 };
+  private saved = { near: 0.5 };
   private awake = true;
   private night = 0;
   private introTimer = 0;
@@ -428,7 +428,7 @@ export class Slides implements Attraction {
     this.stats = { top: 0, maxG: 1, rideT: 0, y0: 0, yMin: 0, rode: false };
     this.camMode = 'pov';
     this.camReset = true;
-    this.saved = { fov: this.ctx.camera.fov, near: this.ctx.camera.near };
+    this.saved = { near: this.ctx.camera.near };
     this.me.stand.visible = true;
     this.hud.hidden = true;
     this.pickEl.hidden = true;
@@ -465,6 +465,16 @@ export class Slides implements Attraction {
     this.ctx.ui.score(null);
     $('sl-cards').innerHTML = this.cardsHtml();
     this.pickEl.hidden = false;
+    // a first visit's intro card still up would cover the picker's cards (on a phone, or any short
+    // screen): it goes, the ℹ️ brings it back
+    if (this.ctx.ui.panelOpenKey === 'slides-intro') {
+      const a = this.pickEl.getBoundingClientRect();
+      const b = this.ctx.ui.panelElement.getBoundingClientRect();
+      if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) {
+        this.ctx.ui.hidePanel();
+        this.introTimer = 0;
+      }
+    }
   }
 
   /** Picks slide k: sit down at its start and wait for the green light. */
@@ -527,7 +537,7 @@ export class Slides implements Attraction {
     this.body = null;
     document.body.classList.remove('is-sliding');
     const cam = this.ctx.camera;
-    cam.fov = this.saved.fov;
+    cam.fov = cam.aspect < 0.8 ? 58 : 42;
     cam.near = this.saved.near;
     cam.updateProjectionMatrix();
     this.ctx.ui.countdown(null);
@@ -1004,6 +1014,11 @@ export class Slides implements Attraction {
   /** Where the round is (climb, pick, ready, ride, fly, float, done; idle when not riding). */
   get stage(): Phase {
     return this.phase;
+  }
+
+  /** Splashed down (floating out, or done): the slide ran to its end, and leaving now is no early exit. */
+  get finished(): boolean {
+    return this.active && (this.phase === 'float' || this.phase === 'done');
   }
 
   /** How far down the picked slide the visitor is, 0..1 (1 from the lip on). */

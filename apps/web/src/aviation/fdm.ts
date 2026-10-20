@@ -355,6 +355,8 @@ export class FlightModel {
   private selConfig = 0;
   private lastLever = 0;
   private gear = 1;
+  /** Where the gear is going (1 down, 0 up): its limiting speed in transit is that way's VLO. */
+  private gearTarget = 1;
   private reverser = 0;
   private spG = 0;
   private spSb = 0;
@@ -368,6 +370,8 @@ export class FlightModel {
   private brakeR = 0;
   private autobrakeOn = false;
   private autobrakeArmed = false;
+  /** On the ground after a landing (not on a takeoff roll): the autobrake's lever disarm and LO/MED apply only then. */
+  private abLanded = false;
   private autobrakeT = 0;
   private autobrakeCmd = 0;
   private lastAutobrake: Controls['autobrake'] = 'off';
@@ -911,6 +915,7 @@ export class FlightModel {
 
     // landing gear (the lever can't raise it with weight on the wheels)
     const gearTarget = c.gearDown || onGround ? 1 : 0;
+    this.gearTarget = gearTarget;
     const before = this.gear;
     this.gear = approach(this.gear, gearTarget, h / A320.gearTravel);
     if (before < 1 && this.gear === 1) this.events.push({ kind: 'gearLocked', down: true });
@@ -934,7 +939,9 @@ export class FlightModel {
     this.spSb = approach(this.spSb, sbInhibit ? 0 : clamp(c.speedbrake, 0, 1), h / 2);
 
     // brakes: pedals, the parking brake, and the autobrake
-    // selecting a setting arms it; it disarms on the pedals, with the levers advanced, and after takeoff
+    // selecting a setting arms it; it disarms on the pedals, after takeoff, and (once landed) with
+    // the levers advanced. On the takeoff roll it stays armed with the levers up: MAX is the
+    // rejected-takeoff mode, braking once the ground spoilers deploy above 72 kt (LO and MED don't).
     if (c.autobrake !== this.lastAutobrake) {
       this.lastAutobrake = c.autobrake;
       this.autobrakeArmed = c.autobrake !== 'off';
@@ -942,11 +949,16 @@ export class FlightModel {
     }
     if (this.autobrakeArmed && this.airborneT > 5 && this.airborneT < 5.1 && this.sinceLiftoff < 6) this.autobrakeArmed = false;
     const pedals = Math.max(c.brakeL, c.brakeR);
-    if ((this.autobrakeOn || this.autobrakeArmed) && (pedals > 0.6 || (onGround && c.throttle > A320.detents.cl - 0.05))) {
+    if ((this.autobrakeOn || this.autobrakeArmed) && (pedals > 0.6 || (onGround && this.abLanded && c.throttle > A320.detents.cl - 0.05))) {
       this.autobrakeOn = false;
       this.autobrakeArmed = false;
     }
-    if (this.autobrakeArmed && this.spG > 0.5) {
+    // the ground spoilers retracting releases it, as on the real system
+    if (this.autobrakeOn && this.spG < 0.5) {
+      this.autobrakeOn = false;
+      this.autobrakeArmed = false;
+    }
+    if (this.autobrakeArmed && this.spG > 0.5 && (this.abLanded || (c.autobrake === 'max' && s.gs > 72))) {
       this.autobrakeOn = true;
       this.autobrakeArmed = false;
       this.autobrakeT = 0;
@@ -1433,6 +1445,7 @@ export class FlightModel {
 
     // touchdown: report the sink rate at contact and the peak load factor over the next quarter second
     if (mains && !this.wasOnGround && this.airborneT === 0 && !this.pendingTd) {
+      this.abLanded = true;
       const sink = Math.max(0, -this.contactSink()) / FPM;
       const crab = ((((s.heading - s.track) % 360) + 540) % 360) - 180;
       this.pendingTd = {
@@ -1463,6 +1476,7 @@ export class FlightModel {
     }
     if (this.wasOnGround && !any && this.airborneT > 0.1) {
       this.events.push({ kind: 'liftoff', ias: s.ias, pos: s.pos.clone() });
+      this.abLanded = false;
     }
     if (any) this.wasOnGround = true;
     else if (this.airborneT > 0.1) this.wasOnGround = false;
@@ -1511,6 +1525,7 @@ export class FlightModel {
     this.brakeL = this.brakeR = 0;
     this.autobrakeOn = false;
     this.autobrakeArmed = false;
+    this.abLanded = false;
     this.autobrakeCmd = 0;
     this.decel = 0;
     this.selConfig = 0;
@@ -1664,6 +1679,7 @@ export class FlightModel {
     s.slatsDeg = this.slats;
     s.config = this.selConfig;
     s.gear = this.gear;
+    s.gearExtending = this.gearTarget > 0.5;
     s.spoilers = Math.max(this.spG, this.spSb);
     s.elevator = this.elev >= 0 ? this.elev / (ELEV_UP * DEG) : this.elev / (ELEV_DOWN * DEG);
     s.aileron = this.ail;
@@ -1729,7 +1745,9 @@ export class FlightModel {
     let vfe = Infinity;
     if (this.flaps > 0.5) vfe = this.flaps > 20.5 ? A320.vfe[4] : this.flaps > 15.5 ? A320.vfe[3] : this.flaps > 10.5 ? A320.vfe[2] : A320.vfe1F;
     else if (this.slats > 0.5) vfe = A320.vfe[1];
-    sp.vmax = Math.min(A320.vmo, mmoKt, vfe, this.gear > 0.01 ? A320.vle : Infinity);
+    // (the gear in transit: VLO for the way it's going, 250 kt extending, 220 retracting; VLE once down)
+    const vGear = this.gear >= 0.999 ? A320.vle : this.gear > 0.001 ? (this.gearTarget > 0.5 ? A320.vlo.extend : A320.vlo.retract) : Infinity;
+    sp.vmax = Math.min(A320.vmo, mmoKt, vfe, vGear);
     // green dot (best lift/drag, clean), S (1.23 VS1g clean), F (1.22 VS1g in CONF 1+F)
     const vClean = vAt(CONFIGS[0].clMax);
     sp.greenDot = Math.sqrt((2 * W) / (RHO0 * S)) * (A320.k / A320.cd0) ** 0.25 / KT;

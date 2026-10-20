@@ -317,10 +317,12 @@ export class Autopilot {
     const V = Math.max(30, s.vel.length());
     const crsDiff = ils ? angleDiff(s.track, ils.course) : 0;
     if (inAir && ils?.valid && fma.armedLateral === 'LOC') {
-      // capture once the closure makes it time to start the turn onto the beam
+      // capture once the closure makes it time to start the turn onto the beam (from the beam's geometry in
+      // metres, inside the localizer's coverage: the display's 2 dots are only ~500 m out on an
+      // intercept, too late to start a 30–40° turn onto it)
       const vLat = V * Math.sin(crsDiff * DEG);
       const closing = vLat * ils.locM < 0;
-      if (Math.abs(ils.loc) < 2 && ((closing && Math.abs(ils.locM) <= Math.abs(vLat) * LOC_TAU * 1.1 + 30) || Math.abs(ils.locM) < 40)) {
+      if ((closing && Math.abs(ils.locM) <= Math.abs(vLat) * LOC_TAU * 1.1 + 30) || Math.abs(ils.locM) < 40) {
         fma.armedLateral = 'none';
         this.setLateral('LOC*');
       }
@@ -398,7 +400,9 @@ export class Autopilot {
       } else if (vMode === 'ALT') {
         vsCmd = clamp(((this.targetAlt - alt) * 60) / ALT_HOLD_TAU, -1000, 1000);
       } else if (vMode === 'V/S') {
-        vsCmd = desVs ?? fcu.vs;
+        // (on the managed path the thrust is near idle: if the speed still runs over 250 kt (or a higher target) the
+        // descent eases off, the FMGS's speed protection, rather than break the 250 kt limit)
+        vsCmd = desVs !== null ? Math.min(0, desVs + Math.max(0, s.ias - Math.max(spd, A320.speedLimitLow) - 1) * 200) : fcu.vs;
       } else if (ils && (vMode === 'G/S' || vMode === 'G/S*')) {
         vsCmd = this.pathVs(s) - clamp((ils.gsFt * 60) / GS_TAU, -600, 600);
         if (vMode === 'G/S*') nzLim = NZ_CAPTURE;

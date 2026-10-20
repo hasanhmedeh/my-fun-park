@@ -483,7 +483,7 @@ export function windWords(fromDeg: number, kt: number, gustKt = 0): string {
   if (kt < 1) return 'wind calm';
   const dir = Math.round(fromDeg / 10) * 10 || 360;
   const base = `wind ${digits(String(dir).padStart(3, '0'))} degrees, ${digits(Math.round(kt))} knots`;
-  return gustKt > kt ? `${base}, gusting ${digits(Math.round(gustKt))}` : base;
+  return gustKt >= kt + 10 ? `${base}, gusting ${digits(Math.round(gustKt))}` : base;
 }
 
 /** The same wind as written: "wind 250° 12 kt gusting 22", or "wind calm". */
@@ -491,7 +491,7 @@ export function windText(fromDeg: number, kt: number, gustKt = 0): string {
   if (kt < 1) return 'wind calm';
   const dir = Math.round(fromDeg / 10) * 10 || 360;
   const base = `wind ${String(dir).padStart(3, '0')}° ${Math.round(kt)} kt`;
-  return gustKt > kt ? `${base} gusting ${Math.round(gustKt)}` : base;
+  return gustKt >= kt + 10 ? `${base} gusting ${Math.round(gustKt)}` : base;
 }
 
 /** A callsign with its number spoken digit by digit: "Funfair 101" → "Funfair one zero one". */

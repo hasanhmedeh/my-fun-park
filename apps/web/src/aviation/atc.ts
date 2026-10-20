@@ -19,7 +19,7 @@
 // them), and other aircraft talk on the frequency now and then.
 
 import { AIRFIELDS, HOLD_OFFSET, nearestNode, onRunway, runwayFrame, taxiRoute, type Airport, type NodeKind, type RunwayEnd } from './airports';
-import { metar } from './weather';
+import { MAX_GUST_KT, metar } from './weather';
 import { phaseIndex, type Navigator } from './nav';
 import {
   altitudeWords,
@@ -349,8 +349,13 @@ export class Atc {
   private wind() {
     const w = this.w;
     const dir = (w.windFrom + (this.rnd() - 0.5) * 20 + 360) % 360;
-    const kt = Math.max(0, Math.round(w.windKt + (this.rnd() - 0.5) * 4));
-    const gust = w.gustKt > w.windKt ? Math.round(w.gustKt + (this.rnd() - 0.5) * 3) : 0;
+    // A gust is only reported 10 kt or more above the mean, as in the METAR, and never above the
+    // game's 25 kt cap (or the day's own gust, should a test day roll a stronger one): on a gusty
+    // day the wandering mean stays 10 kt under that cap so both rules hold.
+    const gusty = w.gustKt > w.windKt;
+    const cap = Math.max(MAX_GUST_KT, w.gustKt);
+    const kt = Math.max(0, Math.min(gusty ? cap - 10 : Infinity, Math.round(w.windKt + (this.rnd() - 0.5) * 4)));
+    const gust = gusty ? Math.min(cap, Math.max(kt + 10, Math.round(w.gustKt + (this.rnd() - 0.5) * 3))) : 0;
     return { text: windText(dir, kt, gust), say: windWords(dir, kt, gust) };
   }
 

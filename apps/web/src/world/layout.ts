@@ -24,7 +24,7 @@
 // The two landmasses are regions: the visitor walks, fast travels and is kept on the ground within
 // the region they stand in, and only a flight takes them across the sea.
 
-import { PLOT_IDS, plotNumber, type PlotId } from '../account/api';
+import { PLOT_IDS, plotNumber, type AttractionId, type PlotId } from '../account/api';
 import { AIRPORT_SPOTS, AIRPORTS, ISLAND, ISLAND_SPOTS, SKYLINK, regionAt, type Region } from './geo';
 
 export type { Region };
@@ -264,6 +264,9 @@ export const ZONES: Record<ZoneId, Zone> = {
   // each plot's title is its coaster's name while one runs there (see setPlotTitle)
   ...(Object.fromEntries(PLOT_IDS.map((id, i) => [id, plotZone(i + 1)])) as Record<PlotId, Zone>),
 };
+
+/** An attraction's display name: its zone's title, except the flight, whose zones are its two gate desks (the round is the flight itself). */
+export const rideTitle = (id: AttractionId) => (id === 'flight' ? 'Funfair Air' : ZONES[id].title);
 
 /** Names a plot's zone after the coaster running on it (or back to "Plot n" when it's empty). */
 export function setPlotTitle(id: PlotId, name: string | null) {

@@ -47,9 +47,9 @@ export function makeWeather(seed: number, tod: TimeOfDay): Weather {
   const windKt = Math.min(MAX_WIND_KT, Math.round(4 + (MAX_WIND_KT - 4) * Math.pow(rnd(), 1.3) * todWind));
   // a METAR reports gusts 10 kt or more above the mean; the game keeps them to 25 kt (so the gusty
   // days are the moderate ones, 10–15 kt mean: on a stronger day the gusts would be past the cap)
-  const gustRoll = windKt >= 10 && rnd() < 0.4;
-  const gustKt = gustRoll ? Math.min(MAX_GUST_KT, windKt + Math.round(9 + rnd() * 5)) : 0;
-  const gusty = gustKt >= windKt + 8;
+  const gustRoll = windKt >= 10 && windKt <= MAX_GUST_KT - 10 && rnd() < 0.4;
+  const gustKt = gustRoll ? Math.min(MAX_GUST_KT, windKt + Math.round(10 + rnd() * 4)) : 0;
+  const gusty = gustKt >= windKt + 10;
 
   // Clouds: zero to two layers of FEW/SCT cumulus, a broken layer one day in seven.
   const clouds: Weather['clouds'] = [];
@@ -99,7 +99,7 @@ export function metar(w: Weather, icao: string, hourUtc: number, day = new Date(
   else if (w.windKt < 3) wind = `VRB${pad(w.windKt, 2)}KT`;
   else {
     const dir = Math.round(w.windFrom / 10) * 10 || 360;
-    wind = `${pad(dir, 3)}${pad(w.windKt, 2)}${w.gustKt > w.windKt ? `G${pad(w.gustKt, 2)}` : ''}KT`;
+    wind = `${pad(dir, 3)}${pad(w.windKt, 2)}${w.gustKt - w.windKt >= 10 ? `G${pad(w.gustKt, 2)}` : ''}KT`;
   }
 
   const mist = w.visibilityM < 5000 && w.tempC - w.dewC <= 2;

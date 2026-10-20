@@ -221,6 +221,10 @@
   bottom: calc(max(16px, env(safe-area-inset-bottom)) + 30px);
   opacity: 0.85;
 }
+/* (no key line on touch: the empty pill goes) */
+.vb-keys:empty {
+  display: none;
+}
 .vb-keys kbd {
   padding: 0 4px;
   border-radius: 4px;
@@ -269,5 +273,13 @@
   }
   .vb-keys {
     display: none;
+  }
+  /* the meter sits above the action button (its portrait placement: bottom max(90px, safe + 80px),
+     76px tall), so the E you time the strike with stays in view */
+  .vb-meter {
+    bottom: calc(max(90px, calc(env(safe-area-inset-bottom) + 80px)) + 88px);
+  }
+  .vb-grade {
+    bottom: calc(max(90px, calc(env(safe-area-inset-bottom) + 80px)) + 88px + 78px);
   }
 }

@@ -150,9 +150,22 @@
   }
 }
 
+/* the aiming joystick stays up (ui.cinematic hides the walking one): the stick nudges the mark,
+   a tap on the sea aims and fires */
+.is-cannons .stick {
+  display: block;
+}
+
+/* on a phone the card sits in the sky under the top bar, clear of the horizon band where the ships
+   sail and the mark sits (the generic phone .ride-hud placement leaves room for a stick under it) */
 @media (max-width: 640px) {
   .cn-hud {
+    left: 12px;
+    right: 12px;
+    top: calc(max(12px, env(safe-area-inset-top)) + 54px);
+    bottom: auto;
+    transform: none;
     width: auto;
-    right: 16px;
+    padding: 10px 14px;
   }
 }

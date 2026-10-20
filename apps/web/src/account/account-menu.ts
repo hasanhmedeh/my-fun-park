@@ -1,7 +1,7 @@
 import { ApiError, ATTRACTION_IDS } from './api';
 import { authDialog } from './auth-dialog';
 import { formatWait, session } from './session';
-import { ZONES } from '../world/layout';
+import { rideTitle } from '../world/layout';
 import { escapeHtml } from '../world/ui';
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -198,7 +198,7 @@ export class AccountMenu {
     // each bar is that attraction's share of the favourite's rounds
     const top = rows.length ? byRide![rows[0]].rounds : 1;
     this.listEl.innerHTML = rows
-      .map((id) => `<li style="--share:${(byRide![id].rounds / top).toFixed(3)}"><span>${escapeHtml(ZONES[id].title)}</span><b>${byRide![id].rounds}</b></li>`)
+      .map((id) => `<li style="--share:${(byRide![id].rounds / top).toFixed(3)}"><span>${escapeHtml(rideTitle(id))}</span><b>${byRide![id].rounds}</b></li>`)
       .join('');
     this.listEl.hidden = !rows.length;
   }

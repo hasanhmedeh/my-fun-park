@@ -35,6 +35,8 @@ const NZ_SMOOTH_S = 0.4;
 /** Speed tolerance before the 250 kt rule counts (an autothrust holding 250 wanders a knot or two), and how long. */
 const SPEED_LIMIT_TOL = 5;
 const SPEED_LIMIT_HOLD_S = 3;
+/** The time constant (s) of the airspeed the 250 kt rule looks at. */
+const IAS_AVG_S = 4;
 /**
  * The schedule's padding over the plan's block time (s). flightPlan() already counts the pushback,
  * the taxi both ways, the takeoff run, the air time and the landing roll; the airline pads that by
@@ -127,12 +129,17 @@ export class FlightScorer {
   private readonly vmoEx = new Excursion(5);
   private readonly flapEx = new Excursion(3);
   private readonly gearEx = new Excursion(3);
+  /** The gear's position last frame, and which way it was last seen moving (when the state doesn't say). */
+  private prevGear = 1;
+  private gearDir: 'ext' | 'ret' = 'ext';
   private readonly stallEx = new Excursion(5);
   private lastG = -Infinity;
   /** The smoothed load factor (see NZ_SMOOTH_S). */
   private nzF = 1;
   private lastSpeed = -Infinity;
   private speedOver = 0;
+  /** The airspeed over the last few seconds, for the 250 kt rule (a gust's knot or five is not the crew's doing). */
+  private iasAvg = -1;
   private readonly lastAlert = new Map<string, number>();
   private lastStrike = -Infinity;
 
@@ -210,10 +217,11 @@ export class FlightScorer {
       }
 
       // the 250 kt speed limit below 10,000 ft, at most once every 30 s
-      this.speedOver = s.altFt < 10000 && s.ias > A320.speedLimitLow + SPEED_LIMIT_TOL ? this.speedOver + dt : 0;
+      this.iasAvg = this.iasAvg < 0 ? s.ias : this.iasAvg + (s.ias - this.iasAvg) * Math.min(1, dt / IAS_AVG_S);
+      this.speedOver = s.altFt < 10000 && this.iasAvg > A320.speedLimitLow + SPEED_LIMIT_TOL ? this.speedOver + dt : 0;
       if (this.speedOver > SPEED_LIMIT_HOLD_S && this.t - this.lastSpeed >= 30) {
         this.lastSpeed = this.t;
-        this.penalise(`Above 250 kt below 10,000 ft (${Math.round(s.ias)} kt)`, 5, this.t);
+        this.penalise(`Above 250 kt below 10,000 ft (${Math.round(this.iasAvg)} kt)`, 5, this.t);
       }
     }
     // side force bothers people on the ground too: taxiing round a corner too fast
@@ -228,8 +236,13 @@ export class FlightScorer {
     // flaps and gear beyond their limiting speeds (VFE, VLE, VLO while moving)
     const vfe = vfeFor(s.config);
     if (this.flapEx.check(air && s.config > 0 && s.ias > vfe + 3, s.config === 0 || s.ias < vfe - 2, dt)) this.penalise(`Flap overspeed (${Math.round(s.ias)} kt, VFE ${vfe})`, 10, this.t);
+    // (in transit: VLO for the way it's going, 250 kt extending and 220 retracting; VLE down and locked)
     const gearMoving = s.gear > 0.02 && s.gear < 0.98;
-    const vGear = gearMoving ? Math.min(A320.vlo.extend, A320.vlo.retract) : A320.vle;
+    if (s.gear > this.prevGear + 1e-6) this.gearDir = 'ext';
+    else if (s.gear < this.prevGear - 1e-6) this.gearDir = 'ret';
+    this.prevGear = s.gear;
+    const extending = s.gearExtending ?? this.gearDir === 'ext';
+    const vGear = gearMoving ? (extending ? A320.vlo.extend : A320.vlo.retract) : A320.vle;
     if (this.gearEx.check(air && s.gear > 0.02 && s.ias > vGear + 3, s.gear <= 0.02 || s.ias < vGear - 2, dt)) this.penalise(`Gear overspeed (${Math.round(s.ias)} kt)`, 10, this.t);
 
     // stall warning and alpha floor
@@ -351,6 +364,11 @@ export class FlightScorer {
     }
     if (this.items.some((i) => /^(Tailstrike|Engine pod strike|Wingtip strike)/.test(i.label))) cap = Math.min(cap, 3);
     return cap;
+  }
+
+  /** The aircraft has left the ground at least once this flight. */
+  get tookOff(): boolean {
+    return this.airborneOnce;
   }
 
   /** The round's stats (SPEC §3's flight keys). The landing's keys are only there if it landed. */

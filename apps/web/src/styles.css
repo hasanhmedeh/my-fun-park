@@ -375,8 +375,11 @@ kbd {
   display: flex;
   gap: 8px;
 }
-/* in the A320's seat the account chip would sit over the engine display: the wallet waits for the gate */
-.is-piloting .hud-account {
+/* in the A320's seat the account chip would sit over the engine display (the wallet waits for the gate), and
+   the other tools under the thrust lever or the x2 warp button: the flight's own sound toggle (by Voices) drives the park's */
+.is-piloting .hud-tools,
+.is-piloting .gfx-panel,
+.is-piloting .time-panel {
   display: none;
 }
 .hud-icon,
@@ -1110,6 +1113,8 @@ kbd {
   color: var(--mustard);
   text-shadow: 0 6px 0 var(--candy-dark), 0 20px 50px rgba(0, 0, 0, 0.5);
   pointer-events: none;
+  /* over a first visit's intro card (z 4), which on an upright phone spans the screen */
+  z-index: 5;
 }
 .countdown.pop {
   animation: pop 0.9s ease-out;
@@ -1187,6 +1192,15 @@ kbd {
   box-shadow: var(--shadow);
   border-top: 8px solid var(--candy);
   animation: slide-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* over the games' HUDs (z 3) and the touch controls, so a card that overlaps them on a small
+     screen is read whole and its ✕ can be tapped; under the park map (5) and the fade */
+  z-index: 4;
+}
+/* tablets: the card ends above the touch action button (bottom right, 76 px tall at 90 px up) */
+@media (pointer: coarse) and (min-width: 721px) and (min-height: 541px) {
+  .panel {
+    max-height: calc(100% - 72px - 190px);
+  }
 }
 .panel.panel-left {
   right: auto;
@@ -1439,6 +1453,33 @@ kbd {
 .touch[hidden] {
   display: none;
 }
+/* the island games' camera on touch (Game adds it): beside the E button, which is the game's own action there */
+.isl-cam-btn {
+  position: absolute;
+  right: calc(max(28px, env(safe-area-inset-right)) + 88px);
+  bottom: calc(max(90px, calc(env(safe-area-inset-bottom) + 80px)) + 14px);
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(29, 18, 56, 0.72);
+  color: #fff;
+  font-size: 1.3rem;
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+  touch-action: none;
+}
+.isl-cam-btn[hidden] {
+  display: none;
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  .isl-cam-btn {
+    right: calc(var(--gut-r, 16px) + 94px);
+    bottom: calc(var(--gut-b, 12px) + 68px);
+    width: 44px;
+    height: 44px;
+  }
+}
 /* the joystick sits just above the minimap */
 .stick {
   position: absolute;
@@ -1487,6 +1528,11 @@ kbd {
   }
   .hud-tools {
     top: auto;
+  }
+  /* on a ride the Exit button takes the bottom's middle: the account chip (the wallet) would sit
+     under it on a narrow phone, so it waits for the ride's end (the results show the tickets left) */
+  .hud:has(> .ride-exit:not([hidden])) > .hud-tools > .hud-account {
+    display: none;
   }
   .hud-help {
     display: none;
@@ -2826,6 +2872,17 @@ kbd {
   .intro-progress {
     margin-top: 16px;
   }
+
+  /* while a card is up (a game's first-visit intro, say) it takes the right 46%: the countdown and
+     Beach Volley's numbers and hint move into the space left of it rather than under it */
+  .hud:has(> .panel:not([hidden])) > .countdown {
+    right: calc(min(380px, 46%) + var(--gut-r));
+  }
+  .hud:has(> .panel:not([hidden])) .vb-top,
+  .hud:has(> .panel:not([hidden])) .vb-hint {
+    left: var(--gut-l);
+    transform: none;
+  }
 }
 
 /* the park map, sideways: a compact legend on the left and the place card beside it */
@@ -2876,8 +2933,16 @@ kbd {
   .wm-card-icon {
     font-size: 1.8rem;
   }
+  /* the text keeps a real column: a long gate button wraps under it instead of squeezing it */
+  .wm-card-text {
+    flex: 1 1 180px;
+  }
   .wm-travel {
     margin-left: auto;
+  }
+  .wm-card.is-away .wm-travel {
+    flex-basis: 100%;
+    justify-content: center;
   }
   .world-map:has(> .wm-card:not([hidden])) .wm-scale {
     display: none;

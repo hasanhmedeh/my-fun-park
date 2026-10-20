@@ -150,6 +150,8 @@ export interface AircraftState {
   slatsDeg: number;
   config: number;
   gear: number;
+  /** Which way the gear is going (or went): true towards down, false towards up (the lever, as the gear follows it). */
+  gearExtending?: boolean;
   spoilers: number;
   /** Control surface deflections, −1..1 (for the 3D model). */
   aileron: number;

@@ -11,6 +11,8 @@ import { Spray, Wakes } from './jetski-fx';
 import { archGeometry, BUOY_H, buoyBody, buoyTrim, rampGeometry, rampTexture, riderGeometry, SADDLE, skiGeometry, spectatorBody, spectatorHead } from './jetski-models';
 import { forwardSpeed, VMAX, type Craft } from './jetski-physics';
 import { aiControls, collideRacers, MISS_PENALTY, newRacer, standings, stepRacer, toGhost, toGrid, VTOP, type RaceEvents, type Racer } from './jetski-race';
+import { lookKey, rivalRiderLooks, Rider, riderColours, visitorRiderLook, type RiderColours } from './jetski-riders';
+import type { Look, PeopleFactory } from '../../crowd/people';
 import './jetski.css';
 
 /** The T-head's middle, where the dock's crowd stands: for their cheering and the idle focus. */
@@ -58,7 +60,12 @@ const ordinal = (n: number) => (n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd'
 /** A racer's model: the ski (hull and rider) and what animates on it. */
 interface Rig {
   root: THREE.Group;
-  rider: THREE.Mesh;
+  /** The seat frame on the saddle (leaned and bobbed by the race): the rider sits in it. */
+  rider: THREE.Group;
+  /** The merged stand-in figure: the rider until the people have loaded, and far away after. */
+  far: THREE.Mesh;
+  /** The rider as a real person (once `setPeople` has run). */
+  body: Rider | null;
   /** Spray to emit (fractional drops carried over between frames). */
   tail: number;
   bow: number;
@@ -121,9 +128,15 @@ export class JetSki implements Attraction {
   /** The edge ropes are unlit lines: dimmed by hand at night. */
   private ropeMat = new THREE.LineBasicMaterial({ color: ROPE });
   private awake = true;
+  private night = 0;
+  private people: { factory: PeopleFactory; visitor: Look } | null = null;
+  private visitorKey = '';
+  private vestMat: THREE.MeshStandardMaterial | null = null;
   private phase: Phase = 'idle';
   private phaseT = 0;
   private raceT = 0;
+  /** After the line: whether the place is final yet (see onFlag). */
+  private settled = false;
   private beat = -1;
   private cam: Cam = 'chase';
   private camPos = new THREE.Vector3();
@@ -416,13 +429,43 @@ export class JetSki implements Attraction {
     root.rotation.order = 'YXZ';
     const hullMat = new THREE.MeshPhysicalMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.12 });
     const hull = new THREE.Mesh(skiGeometry(color, accent), hullMat);
-    const rider = new THREE.Mesh(riderGeometry(color, helmet), std('#ffffff', { vertexColors: true, roughness: 0.7 }));
+    const far = new THREE.Mesh(riderGeometry(color, helmet), std('#ffffff', { vertexColors: true, roughness: 0.7 }));
+    const rider = new THREE.Group();
     rider.position.copy(SADDLE);
     rider.rotation.order = 'YXZ';
+    rider.add(far);
     root.add(hull, rider);
     shadowed(root);
     this.ctx.scene.add(root);
-    return { root, rider, tail: 0, bow: 0, lean: 0 };
+    return { root, rider, far, body: null, tail: 0, bow: 0, lean: 0 };
+  }
+
+  /**
+   * Gives the riders their bodies: the visitor in their own look (beachwear and a life vest in
+   * their ski's colour), the rivals in theirs. Until then the merged stand-in figures ride. Can be
+   * called again (the visitor's rider is rebuilt on `start()` if their look has changed since).
+   */
+  setPeople(factory: PeopleFactory, visitor: Look) {
+    this.people = { factory, visitor };
+    const rivals = rivalRiderLooks();
+    for (let i = 0; i < this.rigs.length; i++) this.dress(i, i === 0 ? visitorRiderLook(visitor) : rivals[i - 1]);
+    this.visitorKey = lookKey(visitor);
+  }
+
+  private dress(i: number, look: Look) {
+    const people = this.people;
+    if (!people) return;
+    const rig = this.rigs[i];
+    const vest = this.racers[i].color;
+    rig.body?.dispose();
+    const q = this.ctx.quality;
+    this.vestMat ??= std('#ffffff', { vertexColors: true, roughness: 0.62 });
+    rig.body = new Rider(people.factory.create(look), rig.rider, rig.far, vest, this.vestMat, q.shadows && q.tier !== 'low' && q.tier !== 'lowest');
+    rig.body.setGlow(this.night);
+    // the far figure in the same colours: vest, hair for the helmet, skin for the suit
+    const col: RiderColours = riderColours(look, vest);
+    rig.far.geometry.dispose();
+    rig.far.geometry = riderGeometry(col.vest, col.hair, col.skin);
   }
 
   /** Your ski waits on its mooring while nobody's racing. */
@@ -447,6 +490,9 @@ export class JetSki implements Attraction {
 
   /** 0 by day .. 1 at night: the dock's lanterns, the buoys' lamps, the skis' navigation lights. */
   setNight(k: number) {
+    this.night = k;
+    for (const r of this.rigs) r.body?.setGlow(k);
+    this.vestMat?.emissive.setScalar(0.025 * k);
     this.dock.setNight(k);
     this.wakes.setNight(k);
     this.spray.setNight(k);
@@ -458,11 +504,17 @@ export class JetSki implements Attraction {
 
   start() {
     this.active = true;
+    // the visitor may have changed their look since the people loaded (a hat, a new top)
+    if (this.people && lookKey(this.people.visitor) !== this.visitorKey) {
+      this.visitorKey = lookKey(this.people.visitor);
+      this.dress(0, visitorRiderLook(this.people.visitor));
+    }
     this.phase = 'grid';
     this.phaseT = 0;
     this.raceT = 0;
     this.beat = -1;
     this.place = 0;
+    this.settled = false;
     this.topSpeed = 0;
     this.final = null;
     this.boostWas = false;
@@ -531,7 +583,7 @@ export class JetSki implements Attraction {
     const me = this.me;
     const stats: Record<string, number> = { topSpeedKmh: this.topSpeed * 3.6, buoysMissed: me.missed, jumps: me.jumps };
     if (me.bestLap) stats.bestLapTimeS = me.bestLap;
-    if (me.finished !== null && this.place) {
+    if (me.finished !== null && this.place && this.settled) {
       stats.position = this.place;
       stats.raceTimeS = me.finished;
     }
@@ -680,7 +732,8 @@ export class JetSki implements Attraction {
     if (this.phase === 'race' || this.phase === 'done') this.raceT += dt;
     if (this.phase === 'race' && this.phaseT > 1.2 && this.phaseT - dt <= 1.2) this.ctx.ui.countdown(null);
     if (this.phase === 'race' && this.phaseT > 4 && this.phaseT - dt <= 4) this.setLamps(3, LAMP_OFF);
-    if (this.phase === 'done' && this.phaseT > COOLDOWN) {
+    if (this.phase === 'done' && !this.settled) this.settle();
+    if (this.phase === 'done' && this.settled && this.phaseT > COOLDOWN) {
       this.phase = 'idle'; // fire once
       this.onComplete?.();
     }
@@ -756,23 +809,44 @@ export class JetSki implements Attraction {
     this.$('js-best').textContent = fmt(this.record.lap);
   }
 
+  /**
+   * Over the line. Times count with their penalties, so a rival crossing just after you with fewer
+   * penalty seconds can still beat you: the place is provisional until the race clock reaches your
+   * time (from then on nobody still out there can finish ahead) or everyone's home, then `settle`
+   * makes it final (the win, the countdown, the cheer) and the cool-down starts.
+   */
   private onFlag() {
     const me = this.me;
     const time = me.finished ?? this.raceT;
     if (me.bestLap && (!this.record.lap || me.bestLap < this.record.lap)) this.record.lap = me.bestLap;
-    // your place: everyone home before you (on time with penalties), and anyone still out there
-    // who'd be ahead on the water counts too only once they finish, so this is final
-    this.place = this.racers.filter((o) => o.finished !== null && o.finished <= time).length;
-    if (this.place === 1) this.record.wins++;
     if (!this.record.race || time < this.record.race) this.record.race = time;
     this.save();
     this.phase = 'done';
     this.phaseT = 0;
+    this.settled = false;
     this.marker.visible = false;
     this.paintGates(-1);
+    this.ctx.sfx.ding();
+    this.settle();
+    if (!this.settled) {
+      this.place = this.racers.filter((o) => o.finished !== null && o.finished <= time).length;
+      this.ctx.ui.countdown('🏁 Finished!');
+      this.toast(`Finished · ${fmt(time)} (incl. +${me.penalty} s) · waiting for the times…`);
+    }
+  }
+
+  /** The place once it can't change any more (see onFlag): the result, and the cool-down from here. */
+  private settle() {
+    const me = this.me;
+    const time = me.finished ?? this.raceT;
+    this.place = this.racers.filter((o) => o.finished !== null && o.finished <= time).length;
+    if (this.raceT < time && this.racers.some((o) => o.finished === null)) return;
+    this.settled = true;
+    this.phaseT = 0;
+    if (this.place === 1) this.record.wins++;
+    this.save();
     this.ctx.ui.countdown(this.place === 1 ? '🏁 WINNER!' : `🏁 ${this.place}${ordinal(this.place)}`);
     this.toast(`Finished ${this.place}${ordinal(this.place)} · ${fmt(time)}${me.penalty ? ` (incl. +${me.penalty} s)` : ''}`);
-    this.ctx.sfx.ding();
     this.ctx.sfx.cheer(this.place === 1 ? 1 : 0.5);
   }
 
@@ -868,7 +942,14 @@ export class JetSki implements Attraction {
     rig.lean += (c.roll * 0.7 - rig.lean) * Math.min(1, dt * 6);
     rig.rider.rotation.set(-0.08 - Math.min(0.2, Math.max(0, c.vy) * 0.03) + (c.air ? -0.1 : 0), c.steer * 0.12, rig.lean);
     rig.rider.position.y = SADDLE.y + (c.stunT > 0 ? -0.05 : 0) + (c.air ? 0.04 : 0);
-    rig.rider.visible = !(i === 0 && this.cam === 'pov' && this.active);
+    const pov = i === 0 && this.cam === 'pov' && this.active;
+    if (rig.body) {
+      // (in the rider's-eye view your own body is out of shot below the camera: not drawn at all)
+      rig.rider.visible = true;
+      const cam = this.ctx.camera.position;
+      const dist = Math.hypot(cam.x - c.x, cam.y - c.y, cam.z - c.z);
+      rig.body.update(dt, { steer: c.steer, throttle: Math.max(0, c.throttle), air: c.air, dist }, rig.root.visible && !pov);
+    } else rig.rider.visible = !pov;
   }
 
   /** The navigation lights follow their skis (bow pair, stern light). */
@@ -1012,6 +1093,11 @@ export class JetSki implements Attraction {
   /** Where the round is: idle (ghost laps), on the grid, racing, or past the flag. */
   get stage(): Phase {
     return this.phase;
+  }
+
+  /** Past the flag: the race ran to its end, and leaving now (Esc) is no early exit. */
+  get finished(): boolean {
+    return this.active && this.phase === 'done';
   }
 
   get yaw() {

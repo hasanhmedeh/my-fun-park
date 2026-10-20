@@ -9,7 +9,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { Ctx } from './context';
 import { Environment } from './environment';
 import { Input } from './input';
-import { DISTRICTS, FALCON_STATION, FOOTPRINTS, LAYOUT, PLAZAS, setPlotTitle, ZONES, type ZoneId } from './layout';
+import { DISTRICTS, FALCON_STATION, FOOTPRINTS, LAYOUT, PLAZAS, rideTitle, setPlotTitle, ZONES, type ZoneId } from './layout';
 import { NAME_COLORS, physicsWord } from './letters';
 import { PALETTE } from './textures';
 import { escapeHtml, UI } from './ui';
@@ -47,24 +47,24 @@ import { Ship } from './attractions/ship';
 import { Speedway } from './attractions/speedway';
 import { Trail } from './attractions/trail';
 import { AIRFIELDS } from '../aviation/airports';
-import { Traffic } from '../aviation/traffic';
-import { Airfield } from './airport/airfield';
-import { Airside, reservedStands } from './airport/airside';
-import { HomeTerminal } from './airport/terminal';
-import { Landside } from './airport/landside';
-import { SkyLink, type SkyLinkRide } from './airport/skylink';
-import { createA320, LIVERIES, warmA320 } from './airport/a320-model';
-import { PalmCay, PALM_CAY_WALK } from './island/island';
-import { IslandTerminal } from './island/island-terminal';
-import { JetSki } from './attractions/island/jetski';
-import { JETSKI_WALK } from './attractions/island/jetski-dock';
-import { Slides } from './attractions/island/slides';
-import { Cannons } from './attractions/island/cannons';
-import { Volley } from './attractions/island/volley';
-import { Travellers } from './crowd/travellers';
-import { Flight } from './attractions/flight';
-import { flightGround } from './flight/ground';
-import { PARK, canTravel, registerWalkAreas, ZONE_REGION } from './layout';
+// the airport, the A320neo and Palm Cay load behind the fair (flight/world-kit.ts): types only here
+import type { Traffic } from '../aviation/traffic';
+import type { Airfield } from './airport/airfield';
+import type { Airside } from './airport/airside';
+import type { HomeTerminal } from './airport/terminal';
+import type { Landside } from './airport/landside';
+import type { SkyLink, SkyLinkRide } from './airport/skylink';
+import type { PalmCay } from './island/island';
+import type { IslandTerminal } from './island/island-terminal';
+import type { JetSki } from './attractions/island/jetski';
+import type { Slides } from './attractions/island/slides';
+import type { Cannons } from './attractions/island/cannons';
+import type { Volley } from './attractions/island/volley';
+import type { Travellers } from './crowd/travellers';
+import type { Flight } from './attractions/flight';
+/** The airport and island code, loaded on its own (flight/world-kit.ts). */
+type WorldKit = typeof import('./flight/world-kit');
+import { PARK, canTravel, registerWalkAreas, REGION_INFO, ZONE_REGION } from './layout';
 import { regionAt, type Region } from './geo';
 import { FOOT_VIEW } from './minimap';
 import { boardListHtml, leaderboard, resetClock, resetIn, trailTime } from '../account/leaderboard';
@@ -126,6 +126,59 @@ type Mode =
 
 /** The SkyLink ride lasts about 80 s door to door; skipping it runs the rest of it in steps this long. */
 const SKYLINK_SKIP_DT = 0.1;
+
+/**
+ * cannon-es's sweep and prune, made to scale with the airport's and the island's colliders. The
+ * stock one skips a pair that can't collide (two static bodies, say) before it checks whether the
+ * sweep has passed the body, so behind a static body it walks the whole rest of the list: with the
+ * ~2,500 static colliders the fair, the terminals and Palm Cay have, that was ~3 M pairs a substep
+ * (≈30 ms a frame at the park entrance). Here the bound is checked first (the list is sorted on the
+ * same key the bound uses, the centre minus the bounding radius, so stopping there is exact), and
+ * the axis is the one the bodies spread along most (z: the fair, the airport and the island lie
+ * north to south), picked once the world is built (Game.build calls autoDetectAxis).
+ */
+class SweepBroadphase extends CANNON.SAPBroadphase {
+  override collisionPairs(_world: CANNON.World, p1: CANNON.Body[], p2: CANNON.Body[]) {
+    const list = this.axisList;
+    const ax = this.axisIndex;
+    const n = list.length;
+    if (this.dirty) {
+      this.sortList();
+      this.dirty = false;
+    }
+    for (let i = 0; i !== n; i++) {
+      const bi = list[i];
+      const hi = SweepBroadphase.low(bi, ax) + 2 * bi.boundingRadius;
+      for (let j = i + 1; j < n; j++) {
+        const bj = list[j];
+        if (SweepBroadphase.low(bj, ax) >= hi) break;
+        if (this.needBroadphaseCollision(bi, bj)) this.intersectionTest(bi, bj, p1, p2);
+      }
+    }
+  }
+
+  override sortList() {
+    const list = this.axisList;
+    const ax = this.axisIndex;
+    for (const b of list) if (b.aabbNeedsUpdate) b.updateAABB();
+    // insertion sort: the order barely changes from one step to the next
+    for (let i = 1; i < list.length; i++) {
+      const b = list[i];
+      const k = SweepBroadphase.low(b, ax);
+      let j = i - 1;
+      while (j >= 0 && SweepBroadphase.low(list[j], ax) > k) {
+        list[j + 1] = list[j];
+        j--;
+      }
+      list[j + 1] = b;
+    }
+  }
+
+  /** Where a body starts along the axis (its centre minus its bounding radius, as checkBounds reads it). */
+  private static low(b: CANNON.Body, ax: 0 | 1 | 2) {
+    return (ax === 0 ? b.position.x : ax === 1 ? b.position.y : b.position.z) - b.boundingRadius;
+  }
+}
 /** Beyond this far from the fair (the camera, in flight) the park's own scenery isn't drawn. */
 const FAIR_DRAW_M = 14000;
 /** The player's collision sphere sits this high over the floor (player.ts BODY_R). */
@@ -144,6 +197,43 @@ function zoneAction(id: AttractionId, zone: ZoneId = id) {
   if (!session.parkOpen) return '🚧 The park is closed';
   if (closed) return '🚧 Under maintenance';
   return `${session.user ? z.action : 'Sign up for tickets'} · ${price}`;
+}
+
+/**
+ * The world-space bounds of a group's fixed scenery on its own landmass, for culling the group
+ * wholesale (Game.cullAirportGroups), padded by 60 m. Skinned people are left out (they walk about,
+ * or are parked hidden at the origin; their bind-pose boxes say nothing), an instanced pool counts
+ * only its live instances (a zero-scaled one collapses to the origin), and
+ * a box that reaches off the group's landmass (a rider parked at the origin, a Points cloud at 0)
+ * is dropped, so one stray child can't stretch Palm Cay's box 40 km north over the coast.
+ */
+function staticBounds(group: THREE.Object3D, region: Region): THREE.Box3 {
+  const box = new THREE.Box3();
+  const b = new THREE.Box3();
+  const one = new THREE.Box3();
+  const m4 = new THREE.Matrix4();
+  const onLand = (bb: THREE.Box3) => !bb.isEmpty() && (region === 'island' ? bb.min.z > 20000 : bb.max.z < 20000);
+  group.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    const geo = mesh.geometry as THREE.BufferGeometry | undefined;
+    if (!geo || !(mesh.isMesh || (o as THREE.Points).isPoints || (o as THREE.Line).isLine)) return;
+    if ((o as THREE.SkinnedMesh).isSkinnedMesh) return;
+    if (!geo.boundingBox) geo.computeBoundingBox();
+    if (!geo.boundingBox || geo.boundingBox.isEmpty()) return;
+    const im = o as THREE.InstancedMesh;
+    if (im.isInstancedMesh) {
+      for (let i = 0; i < im.count; i++) {
+        im.getMatrixAt(i, m4);
+        if (Math.abs(m4.determinant()) < 1e-9) continue;
+        one.copy(geo.boundingBox).applyMatrix4(m4.premultiply(im.matrixWorld));
+        if (onLand(one)) box.union(one);
+      }
+      return;
+    }
+    b.copy(geo.boundingBox).applyMatrix4(o.matrixWorld);
+    if (onLand(b)) box.union(b);
+  });
+  return box.isEmpty() ? box : box.expandByScalar(60);
 }
 
 /** Something with a round to report (see account/stats.ts). */
@@ -194,6 +284,8 @@ export class Game {
   private plotRound: { plot: PlotId; creation: string; name: string; coaster: Coaster } | null = null;
   /** The train ran out of speed this round: how far it got (metres), for the results. */
   private stalledAt: number | null = null;
+  /** The flight just flown ended in a crash or a ditching (its report closed the round, not completed). */
+  private flightFailed = false;
   /** The Coaster Workshop's Builder's Yard (drawn on its own layer) and its sheet. */
   private yard!: Yard;
   private workshop: Builder | null = null;
@@ -270,6 +362,12 @@ export class Game {
   private islandTerminal!: IslandTerminal;
   private travellers: Travellers | null = null;
   private flight!: Flight;
+  /** Palm Cay's scenery, its terminal and its four games, gathered at the origin (shown with the island). */
+  private readonly islandRoot = new THREE.Group();
+  /** The island games' touch camera button (phones only). */
+  private islandCamBtn: HTMLButtonElement | null = null;
+  /** The airport and island code (flight/world-kit.ts), once its chunk is in: from the airport's loading step on. */
+  private kit!: WorldKit;
   private jetski!: JetSki;
   private slides!: Slides;
   private cannons!: Cannons;
@@ -296,6 +394,10 @@ export class Game {
     const loader = new GLTFLoader();
     const peopleModels = Promise.all([loader.loadAsync(GUESTS_URL), loader.loadAsync(GUEST_ANIMS_URL)]);
     const dogModels = Promise.all([loader.loadAsync(DOG_URLS.shiba), loader.loadAsync(DOG_URLS.husky)]).catch(() => null);
+    // the airport's, the aircraft's and Palm Cay's code: its own chunk, downloading while the fair builds
+    const worldKit = import('./flight/world-kit');
+    // (a failure surfaces at the airport's step, which awaits it: not as an unhandled rejection before)
+    worldKit.catch(() => undefined);
     const steps: [number, () => void | Promise<void>][] = [];
     const step = (w: number, fn: () => void | Promise<void>) => steps.push([w, fn]);
 
@@ -468,11 +570,14 @@ export class Game {
       this.fairObjects = this.scene.children.slice(fairFrom);
     });
     // Funfair International on the south coast, the SkyLink out to it, and Palm Cay 40 km south
-    step(3, () => {
+    step(3, async () => {
+      this.kit = await worldKit;
+      const { Airfield } = this.kit;
       this.airfields = { home: new Airfield(this.ctx, AIRFIELDS.home), island: new Airfield(this.ctx, AIRFIELDS.island) };
       this.scene.add(this.airfields.home.group, this.airfields.island.group);
     });
     step(3, () => {
+      const { HomeTerminal, Landside, SkyLink } = this.kit;
       this.homeTerminal = new HomeTerminal(this.ctx);
       this.landside = new Landside(this.ctx);
       this.skylink = new SkyLink(this.ctx);
@@ -481,6 +586,7 @@ export class Game {
       registerWalkAreas('home', this.skylink.walk, 'skylink');
     });
     step(2, () => {
+      const { Airside, reservedStands } = this.kit;
       this.airside = {
         home: new Airside(this.ctx, AIRFIELDS.home, { reserved: reservedStands('home') }),
         island: new Airside(this.ctx, AIRFIELDS.island, { reserved: reservedStands('island') }),
@@ -491,6 +597,7 @@ export class Game {
     });
     step(2, () => {
       // the AI fleet's geometry and paint, built now rather than on the first arrival
+      const { Traffic, createA320, LIVERIES, warmA320 } = this.kit;
       warmA320(['ai', 'parked'], Object.values(LIVERIES));
       this.traffic = new Traffic(this.ctx, {
         createPlane: (o) => createA320(o),
@@ -503,7 +610,11 @@ export class Game {
       });
       this.scene.add(this.traffic.group);
     });
+    // (Palm Cay, its terminal and its games: gathered under islandRoot once built)
+    let isleFrom = 0;
     step(3, () => {
+      isleFrom = this.scene.children.length;
+      const { PalmCay, IslandTerminal, PALM_CAY_WALK } = this.kit;
       this.palmCay = new PalmCay(this.ctx);
       this.islandTerminal = new IslandTerminal(this.ctx);
       this.scene.add(this.palmCay.group, this.islandTerminal.group);
@@ -512,6 +623,7 @@ export class Game {
     });
     step(3, () => {
       // Palm Cay's four games (each adds itself to the scene)
+      const { JetSki, Slides, Cannons, Volley, JETSKI_WALK } = this.kit;
       this.jetski = new JetSki(this.ctx);
       this.slides = new Slides(this.ctx);
       this.cannons = new Cannons(this.ctx);
@@ -520,6 +632,21 @@ export class Game {
       registerWalkAreas('island', JETSKI_WALK, 'jetski');
       // until the visitor gets there, the island sleeps
       for (const g of [this.jetski, this.slides, this.cannons, this.volley]) g.setAwake(false);
+      // everything the island added straight to the scene (the games' docks, courts, forts, ships,
+      // wakes, slides…) under one group at the origin, so the mainland can switch it off in one go
+      // (updateAirports): world transforms don't change, and nothing here takes itself out of the scene
+      const isle = this.scene.children.slice(isleFrom);
+      this.islandRoot.add(...isle);
+      // but no lights: islandRoot is switched on and off, and a change in the scene's light count
+      // recompiles every lit shader in view (a long freeze at the first departure). The cannons'
+      // flash light stays in the scene, always counted (at intensity 0 between shots), as it was
+      // built to; islandRoot sits at the origin, so its world position doesn't change.
+      const lights: THREE.Object3D[] = [];
+      this.islandRoot.traverse((o) => {
+        if ((o as THREE.Light).isLight) lights.push(o);
+      });
+      for (const l of lights) this.scene.attach(l);
+      this.scene.add(this.islandRoot);
     });
     step(1, () => {
       // the districts' signs and the fingerposts (once everything they keep clear of is standing)
@@ -534,6 +661,7 @@ export class Game {
       this.booth.setVendor(people.create(VENDOR_LOOK));
       this.wardrobe = new Wardrobe(this.player.rig, this.scene);
       // the airport's and the island's travellers (they map the colliders, so everything stands by now)
+      const { Travellers, Flight, flightGround } = this.kit;
       this.travellers = new Travellers(this.ctx, people, {
         home: this.homeTerminal,
         island: this.islandTerminal,
@@ -542,6 +670,7 @@ export class Game {
         tier: this.quality.tier,
       });
       this.volley.setPeople(people, this.player.rig.look);
+      this.jetski.setPeople(people, this.player.rig.look);
       // the flight, with the world's ground under it: the terrain and the sea, the airfields' pavement
       this.flight = new Flight(this.ctx, {
         env: this.env,
@@ -555,6 +684,9 @@ export class Game {
         ground: flightGround({ home: (x, z) => this.airfields.home.surfaceAt(x, z), island: (x, z) => this.airfields.island.surfaceAt(x, z) }),
       });
       this.updatables.push(this.flight);
+      // both terminals' boards list Funfair Air's day from the booking itself, at the card's time
+      this.paintFlightBoards();
+      this.flight.onTimeOfDay = () => this.paintFlightBoards();
       this.wire();
       // the crowd: queues, riders, families, kids and dogs (fewer on modest hardware)
       const dogs = await dogModels;
@@ -586,6 +718,8 @@ export class Game {
       onProgress(done / total);
       await nextFrame();
     }
+    // every collider is in: sweep along the axis they spread along most (SweepBroadphase)
+    (this.world.broadphase as SweepBroadphase).autoDetectAxis();
     this.timer.connect(document);
     this.timer.reset();
     this.setupDebug();
@@ -646,7 +780,12 @@ export class Game {
   private setupPhysics() {
     const w = this.world;
     w.gravity.set(0, -20, 0);
-    w.broadphase = new CANNON.SAPBroadphase(w);
+    w.broadphase = new SweepBroadphase(w);
+    // which pairs touched this step and the last: a sparse map, not cannon's default N²/2 array,
+    // which with the airport's and the island's ~2,500 colliders is 3.3 M entries cleared every
+    // substep (≈40 ms a frame in the park). The two have the same interface.
+    w.collisionMatrix = new CANNON.ObjectCollisionMatrix() as unknown as CANNON.ArrayCollisionMatrix;
+    w.collisionMatrixPrevious = new CANNON.ObjectCollisionMatrix() as unknown as CANNON.ArrayCollisionMatrix;
     w.allowSleep = true;
     (w.solver as CANNON.GSSolver).iterations = 8;
     const ground = new CANNON.Material('ground');
@@ -688,7 +827,8 @@ export class Game {
     this.input.on('escape', () => this.onEscape());
     this.input.on('info', () => this.ui.toggleInfo());
     this.input.on('reset', () => {
-      if (this.mode === 'drive') this.teleport('entrance');
+      // (back to this landmass's own front door: the entrance at the fair, the arrivals hall on Palm Cay)
+      if (this.mode === 'drive') this.teleport(this.region === 'island' ? REGION_INFO.island.arrival : 'entrance');
       else if (this.mode === 'race') this.speedway.rescue();
       else if (this.mode === 'trail') this.trail.rescue();
       else if (this.mode === 'jetski') this.jetski.rescue();
@@ -705,6 +845,26 @@ export class Game {
       else if (this.mode !== 'drone' && this.mode !== 'race' && this.mode !== 'trail' && this.mode !== 'jetski' && this.mode !== 'flight') this.onAction();
     });
     this.input.on('kick', () => this.mode === 'drive' && this.player.kick());
+    // on touch, the island games' camera (C on a keyboard): their E is the game's own action
+    if (this.mobile) {
+      const cam = document.createElement('button');
+      cam.type = 'button';
+      cam.className = 'isl-cam-btn';
+      cam.textContent = '🎥';
+      cam.setAttribute('aria-label', 'Change the camera');
+      cam.hidden = true;
+      cam.addEventListener('pointerdown', (e) => {
+        // (not through to the canvas, where the cannons and the volley aim and fire)
+        e.preventDefault();
+        e.stopPropagation();
+        if (this.mode === 'jetski') this.jetski.cycleCamera();
+        else if (this.mode === 'slides') this.slides.cycleCamera();
+        else if (this.mode === 'cannons') this.cannons.cycleCamera();
+        else if (this.mode === 'volley') this.volley.cycleCamera();
+      });
+      document.getElementById('touch')!.append(cam);
+      this.islandCamBtn = cam;
+    }
     this.input.on('camera', () => {
       if (this.mode === 'coaster') this.ride.cycleCamera();
       else if (this.mode === 'wheel') this.wheel.cycleCamera();
@@ -753,6 +913,8 @@ export class Game {
       const ride = isAttraction(b.dataset.ride) ? b.dataset.ride : null;
       if (b.dataset.auth) void this.signIn(b.dataset.auth as AuthMode, ride);
       else if (b.dataset.goto === 'booth') this.goToBooth();
+      else if (b.dataset.goto === 'mainland') this.returnToMainland();
+      else if (b.dataset.goto === 'desk') this.goToFlightDesk();
       else if (b.dataset.goto === 'ideas') this.goToIdeas();
       else if (b.hasAttribute('data-stop')) this.askToLeave();
       else if (ride) this.board(ride);
@@ -769,7 +931,7 @@ export class Game {
       if (!round || this.lockedOut) return;
       this.round = null;
       // a trail run already over the line ran to its end (its time still counts)
-      const done = (round.ride === 'trail' && this.trail.crossedLine) || (round.ride === 'flight' && this.flight.arrived);
+      const done = (round.ride === 'trail' && this.trail.crossedLine) || this.roundRanToEnd();
       session.finishOnExit(round.id, done, this.measuredStats(round.ride));
     });
     // the sign-up form, the results screen and "leave early?" have the keyboard while they're open
@@ -883,7 +1045,11 @@ export class Game {
     for (const a of [this.stack, this.falcon, this.rocket, this.wheel, this.flip, this.ship, this.speedway, this.trail, this.striker, this.crates, this.ducks, this.jetski, this.slides, this.cannons, this.volley])
       a.onComplete = () => this.leave(true);
     // a flight ends gate to gate (completed), or after a failure's aftermath and its report (not)
-    this.flight.onComplete = () => this.leave(this.flight.completed);
+    this.flight.onComplete = () => {
+      // the report closes the round: a crash or a ditching isn't a completed flight
+      this.flightFailed = !this.flight.completed;
+      this.leave(this.flight.completed);
+    };
     // the Rally Trail's leaderboard: on its boards and its HUD, and on its card while that's open
     leaderboard.onChange((board) => {
       this.trail.setBoard(board);
@@ -982,7 +1148,9 @@ export class Game {
     }. Leftover tickets carry over.</p><p>The park is laid out like a wheel: the carousel on the Hub in the middle, four avenues out from it, and the Promenade looping round past every district. Signposts point the way, and the ${
       this.mobile ? 'minimap opens' : '<kbd>M</kbd> key opens'
     } the park map, where you can fast travel.</p>${districts}${
-      user ? '<p class="panel-actions"><button class="btn btn-primary btn-small" type="button" data-goto="booth">Take me to the Ticket Booth 🎟️</button></p>' : accountButtons()
+      user
+        ? `<p class="panel-actions"><button class="btn btn-primary btn-small" type="button" data-goto="booth">${this.awayFromBooth ? 'Get tickets at the fair ✈️' : 'Take me to the Ticket Booth 🎟️'}</button></p>`
+        : accountButtons()
     }<p>${this.mobile ? 'Use the joystick to walk (push it all the way to run) and the <kbd>E</kbd> button to play.' : 'Walk with <kbd>WASD</kbd> or arrows, hold <kbd>Shift</kbd> to run, <kbd>Space</kbd> to roll, <kbd>F</kbd> to kick, <kbd>H</kbd> to wave and <kbd>E</kbd> to play. Try kicking the big letters over!'}</p><p class="sub">Open this again any time with the ℹ️ button (top right) or <kbd>I</kbd>.</p>`;
   }
 
@@ -1142,7 +1310,7 @@ export class Game {
         // the visitor steps up to the counter and takes the gun (the camera is their eyes)
         this.player.interact();
         const spot = this.ducks.standSpot;
-        this.player.reset(spot.x, spot.z, spot.heading);
+        this.placeVisitor(spot.x, spot.z, spot.heading);
         this.mode = 'ducks';
         this.player.enabled = false;
         this.player.group.visible = false;
@@ -1177,12 +1345,13 @@ export class Game {
         // the visitor steps up behind the guns (the camera is their eyes)
         this.player.interact();
         const spot = this.cannons.standSpot;
-        this.player.reset(spot.x, spot.z, spot.heading);
+        this.placeVisitor(spot.x, spot.z, spot.heading);
         this.mode = 'cannons';
         this.player.enabled = false;
         this.player.group.visible = false;
         this.ui.rideExit(true);
         this.ui.prompt('', '', '');
+        this.ui.cinematic(true);
         this.cannons.start();
         this.cannonsBadge = '';
         this.panelZone = 'cannons';
@@ -1193,12 +1362,14 @@ export class Game {
         // the visitor takes the server's spot (the game draws them as its own player)
         this.player.interact();
         const spot = this.volley.standSpot;
-        this.player.reset(spot.x, spot.z, spot.heading);
+        this.placeVisitor(spot.x, spot.z, spot.heading);
         this.mode = 'volley';
         this.player.enabled = false;
         this.player.group.visible = false;
         this.ui.rideExit(true);
         this.ui.prompt('', '', '');
+        // (the game's own HUD: the walking keys and the minimap step aside)
+        this.ui.cinematic(true);
         this.volley.start();
         this.panelZone = 'volley';
         break;
@@ -1271,10 +1442,11 @@ export class Game {
     // closed since we last looked (the session has noted it)
     if (err instanceof ParkClosedError) return this.showClosed(ride);
     if (err instanceof RideClosedError) return this.showMaintenance(ride);
-    const z = ZONES[ride];
+    const zone = this.deskZone(ride);
+    const z = ZONES[zone];
     const closed = !(err instanceof ApiError) || err.unavailable;
     this.sfx.beep();
-    this.panelZone = ride;
+    this.panelZone = zone;
     this.ui.panel(
       `ticket-error-${Date.now()}`,
       closed
@@ -1286,14 +1458,15 @@ export class Game {
 
   /** The whole park is closed: the sign on the gate. */
   private showClosed(ride: AttractionId) {
-    const z = ZONES[ride];
+    const zone = this.deskZone(ride);
+    const z = ZONES[zone];
     this.player.interact();
     this.sfx.beep();
-    this.panelZone = ride;
+    this.panelZone = zone;
     const sign = session.park?.message ?? "The park is closed right now. Come back soon: you're welcome to look around meanwhile.";
     this.ui.panel(
       `closed-${ride}-${Date.now()}`,
-      `<p class="eyebrow">${escapeHtml(z.title)} · Park closed</p><h2>🚧 The park is closed</h2><p>${escapeHtml(sign)}</p><p class="sub">No tickets are spent while the park is closed.</p>`,
+      `<p class="eyebrow">${escapeHtml(z.title)} · Park closed</p><h2>🚧 The park is closed</h2><p>${escapeHtml(sign)}</p><p class="sub">No tickets are spent while the park is closed.</p>${this.strandedHtml(zone)}`,
       { accent: PALETTE.candy },
     );
   }
@@ -1340,7 +1513,8 @@ export class Game {
     // open again already, or the server's away: the round is closed as usual, without the results
     if (refunded === null) void session.finish(roundId, false, {}).catch(() => {});
     if (!this.inFair || this.mode !== 'drive' || this.round || this.boarding) return;
-    const z = ZONES[ride];
+    const zone = this.deskZone(ride);
+    const z = ZONES[zone];
     const parkClosed = !session.parkOpen;
     const back = refunded ? (refunded === 1 ? 'its ticket is back in your wallet' : `its ${refunded} tickets are back in your wallet`) : 'it has been ended';
     // a member's coaster taken out of Creators' Valley (or swapped for a newer version) under the rider
@@ -1348,7 +1522,7 @@ export class Game {
       const newer = session.creationOn(plotNumber(ride));
       const name = escapeHtml(coaster);
       this.sfx.beep();
-      this.panelZone = ride;
+      this.panelZone = zone;
       this.ui.panel(
         `taken-${ride}-${Date.now()}`,
         `<p class="eyebrow">${name} · Creators' Valley</p><h2>🚧 ${name} just left the park</h2><p>${
@@ -1364,24 +1538,25 @@ export class Game {
       ? (session.park?.message ?? "The park is closed right now. Come back soon: you're welcome to look around meanwhile.")
       : (session.maintenance(ride) ?? `Our crew is giving ${z.title} some care. It will be back soon: try another attraction meanwhile!`);
     this.sfx.beep();
-    this.panelZone = ride;
+    this.panelZone = zone;
     this.ui.panel(
       `${parkClosed ? 'closed' : 'maintenance'}-${ride}-${Date.now()}`,
-      `<p class="eyebrow">${escapeHtml(z.title)} · ${parkClosed ? 'Park closed' : 'Under maintenance'}</p><h2>🚧 ${parkClosed ? 'The park just closed' : `${escapeHtml(z.title)} just closed`}</h2><p>${escapeHtml(sign)}</p><p class="sub">Your round was stopped, and ${back}.</p>`,
+      `<p class="eyebrow">${escapeHtml(z.title)} · ${parkClosed ? 'Park closed' : 'Under maintenance'}</p><h2>🚧 ${parkClosed ? 'The park just closed' : `${escapeHtml(z.title)} just closed`}</h2><p>${escapeHtml(sign)}</p><p class="sub">Your round was stopped, and ${back}.</p>${this.strandedHtml(zone)}`,
       { accent: PALETTE.candy },
     );
   }
 
   /** The attraction is closed for maintenance: its sign. */
   private showMaintenance(ride: AttractionId) {
-    const z = ZONES[ride];
+    const zone = this.deskZone(ride);
+    const z = ZONES[zone];
     this.player.interact();
     this.sfx.beep();
-    this.panelZone = ride;
+    this.panelZone = zone;
     const sign = session.maintenance(ride) ?? `Our crew is giving ${z.title} some care. It will be back soon: try another attraction meanwhile!`;
     this.ui.panel(
       `maintenance-${ride}-${Date.now()}`,
-      `<p class="eyebrow">${escapeHtml(z.title)} · Under maintenance</p><h2>🚧 Under maintenance</h2><p>${escapeHtml(sign)}</p><p class="sub">No tickets were spent.</p>`,
+      `<p class="eyebrow">${escapeHtml(z.title)} · Under maintenance</p><h2>🚧 Under maintenance</h2><p>${escapeHtml(sign)}</p><p class="sub">No tickets were spent.</p>${this.strandedHtml(zone)}`,
       { accent: PALETTE.candy },
     );
   }
@@ -1405,7 +1580,7 @@ export class Game {
     // a maintenance or closed sign that's open while the gate reopens is stale
     const key = this.ui.panelOpenKey;
     if (this.mode === 'drive' && (key.startsWith('maintenance-') || key.startsWith('closed-'))) {
-      const ride = this.panelZone;
+      const ride = this.panelZone === 'flightBack' ? 'flight' : this.panelZone;
       if (ride && isAttraction(ride) && open && session.maintenance(ride) === undefined) {
         this.ui.hidePanel();
         this.panelZone = null;
@@ -1424,33 +1599,44 @@ export class Game {
     }
   }
 
+  /** The zone of the desk the visitor is at for this ride: the flight is sold at Gate 3 and at the Palm Cay desk. */
+  private deskZone(ride: AttractionId): ZoneId {
+    return ride === 'flight' && this.region === 'island' ? 'flightBack' : ride;
+  }
+
   /** The members-only card a guest gets at an attraction. */
   private showGate(ride: AttractionId, expired = false) {
-    const z = ZONES[ride];
+    const zone = this.deskZone(ride);
+    const z = ZONES[zone];
     this.player.interact();
     this.sfx.beep();
-    this.panelZone = ride;
+    this.panelZone = zone;
     this.ui.panel(
       `gate-${ride}-${Date.now()}`,
       `<p class="eyebrow">${escapeHtml(z.title)} · ${ticketsText(session.cost(ride))}</p><h2>🎟️ Members only</h2><p>${
         expired ? "Your session ran out, so you're back to being a guest. " : ''
-      }Every ride and game costs tickets, and tickets come with a free account: pick up ${packText()}. Visiting the booth is always free.</p>${accountButtons(ride)}`,
+      }Every ride and game costs tickets, and tickets come with a free account: pick up ${packText()}. Visiting the booth is always free.</p>${accountButtons(ride)}${this.strandedHtml(zone)}`,
       { accent: PALETTE.mustard },
     );
   }
 
   /** A member without enough tickets for this round: how many they're short, and the way to the booth. */
   private showShort(ride: AttractionId, cost: number, balance: number) {
-    const z = ZONES[ride];
+    const zone = this.deskZone(ride);
+    const z = ZONES[zone];
     this.player.interact();
     this.sfx.beep();
-    this.panelZone = ride;
+    this.panelZone = zone;
     const wait = session.msUntilPurchase();
     this.ui.panel(
       `short-${ride}-${Date.now()}`,
       `<p class="eyebrow">${escapeHtml(z.title)} · ${ticketsText(cost)}</p><h2>Not enough tickets</h2><p>${escapeHtml(z.title)} costs <strong>${ticketsText(cost)}</strong> a round, and you have <strong>${balance}</strong>.</p>${
         wait === null ? '' : waitHtml(wait)
-      }<p class="panel-actions"><button class="btn btn-primary btn-small" type="button" data-goto="booth">Go to the Ticket Booth 🎟️</button></p>`,
+      }<p class="panel-actions">${
+        zone === 'flightBack'
+          ? this.returnHomeButton()
+          : `<button class="btn btn-primary btn-small" type="button" data-goto="booth">${this.awayFromBooth ? 'Get tickets at the fair ✈️' : 'Go to the Ticket Booth 🎟️'}</button>`
+      }</p>`,
       { accent: PALETTE.mustard },
     );
     // the countdown needs the wallet: it fills in once it's here
@@ -1578,7 +1764,7 @@ export class Game {
     this.camPos.copy(this.camera.position);
     this.fade(() => {
       const spot = this.shop!.counterSpot;
-      this.player.reset(spot.x, spot.z, spot.heading);
+      this.placeVisitor(spot.x, spot.z, spot.heading);
       this.mode = 'shop';
       document.body.classList.add('is-shopping');
       this.shop!.open();
@@ -1601,9 +1787,92 @@ export class Game {
   /** Takes the visitor to the Ticket Booth and opens its counter. */
   private goToBooth() {
     if (this.mode !== 'drive' || this.round) return;
+    // the booth is at the fair: from Palm Cay the way there is the flight home (or the free seat)
+    if (this.awayFromBooth) return this.showBoothAway();
     this.ui.hidePanel();
     this.panelZone = null;
     this.teleport('booth', () => this.enterShop());
+  }
+
+  /** The visitor stands across the sea from the Ticket Booth (on Palm Cay). */
+  private get awayFromBooth() {
+    return !canTravel(regionAt(this.player.position.x, this.player.position.z), 'booth');
+  }
+
+  /** Whether this member can book the flight home from Palm Cay right now (tickets, gates, desk). */
+  private canFlyHome() {
+    const balance = session.balance;
+    return !!session.user && (session.parkOpen || session.isStaff) && (session.maintenance('flight') === undefined || session.isStaff) && (balance === null || balance >= session.cost('flight'));
+  }
+
+  /** On the Palm Cay desk's cards that say the flight home can't be booked: the free seat home. */
+  private strandedHtml(zone: ZoneId) {
+    return zone === 'flightBack' ? `<p class="panel-actions">${this.returnHomeButton()}</p>` : '';
+  }
+
+  /** The free way back to the fair from Palm Cay, for when the flight home can't be booked (the button). */
+  private returnHomeButton() {
+    return '<button class="btn btn-outline btn-small" type="button" data-goto="mainland">Free seat home on the staff shuttle 🛩️</button>';
+  }
+
+  /** On Palm Cay, the way to more tickets: they're sold at the fair, so it's the flight home (or the free shuttle seat when that can't be booked). */
+  private showBoothAway() {
+    this.player.interact();
+    this.sfx.beep();
+    this.panelZone = this.zones.active;
+    const fly = this.canFlyHome();
+    this.ui.panel(
+      `booth-away-${Date.now()}`,
+      `<p class="eyebrow">Ticket Booth · The Funfair</p><h2>The Ticket Booth is back at the fair 🎟️</h2><p>Tickets are handed out at the booth by the fair's gate, about 40 km north across the sea. ${
+        fly ? "Fly home from Palm Cay's gate desk (Funfair Air FA102), then take the SkyLink to the fair." : "You can't book the flight home right now, so the staff shuttle has a free seat for you: it lands at Funfair International, a SkyLink ride from the fair."
+      }</p><p class="panel-actions">${
+        fly ? '<button class="btn btn-primary btn-small" type="button" data-goto="desk">Go to the Palm Cay gate desk ✈️</button>' : this.returnHomeButton()
+      }</p>`,
+      { accent: PALETTE.mustard },
+    );
+  }
+
+  /** Over to this landmass's gate desk, with its flight card open. */
+  private goToFlightDesk() {
+    if (this.mode !== 'drive' || this.round) return;
+    const desk = this.deskZone('flight');
+    this.ui.hidePanel();
+    this.panelZone = null;
+    if (this.zones.active === desk) this.showZonePanel(desk);
+    else this.teleport(desk, () => this.showZonePanel(desk));
+  }
+
+  /**
+   * The free way off Palm Cay (no round, no tickets): the staff shuttle sets the visitor down in
+   * Funfair International's arrivals hall, behind the fade, so nobody is stranded on the island
+   * without the tickets for the flight home (or while it's closed). The region switch (which games
+   * are awake, the scenery shown) follows by itself on the next frame, as after a landing.
+   */
+  private returnToMainland() {
+    if (this.mode !== 'drive' || this.round || this.boarding || this.region !== 'island') return;
+    this.ui.hidePanel();
+    this.panelZone = null;
+    const z = ZONES[REGION_INFO.home.arrival];
+    this.fade(() => {
+      this.placeVisitor(z.x, z.z, z.heading, z.y ?? 0);
+      this.camYaw = z.heading;
+      this.camPitch = 0.2;
+      this.updateDriveCamera(1, true);
+      this.sfx.chime();
+    });
+  }
+
+  /** A place across the sea from the visitor: you fly there, from this side's gate desk. */
+  private showAcrossSea(id: ZoneId) {
+    this.player.interact();
+    this.sfx.beep();
+    this.panelZone = this.zones.active;
+    const there = REGION_INFO[ZONE_REGION[id]].name;
+    this.ui.panel(
+      `across-${id}-${Date.now()}`,
+      `<p class="eyebrow">${escapeHtml(ZONES[id].title)} · ${escapeHtml(there)}</p><h2>That's across the sea ✈️</h2><p>${escapeHtml(ZONES[id].title)} is on ${escapeHtml(there)}, and there's no walking over the water: Funfair Air flies between the two from the gate desks.</p><p class="panel-actions"><button class="btn btn-primary btn-small" type="button" data-goto="desk">Go to the gate desk ✈️</button></p>`,
+      { accent: PALETTE.mustard },
+    );
   }
 
   /**
@@ -1621,7 +1890,7 @@ export class Game {
     this.camPos.copy(this.camera.position);
     this.fade(() => {
       const spot = this.ideas!.standSpot;
-      this.player.reset(spot.x, spot.z, spot.heading);
+      this.placeVisitor(spot.x, spot.z, spot.heading);
       this.mode = 'ideas';
       document.body.classList.add('is-shopping');
       this.ideas!.open();
@@ -1696,7 +1965,7 @@ export class Game {
       this.camera.layers.set(0);
       document.body.classList.remove('is-shopping', 'is-workshop');
       const z = ZONES.workshop;
-      this.player.reset(z.x, z.z, z.heading);
+      this.placeVisitor(z.x, z.z, z.heading);
       this.player.group.visible = true;
       this.player.enabled = this.inFair;
       this.camYaw = z.heading; // behind the visitor, facing the kiosk
@@ -1806,7 +2075,7 @@ export class Game {
     document.body.classList.remove('is-shopping');
     const back = () => {
       this.mode = 'drive';
-      this.player.reset(spot.x, spot.z, spot.heading);
+      this.placeVisitor(spot.x, spot.z, spot.heading);
       this.player.group.visible = true;
       this.player.enabled = this.inFair;
       this.camYaw = spot.heading; // behind the visitor, looking where they look
@@ -1896,10 +2165,10 @@ export class Game {
     if (this.mode === 'ideas') return this.leaveIdeas();
     if (this.mode === 'museum') return this.leaveMuseum();
     if (this.mode === 'workshop') return this.workshop?.escape();
-    // past the line already: the run's done, so this is no early exit
-    if (this.mode === 'trail' && this.trail.finished) return this.leave(true);
-    // on the ground at the far gate: the flight's done, Esc just deplanes
-    if (this.mode === 'flight' && this.flight.arrived) return this.leave(true);
+    // past the line, at the far gate, or in an island game's last look: the round's done, so this is
+    // no early exit (and a crash's aftermath or report just closes the lost flight)
+    if (this.roundRanToEnd()) return this.leave(true);
+    if (this.flightLost()) return;
     if (this.mode === 'skylink') return this.skipSkyLink();
     if (this.mode !== 'drive' || this.round?.ride === 'crates') return this.askToLeave();
     if (this.zones.active === 'crates') this.cratesDismissed = true;
@@ -1910,13 +2179,40 @@ export class Game {
 
   /** Esc, the exit button or "Stop the round" mid-round: its tickets aren't given back, so the visitor is asked first. */
   private askToLeave() {
+    if (this.roundRanToEnd()) return this.leave(true);
+    if (this.flightLost()) return;
     const round = this.round;
     // nothing to lose (no round, or one already on its way out): straight out as before
     if (!round || this.leaving || this.lockedOut) return this.leave(false);
     if (leaveEarly.isOpen) return;
-    void leaveEarly.ask(ZONES[round.ride].title, round.tickets, isGame(round.ride)).then((go) => {
+    void leaveEarly.ask(rideTitle(round.ride), round.tickets, isGame(round.ride)).then((go) => {
       if (go && this.round === round) this.leave(false);
     });
+  }
+
+  /**
+   * The round in progress already ran to its end, and is only finishing up: a trail run past the
+   * line, a flight on the ground at the far gate, the jet-ski past the flag, a slide's splashdown,
+   * the cannons' or the volley's last look. Leaving now (Esc, the exit button, the tab closing)
+   * counts as completed.
+   */
+  private roundRanToEnd() {
+    return (
+      (this.mode === 'trail' && this.trail.finished) ||
+      (this.mode === 'flight' && this.flight.arrived) ||
+      (this.mode === 'jetski' && this.jetski.finished) ||
+      (this.mode === 'slides' && this.slides.finished) ||
+      (this.mode === 'cannons' && this.cannons.finished) ||
+      (this.mode === 'volley' && this.volley.finished)
+    );
+  }
+
+  /** In a crash's or a ditching's aftermath (or its report): the flight is lost, so leaving closes it as such, without asking. */
+  private flightLost() {
+    if (this.mode !== 'flight' || !this.flight.failed) return false;
+    this.flightFailed = true;
+    this.leave(false);
+    return true;
   }
 
   /**
@@ -1986,11 +2282,16 @@ export class Game {
       this.ui.score(null);
     }
     if (from === 'cannons' || from === 'volley') {
+      // (the serve spot is out on the sand, inside the court's fence: back to its ring instead)
+      if (from === 'volley') this.placeVisitor(ZONES.volley.x, ZONES.volley.z, ZONES.volley.heading);
       this.player.group.visible = true;
       this.camYaw = ZONES[from].heading;
       this.ui.score(null);
     }
     let flightZone: ZoneId = 'flight';
+    // however the flight was left (Esc, the exit button, a lock-out, the report's Continue), a
+    // crash or a ditching ends it as one
+    if (from === 'flight' && this.flight.lastFailed) this.flightFailed = true;
     if (from === 'flight') {
       // off the aircraft: in the arrivals hall it landed at (or still at the desk, if it never left)
       this.player.group.visible = true;
@@ -1998,9 +2299,10 @@ export class Game {
       const pos = a ?? this.player.position;
       flightZone = regionAt(pos.x, pos.z) === 'island' ? 'flightBack' : 'flight';
       if (a) {
-        this.player.reset(a.x, a.z, a.heading, ZONES[flightZone].y ?? 0);
-        this.camYaw = a.heading;
-        this.camPitch = 0.2;
+        this.placeVisitor(a.x, a.z, a.heading, ZONES[flightZone].y ?? 0);
+        // a little off to one side: the home hall has a tree tub right behind the arrivals spot
+        this.camYaw = a.heading + 0.7;
+        this.camPitch = 0.25;
       }
       this.minimap.markers = [];
       this.minimap.arrow = 'visitor';
@@ -2018,6 +2320,9 @@ export class Game {
     // a member's coaster taken out of the park while it was ridden can go now
     if (from === 'coaster') this.valley.release();
     if (wasRide) this.updateDriveCamera(1, true);
+    // off a ride the visitor may be far from where they boarded (a flight's arrival, the gate desk
+    // after a crash, the jet-ski's or the slides' landing spot): the trees there, at once
+    if (wasRide) this.warmTerrain();
     const completed = this.leaveCompleted;
     this.leaving = this.leaveCompleted = false;
     this.finishRound(completed);
@@ -2036,6 +2341,8 @@ export class Game {
     const plotRound = this.plotRound;
     const stalled = this.stalledAt;
     this.stalledAt = null;
+    const crashed = this.flightFailed && round.ride === 'flight';
+    this.flightFailed = false;
     if (this.lockedOut) {
       this.lockedOut = false;
       this.plotRound = null;
@@ -2051,17 +2358,25 @@ export class Game {
     const result: RoundResult = {
       ride: round.ride,
       // (the flight's zone is its gate desk: the round is the flight itself)
-      title: plotRound?.name ?? (round.ride === 'flight' ? 'Funfair Air' : ZONES[round.ride].title),
+      title: plotRound?.name ?? rideTitle(round.ride),
       completed,
+      boothAway: this.awayFromBooth,
       stats,
-      ...(stalled === null
-        ? {}
-        : {
+      ...(crashed
+        ? {
             ending: {
-              headline: `Stalled at ${stalled} m`,
-              lead: 'Not enough speed to make it over the top: the train rolled to a stop, and the crew towed it back to the station.',
+              headline: "The flight didn't make it",
+              lead: "A crash or a ditching ends the round: the passengers never reached the other side, and you're back at the gate you left from.",
             },
-          }),
+          }
+        : stalled === null
+          ? {}
+          : {
+              ending: {
+                headline: `Stalled at ${stalled} m`,
+                lead: 'Not enough speed to make it over the top: the train rolled to a stop, and the crew towed it back to the station.',
+              },
+            }),
     };
     void results.open(result).then((choice) => this.afterResults(round.ride, choice));
     const finishing = session.finish(round.id, completed, stats).then(
@@ -2131,11 +2446,11 @@ export class Game {
     if (this.mode === 'striker' || this.mode === 'ducks' || this.mode === 'cannons' || this.mode === 'volley') this.leave(false);
     if (this.mode !== 'drive') return;
     // no walking across the sea: Palm Cay is reached by air only
-    if (!canTravel(regionAt(this.player.position.x, this.player.position.z), id)) return;
+    if (!canTravel(regionAt(this.player.position.x, this.player.position.z), id)) return this.showAcrossSea(id);
     const z = ZONES[id];
     this.fade(() => {
       // park just in front of the trigger ring so the prompt shows up immediately
-      this.player.reset(z.x, z.z, z.heading, z.y ?? 0);
+      this.placeVisitor(z.x, z.z, z.heading, z.y ?? 0);
       this.camYaw = z.heading; // behind the visitor, facing the attraction
       this.camPitch = 0.2;
       this.updateDriveCamera(1, true);
@@ -2205,7 +2520,7 @@ export class Game {
     const z = ZONES[sr.to];
     // just outside the far hall's ring, facing out of it (so E there doesn't send them straight back)
     const pos = this.player.position;
-    this.player.reset(pos.x, pos.z, sr.to === 'skylinkBack' ? Math.PI : 0, z.y ?? 0);
+    this.placeVisitor(pos.x, pos.z, sr.to === 'skylinkBack' ? Math.PI : 0, z.y ?? 0);
     this.camYaw = sr.to === 'skylinkBack' ? Math.PI : 0;
     this.camPitch = 0.2;
     this.mode = 'drive';
@@ -2213,6 +2528,42 @@ export class Game {
     this.ui.rideExit(false);
     this.ui.cinematic(false);
     this.updateDriveCamera(1, true);
+  }
+
+  /**
+   * The terminals' boards and gate screens from the same source as the booking card: FA101 at
+   * gate 3 and FA102 on the island at the times the card offers, the one it has picked boarding.
+   */
+  private paintFlightBoards() {
+    const tod = this.flight.timeOfDay;
+    const { scheduleBoards, DEFAULT_ARRIVALS, DEFAULT_DEPARTURES, ISLAND_ARRIVALS, ISLAND_DEPARTURES } = this.kit;
+    const home = scheduleBoards('home', tod, { departures: DEFAULT_DEPARTURES, arrivals: DEFAULT_ARRIVALS });
+    this.homeTerminal.setFlights(home.departures, home.arrivals);
+    const isle = scheduleBoards('island', tod, { departures: ISLAND_DEPARTURES, arrivals: ISLAND_ARRIVALS });
+    this.islandTerminal.setFlights(isle.departures, isle.arrivals);
+  }
+
+  /** Puts the visitor down (Player.reset), with the trees round the spot planted for the first frame there. */
+  private placeVisitor(x: number, z: number, heading: number, floorY = 0) {
+    this.player.reset(x, z, heading, floorY);
+    this.warmTerrain(x, z);
+  }
+
+  /** Where and when the trees were last warmed (one warm per spot: a fade, a reset and a region change can land together). */
+  private lastWarm = { x: NaN, z: NaN, at: -1 };
+
+  /**
+   * Plants the terrain's trees round (x, z) at once (Terrain.warm) after a jump: a teleport, a
+   * region change, an arrival or a reset. On foot the view range is always the walking one by then
+   * (the flight restores it in its exit(), before endRide runs), which warm() reads to know how far
+   * out to plant. A second call for about the same spot within a second is skipped.
+   */
+  private warmTerrain(x = this.player.position.x, z = this.player.position.z) {
+    const now = performance.now();
+    const w = this.lastWarm;
+    if (now - w.at < 1000 && Math.hypot(x - w.x, z - w.z) < 40) return;
+    this.lastWarm = { x, z, at: now };
+    this.env.terrain.warm(x, z);
   }
 
   /** Aboard the SkyLink: the view from the leading car's windscreen. */
@@ -2308,6 +2659,10 @@ export class Game {
     this.wardrobe?.update(dt);
     this.updateCoasterAudio();
     if (MAP_MODES.has(this.mode)) this.updateMinimap(dt);
+    if (this.islandCamBtn) {
+      const isle = this.mode === 'jetski' || this.mode === 'slides' || this.mode === 'cannons' || this.mode === 'volley';
+      if (this.islandCamBtn.hidden === isle) this.islandCamBtn.hidden = !isle;
+    }
     wind.uTime.value = t;
     wind.uCar.value.copy(this.player.position);
 
@@ -2462,7 +2817,47 @@ export class Game {
     }
     // a picture of the coaster for staff, taken just before the frame covers it
     if (this.mode === 'workshop') this.yard.takeSnapshot(this.scene);
+    this.cullAirportGroups();
     this.post.render(dt);
+  }
+
+  /** Each airport and island group's world bounds (padded), worked out once after the build. */
+  private airportBounds: { group: THREE.Object3D; box: THREE.Box3 }[] | null = null;
+  private readonly cullFrustum = new THREE.Frustum();
+  private readonly cullMatrix = new THREE.Matrix4();
+
+  /**
+   * Drops the airports' and Palm Cay's groups wholesale when their bounds are out of the camera's
+   * view, just before the frame is drawn (updateAirports has set which side is shown). Their merged
+   * meshes are big (an apron, a guideway, a landside road net), so three's per-mesh sphere test
+   * keeps them in from the park's entrance even looking north, away from them: ~45 draw calls and
+   * ~190k triangles for nothing. The bounds are padded by 60 m, more than the walking shadow box,
+   * so nothing casting a shadow into view goes missing. (Lights are kept out of these groups on
+   * purpose, so hiding them never recompiles a shader: see where islandRoot is gathered.) The AI
+   * traffic and the hero aircraft move, and stay as they are.
+   */
+  private cullAirportGroups() {
+    if (!this.homeTerminal) return;
+    if (!this.airportBounds) {
+      const groups: [THREE.Object3D, Region][] = [
+        [this.airfields.home.group, 'home'],
+        [this.airfields.island.group, 'island'],
+        [this.airside.home.group, 'home'],
+        [this.airside.island.group, 'island'],
+        [this.homeTerminal.group, 'home'],
+        [this.landside.group, 'home'],
+        [this.skylink.group, 'home'],
+        [this.islandRoot, 'island'],
+      ];
+      this.airportBounds = groups.map(([group, region]) => {
+        group.updateMatrixWorld(true);
+        return { group, box: staticBounds(group, region) };
+      });
+    }
+    const cam = this.camera;
+    cam.updateMatrixWorld();
+    this.cullFrustum.setFromProjectionMatrix(this.cullMatrix.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+    for (const { group, box } of this.airportBounds) if (group.visible && !box.isEmpty() && !this.cullFrustum.intersectsBox(box)) group.visible = false;
   }
 
   /**
@@ -2472,6 +2867,9 @@ export class Game {
     this.region = region;
     const island = region === 'island';
     for (const g of [this.jetski, this.slides, this.cannons, this.volley]) g.setAwake(island);
+    // on foot (an arrival, a jump): the trees round the visitor at once. In flight the aircraft's
+    // own planting fills them in as it goes, and a 45 ms warm would only stutter the view.
+    if (!this.flight.active) this.warmTerrain();
     // (the park map opens on the visitor's own landmass by itself)
   }
 
@@ -2504,6 +2902,7 @@ export class Game {
     this.homeTerminal.group.visible = this.landside.group.visible = this.skylink.group.visible = showHome;
     this.airfields.island.group.visible = this.airside.island.group.visible = showIsland;
     this.islandTerminal.group.visible = this.palmCay.group.visible = showIsland;
+    this.islandRoot.visible = showIsland;
     for (const r of ['home', 'island'] as const) {
       this.airside[r].setAircraft(this.traffic.bodies(r));
       if (r === 'home' ? showHome : showIsland) {
@@ -2643,7 +3042,7 @@ export class Game {
   /** Dev helper used by screenshot scripts. */
   debugAction(zone: ZoneId) {
     const z = ZONES[zone];
-    this.player.reset(z.x, z.z, z.heading);
+    this.placeVisitor(z.x, z.z, z.heading);
     this.zones.update(this.player.position, this.time.t);
     this.onAction();
   }

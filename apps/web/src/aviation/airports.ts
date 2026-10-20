@@ -162,7 +162,9 @@ function runwayEnd(
       locAntenna: { x: endX + s * 300, z: r.z },
       gsAntenna: { x: thrX + s * GPI_M, z: r.z - left * (r.width / 2 + 120) },
       rangeNm: 18,
-      locHalfWidthDeg: 2.5,
+      // (ICAO: full scale is about 105 m either side of the centreline at the threshold, from the antenna
+      // 300 m beyond the far end: about 1.6° at Funfair International, 1.9° at Palm Cay)
+      locHalfWidthDeg: Math.min(3, (Math.atan(106 / (Math.abs(r.x1 - r.x0) + 300)) * 180) / Math.PI),
     },
     papi: { x: thrX + s * (GPI_M + 30), z: r.z + left * papiOff, angles: [3.5, 3.1667, 2.8333, 2.5] },
     iaf,

@@ -619,12 +619,13 @@ export function runRadioChecks(): Row[] {
     };
     const c = at(5 * NM, 0);
     add('ILS: on the localizer and the slope at 5 NM', c.valid && near(c.loc, 0, 0.01) && near(c.gs, 0, 0.01) && near(c.dme, 5, 0.1), `loc ${c.loc.toFixed(3)} gs ${c.gs.toFixed(3)} dme ${c.dme.toFixed(2)} NM, ${rw.ils.ident} ${rw.ils.freq}`);
-    // 1.25° off at the localizer antenna (one dot), right of the centreline: the runway is left, the pointer goes negative
+    // one dot (half the runway's full-scale half-width) off at the localizer antenna, right of the centreline: the runway is left, the pointer goes negative
     const antD = Math.abs(runwayFrame(rw, rw.ils.locAntenna.x, rw.ils.locAntenna.z).along) + 5 * NM;
-    const oneDot = antD * Math.tan(1.25 * D2R);
+    const dotDeg = rw.ils.locHalfWidthDeg / 2;
+    const oneDot = antD * Math.tan(dotDeg * D2R);
     const r1 = at(5 * NM, oneDot);
     const l1 = at(5 * NM, -oneDot * 2);
-    add('ILS: localizer 1.25° a dot, sign (right of course = runway left)', near(r1.loc, -1, 0.02) && near(l1.loc, 2, 0.04) && near(r1.locM, oneDot, 0.5), `${oneDot.toFixed(0)} m right → ${r1.loc.toFixed(3)} dots; ${(2 * oneDot).toFixed(0)} m left → ${l1.loc.toFixed(3)}`);
+    add(`ILS: localizer ${dotDeg.toFixed(2)}° a dot (≈105 m full scale at the threshold), sign (right of course = runway left)`, near(r1.loc, -1, 0.02) && near(l1.loc, 2, 0.04) && near(r1.locM, oneDot, 0.5), `${oneDot.toFixed(0)} m right → ${r1.loc.toFixed(3)} dots; ${(2 * oneDot).toFixed(0)} m left → ${l1.loc.toFixed(3)}`);
     const hi = at(5 * NM, 0, 0.35);
     const lo = at(5 * NM, 0, -0.7);
     const peg = at(5 * NM, 0, -1.5);
@@ -747,11 +748,17 @@ export function runRadioChecks(): Row[] {
       const a = sc.score();
       sc.update(16, s, f);
       s.nz = 1;
+      // a gust: 2 s at 262 kt is smoothed out (the rule looks at the speed over a few seconds)
+      s.ias = 262;
+      for (let i = 0; i < 20; i++) sc.update(0.1, s, f);
+      s.ias = 250;
+      for (let i = 0; i < 100; i++) sc.update(0.1, s, f);
+      const gust = sc.score();
       s.ias = 270;
-      for (let i = 0; i < 50; i++) sc.update(0.1, s, f);
+      for (let i = 0; i < 80; i++) sc.update(0.1, s, f);
       const b = sc.score();
       for (let i = 0; i < 50; i++) sc.update(0.1, s, f);
-      add('Score: load factor −5 / 20 s (smoothed), 250 kt below FL100 −5 / 30 s', spike === 100 && a === 95 && b === 85 && sc.score() === 85, `1.6 g spike → ${spike}, 1.45 g → ${a} (once in 5 s), again 21 s later + 270 kt → ${b}, still 270 kt 5 s later → ${sc.score()}`);
+      add('Score: load factor −5 / 20 s (smoothed), 250 kt below FL100 −5 / 30 s (smoothed)', spike === 100 && a === 95 && gust === 90 && b === 85 && sc.score() === 85, `1.6 g spike → ${spike}, 1.45 g → ${a} (once in 5 s), again 21 s later → ${gust} (a 2 s gust to 262 kt costs nothing), 270 kt for 8 s → ${b}, still 270 kt 5 s later → ${sc.score()}`);
     }
     {
       const { sc, s } = mk();
@@ -826,6 +833,29 @@ export function runRadioChecks(): Row[] {
     const want = ['niner', 'one one eight decimal three', 'one two one decimal eight', 'five thousand', 'three thousand five hundred', 'flight level one two zero', 'two seven zero', 'wind two five zero degrees, one two knots, gusting two two', 'Echo two'];
     const bad = words.map((w, i) => (w === want[i] ? '' : `${w} ≠ ${want[i]}`)).filter(Boolean);
     add('Speech: numbers the radio way', bad.length === 0, bad.join('; ') || words.slice(1, 6).join(' | '));
+  }
+
+  // ---------------------------------------------------------------- the tower's wind keeps to the 25 kt gust cap
+  {
+    let worst = 0;
+    let low = 99;
+    let n = 0;
+    for (const [windKt, gustKt] of [[15, 25], [14, 25], [12, 24], [10, 20]]) {
+      for (const flightNo of ['FA101', 'FA102', 'FA7', 'FA42']) {
+        const sp = new Speech(new Sfx());
+        sp.enabled = false;
+        const atc = new Atc(sp, new Navigator(flightPlan('home', '27', '27')), isaWeather({ windFrom: 120, windKt, gustKt }), { callsign: 'Funfair 101', flightNo, runwayBusy: () => ({ busy: false, clearInS: 0 }) });
+        const wind = (atc as unknown as { wind(): { text: string } }).wind.bind(atc);
+        for (let i = 0; i < 200; i++) {
+          const m = /(\d+) kt gusting (\d+)/.exec(wind().text);
+          if (!m) continue;
+          n++;
+          worst = Math.max(worst, Number(m[2]));
+          low = Math.min(low, Number(m[2]) - Number(m[1]));
+        }
+      }
+    }
+    add('ATC: the spoken gust is never above 25 kt, and always 10 kt over the mean', n > 0 && worst <= 25 && low >= 10, `${n} gusty reports, highest gust ${worst} kt, smallest spread ${low} kt`);
   }
 
   // ---------------------------------------------------------------- GPWS envelopes
@@ -908,7 +938,7 @@ export function runRadioChecks(): Row[] {
     add(`${label}: landed, parked, scored`, fl.parked && !!td && td.along > 150 && td.along < 900 && Math.abs(td.right) < 3 && keysOk && fl.scorer.failed === null && st.score >= 90, `touchdown ${td ? `${Math.round(td.along)} m, ${td.right.toFixed(1)} m, ${Math.round(td.fpm)} fpm` : 'none'}; score ${st.score} ${st.stars}★ comfort ${st.comfort}; ${Math.round(fl.timeS)} s; ${fl.scorer.items.map((i) => `${i.points} ${i.label}`).join('; ')}`);
     add(`${label}: no violations or GPWS alerts on a clean flight`, fl.violations.length === 0 && fl.alerts.length === 0, `violations [${fl.violations.join('; ')}], alerts [${fl.alerts.join(', ')}]`);
     const said = fl.lines.map((l) => l.u.text).join('\n');
-    const calls = ['One hundred knots', 'V1', 'Rotate', 'Positive climb', '2500', '1000', '500', '400', '300', 'MINIMUMS', '100', '50', '40', '30', '20', '10', 'RETARD', 'Spoilers', 'Reverse green', 'Seventy knots'];
+    const calls = ['One hundred knots', 'V1', 'Rotate', 'Positive climb', '2500', '1000', '500', '400', '300', 'MINIMUM', '100', '50', '40', '30', '20', '10', 'RETARD', 'Spoilers', 'Reverse green', 'Seventy knots'];
     const missingCalls = calls.filter((c) => !fl.lines.some((l) => l.u.text === c));
     add(`${label}: flight-deck callouts`, missingCalls.length === 0, missingCalls.length ? `missing ${missingCalls.join(', ')}` : calls.join(', '));
     const cab = [/arm doors/, /safety demonstration/, /life jacket/, /this is your captain speaking/, /seats for takeoff/, /started our descent/, /seats for landing/, /welcome to (Palm Cay|Funfair International)/i, /disarm doors/];

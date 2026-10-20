@@ -232,6 +232,11 @@ export class Volley implements Attraction {
     return s > 0 ? this.locals : [this.partner, this.active ? this.me : this.stand];
   }
 
+  /** The last serve is played (the last look at the court): leaving now is no early exit. */
+  get finished(): boolean {
+    return this.active && this.phase === 'over';
+  }
+
   /** Where the visitor stands to play (the serve spot behind the near baseline), facing the far court (east). */
   get standSpot() {
     const w = toWorld(SERVE_SPOT.x, 0, SERVE_SPOT.z);

@@ -134,7 +134,9 @@
 
 .ck-col {
   flex: none;
-  width: calc(var(--ck-du) * 0.56);
+  /* (never narrower than the gear row and the three autobrake buttons, or on a 720 px tall screen
+     their right ends slide under the E/WD) */
+  width: max(calc(var(--ck-du) * 0.56), 160px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -639,6 +641,41 @@
   color: #ff3b30;
 }
 
+/* ---------- laptop-width screens: the FCU (660 px) centred in the glareshield reaches back over the
+   masters at the left end, so they follow the FCU on its right instead ---------- */
+@media (min-width: 821px) and (max-width: 1360px) and (min-height: 541px) {
+  .ck-masters {
+    position: static;
+    order: 1;
+    margin-left: 10px;
+    transform: none;
+  }
+}
+
+/* ---------- tablets held upright (768–1100 px wide): the FCU fills the glareshield, over the
+   masters at its left end, and the flight's AP/A/THR/CAM/warp column on the right stands on the
+   E/WD and the autobrake. The display units shrink so the panel's row (PFD, ND, the centre column,
+   E/WD) ends left of that column, and the masters move down onto the panel's free right corner,
+   above it. ---------- */
+@media (orientation: portrait) and (min-width: 721px) and (max-width: 1100px) and (min-height: 541px) {
+  .ck-root {
+    --ck-du: min(calc(45vh - var(--ck-glare-h) - 66px), 19vw, calc((100vw - 400px) / 3));
+  }
+  .ck-panel {
+    justify-content: flex-start;
+    padding-left: 16px;
+  }
+  .ck-masters {
+    position: absolute;
+    order: 0;
+    margin-left: 0;
+    left: auto;
+    right: 16px;
+    top: calc(100% + 14px);
+    transform: none;
+  }
+}
+
 /* ---------- phones held sideways: PFD + ND under a narrower glareshield ---------- */
 @media (orientation: landscape) and (max-height: 540px) {
   .ck-root {
@@ -850,6 +887,28 @@
   }
   .ck-strip-data {
     display: none;
+  }
+}
+
+/* ---------- narrow phones held sideways (iPhone SE/8, 667×375; 740×360): the glareshield spans the
+   width between the two button blocks, so they'd sit on the FCU and the master lights. With the
+   flight deck showing, FLAPS/GEAR/brakes move to the windscreen's top-left corner and AP/A/THR/CAM/
+   warp under the camera toggles top right, both above the radio line and the glareshield. ---------- */
+@media (orientation: landscape) and (max-height: 540px) and (max-width: 820px) {
+  .is-piloting .hud:has(> .ck-host .ck-root[data-view='cockpit']) .fl-tbtns button {
+    height: 28px;
+  }
+  .is-piloting .hud:has(> .ck-host .ck-root[data-view='cockpit']) .fl-tbtns-a {
+    top: calc(max(8px, env(safe-area-inset-top)) + 8px);
+    bottom: auto;
+    left: max(10px, env(safe-area-inset-left));
+    /* two columns (three rows), clear of the hint card in the middle of the top edge */
+    grid-template-columns: repeat(2, 54px);
+  }
+  .is-piloting .hud:has(> .ck-host .ck-root[data-view='cockpit']) .fl-tbtns-b {
+    top: calc(max(8px, env(safe-area-inset-top)) + 100px);
+    bottom: auto;
+    right: max(12px, env(safe-area-inset-right));
   }
 }
 

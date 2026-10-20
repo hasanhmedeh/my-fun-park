@@ -21,11 +21,12 @@ import type { AircraftState, Fix, FlightPlan, IlsReading, NavSource } from './ty
 // ------------------------------------------------------------------------------------------------
 
 /**
- * Display sensitivity: a localizer's full-scale deflection (2 dots) is its course half-width, about
- * 2.5° for a runway this long; a glide slope's is 0.7° (0.12 × the 3° path each way per ICAO
- * Annex 10, ≈ 0.35° a dot). Beyond full scale the pointers peg at the edge of the scale (2.5 dots).
+ * Display sensitivity: a localizer's full-scale deflection (2 dots) is its course half-width, tailored
+ * per runway (airports.ts locHalfWidthDeg: about 105 m either side of the centreline at the
+ * threshold, so 1.6° at Funfair International and 1.9° at Palm Cay); a glide slope's is 0.7° (0.12 ×
+ * the 3° path each way per ICAO Annex 10, ≈ 0.35° a dot). Beyond full scale the pointers peg at the
+ * edge of the scale (2.5 dots).
  */
-export const LOC_DEG_PER_DOT = 1.25;
 export const GS_DEG_PER_DOT = 0.35;
 const DOTS_MAX = 2.5;
 /** The localizer's coverage either side of the course (deg). */
@@ -64,7 +65,7 @@ export function ilsReading(rw: RunwayEnd, s: AircraftState, out: IlsReading = em
   const lateral = ax * -f.z + az * f.x; // right of the course line, looking along the landing direction
   const theta = Math.atan2(lateral, inFront) / D2R;
   // right of the centreline the runway lies to the left: the pointer swings left (negative)
-  out.loc = clamp(-theta / LOC_DEG_PER_DOT, -DOTS_MAX, DOTS_MAX);
+  out.loc = clamp(-theta / (ils.locHalfWidthDeg / 2), -DOTS_MAX, DOTS_MAX);
 
   // glide slope: the elevation angle at the glide slope antenna, beside the runway at the GPI
   const gx = x - ils.gsAntenna.x;

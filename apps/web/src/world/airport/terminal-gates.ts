@@ -158,8 +158,31 @@ function boardingArea(k: TerminalKits, g: GatePlan, col: Collision): V3[] {
   const land0 = sx + E.landX0;
   const f = ROTUNDA_FLOOR;
   const zc = (E.z0 + E.z1) / 2;
-  // the top landing (a slab on a solid, panelled base), its balustrade
-  k.interior.span(land0, FLOOR_Y, E.stairZ0, top, f, AIR_Z - 0.1, '#e8e4dc');
+  // the top landing (a slab on a solid, panelled base), its balustrade. The base is clad in
+  // stone-grey panels with dark joints over a dark plinth, under a steel fascia at the slab's edge
+  // (a plain pale box here read as an untextured block from the gate window).
+  const kick = 0.14;
+  const fascia = 0.26;
+  const z1 = AIR_Z - 0.1;
+  k.interior.span(land0, FLOOR_Y, E.stairZ0, top, f - fascia, z1, '#b5aea3');
+  k.interior.span(land0 - 0.015, FLOOR_Y, E.stairZ0 - 0.015, top, FLOOR_Y + kick, z1, '#3a3f45');
+  k.metal.span(land0 - 0.03, f - fascia, E.stairZ0 - 0.03, top, f, z1, '#c3c9cf');
+  const joint = '#7b766e';
+  const panels = (n: number) => Array.from({ length: n - 1 }, (_, i) => (i + 1) / n);
+  // on the north face (the lounge's side) and both ends, vertical joints every 1.1 m or so, and one across
+  for (const a of panels(Math.max(2, Math.round((top - land0) / 1.1)))) {
+    const x = land0 + (top - land0) * a;
+    k.interior.span(x - 0.012, FLOOR_Y + kick, E.stairZ0 - 0.012, x + 0.012, f - fascia, E.stairZ0, joint);
+  }
+  const midY = (FLOOR_Y + kick + f - fascia) / 2;
+  for (const [xa, xb] of [[land0 - 0.012, land0], [top, top + 0.012]]) {
+    for (const a of panels(Math.max(2, Math.round((z1 - E.stairZ0) / 1.1)))) {
+      const z = E.stairZ0 + (z1 - E.stairZ0) * a;
+      k.interior.span(xa, FLOOR_Y + kick, z - 0.012, xb, f - fascia, z + 0.012, joint);
+    }
+    k.interior.span(xa, midY - 0.012, E.stairZ0, xb, midY + 0.012, z1, joint);
+  }
+  k.interior.span(land0, midY - 0.012, E.stairZ0 - 0.012, top, midY + 0.012, E.stairZ0, joint);
   k.floor.floor(land0, E.stairZ0, top, AIR_Z - 0.1, f + 0.01, '#ddd6ca');
   k.floor.worldUvXZ(k.floor.vertexCount - 4, 2.4);
   k.glass.quad({ x: land0, y: f, z: E.stairZ0 }, { x: top, y: f, z: E.stairZ0 }, { x: top, y: f + 1.05, z: E.stairZ0 }, { x: land0, y: f + 1.05, z: E.stairZ0 }, '#ffffff');

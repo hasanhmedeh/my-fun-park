@@ -10,7 +10,10 @@
 // it has vacated, a departure from lining up until it's well clear), departures go in the gaps
 // between arrivals, and everything keeps clear of the player: `holdForPlayer` (and the player
 // being on the runway or on final) stops line-ups and new arrivals, and sends an arrival inside
-// 3 NM around. Every movement has its radio calls (`onRadio`), paced like a real frequency.
+// 3 NM around. A player inbound to a field (flying towards it, and from the descent or approach
+// clearance on, `holdArrivals`) is sequenced too: no new arrival spawns ahead of or beside them,
+// and one on final too close ahead (or behind) breaks off to the sea side at once instead of going
+// around through them. Every movement has its radio calls (`onRadio`), paced like a real frequency.
 //
 // At most three AI aircraft per airport exist at once, the ones parked at the traffic stands
 // included; away from the player's region they're hidden and stepped a few times a second.
@@ -42,10 +45,16 @@ const SPAWN = { min: 16000, max: 18000, side: 3000, alt: 3000 * FT };
 const GONE = 25000;
 /** A departure may line up only if no arrival is closer to the threshold than this (the arrival needs its landing clearance ~70 s later, 3 NM out). */
 const DEP_GAP = 12000;
+/** No departure lines up while the player is inbound inside this (m from the threshold). */
+const DEP_INBOUND = 30000;
 /** Arrivals follow each other at least this far apart (5 NM). */
 const ARR_SEP = 5 * NM;
 /** An arrival that's not been cleared to land by here goes around; holdForPlayer sends it round inside this too. */
 const GA_DIST = 3 * NM;
+/** A player inbound to a field blocks new arrivals while this close to its threshold (the IAFs are 13–15 km out). */
+const INBOUND_BLOCK = SPAWN.max + ARR_SEP + 15000;
+/** No arrival spawns within this of the player (horizontally, and vertically). */
+const SPAWN_CLEAR = { m: 5 * NM, ft: 1000 };
 /** Aircraft never get closer than this on the ground (m between reference points along the way). */
 const TAXI_GAP = 55;
 /** An aircraft's footprint for the airside's vehicles (wings included). */
@@ -112,6 +121,8 @@ interface Flight {
   /** Turnaround left (s), or other waits. */
   wait: number;
   cleared: boolean;
+  /** Broken off the approach for the player (a go-around that turns to the sea side at once, without a landing try). */
+  brk?: boolean;
   /** Visual state ramps: gear, flaps, engines. */
   gear: number;
   flaps: number;
@@ -139,6 +150,12 @@ interface Field {
   playerOnRunway: boolean;
   /** The player's distance to this field's threshold while on its approach (Infinity otherwise). */
   playerFinal: number;
+  /** The player is airborne and inbound to this field: flying towards it in its region, or sequenced by holdArrivals. */
+  playerInbound: boolean;
+  /** The player's distance (m, straight) to the threshold of the runway in use, while inbound (Infinity otherwise). */
+  playerDist: number;
+  /** The player is cleared for the descent or the approach here: no new arrivals until they land or give up (holdArrivals). */
+  arrHold: boolean;
   nextArrival: number;
   /** Logic steps far from the player run at a low rate. */
   acc: number;
@@ -182,6 +199,7 @@ export class Traffic {
   private radioFree = 0;
   private playerRegion: Region = 'home';
   private playerAirborne = false;
+  private readonly playerPos = { x: 0, z: 0, altFt: 0 };
   private readonly playerBody: Body = { x: 0, z: 0, heading: 0, hl: BODY_HL, hw: BODY_HW };
   private playerOnGround = false;
   private readonly contactList: { callsign: string; x: number; z: number; altFt: number; vs: number }[] = [];
@@ -213,6 +231,9 @@ export class Traffic {
       hold: false,
       playerOnRunway: false,
       playerFinal: Infinity,
+      playerInbound: false,
+      playerDist: Infinity,
+      arrHold: false,
       nextArrival: 0,
       acc: 0,
       bodies: [],
@@ -260,6 +281,18 @@ export class Traffic {
   /** Keep the AI off the runway while the player uses it (lining up, taking off, landing). */
   holdForPlayer(region: Region, on: boolean) {
     this.fields[region].hold = on;
+  }
+
+  /**
+   * The player is cleared for the descent or the approach to this field (on), or landed or gave up
+   * (off): no new arrivals spawn meanwhile (departures carry on), and an arrival already on final
+   * that's not a clear number one ahead of the player breaks off at once.
+   */
+  holdArrivals(region: Region, on: boolean) {
+    const F = this.fields[region];
+    if (F.arrHold === on) return;
+    F.arrHold = on;
+    if (on) this.sequence(F, true);
   }
 
   /** Whether the runway is in use by AI traffic, for ATC (Atc's opts.runwayBusy). */
@@ -313,6 +346,9 @@ export class Traffic {
     this.playerAirborne = !!player && player.radioAltFt > 50;
     this.playerOnGround = !!player && !this.playerAirborne;
     if (player) {
+      this.playerPos.x = player.pos.x;
+      this.playerPos.z = player.pos.z;
+      this.playerPos.altFt = player.altFt;
       this.playerBody.x = player.pos.x;
       this.playerBody.z = player.pos.z;
       this.playerBody.heading = player.heading;
@@ -357,8 +393,20 @@ export class Traffic {
   private watchPlayer(F: Field, player: AircraftState | null, region: Region) {
     F.playerOnRunway = false;
     F.playerFinal = Infinity;
+    F.playerInbound = false;
+    F.playerDist = Infinity;
     if (!player || region !== F.region) return;
     const p = player.pos;
+    if (this.playerAirborne) {
+      // inbound: sequenced here (holdArrivals), or flying towards the field (within 90° of it)
+      const th = F.rw.threshold;
+      const d = Math.hypot(th.x - p.x, th.z - p.z);
+      const bearing = (Math.atan2(th.x - p.x, -(th.z - p.z)) / DEG + 360) % 360;
+      if (F.arrHold || Math.abs(wrap180(bearing - player.heading)) < 90) {
+        F.playerInbound = true;
+        F.playerDist = d;
+      }
+    }
     if (onRunway(F.ap, p.x, p.z, 10) && player.radioAltFt < 200) F.playerOnRunway = true;
     for (const rw of Object.values(F.ap.runways)) {
       const r = runwayFrame(rw, p.x, p.z);
@@ -381,6 +429,7 @@ export class Traffic {
         F.nextArrival = (F.region === 'home' ? 200 : 260) + this.rnd() * 180;
       }
     }
+    if (F.playerInbound) this.sequence(F, false);
     for (const f of F.slots) if (f) this.fly(F, f, dt);
     // the bodies the vehicles keep clear of
     F.bodies.length = 0;
@@ -390,8 +439,22 @@ export class Traffic {
   private canSpawnArrival(F: Field) {
     if (F.hold || F.playerOnRunway || F.slots.every((s) => s)) return false;
     if (!this.freeStand(F)) return false;
-    // behind the player on the approach, and behind the last arrival
+    // behind the player on the approach, and behind the last arrival; none while the player is
+    // cleared in, or inbound within reach of the spawn box (the IAFs are 3.8 km off the centreline)
+    if (F.arrHold) return false;
     if (F.playerFinal < SPAWN.max + ARR_SEP) return false;
+    if (F.playerInbound && F.playerDist < INBOUND_BLOCK) return false;
+    // and never next to the player, wherever they are
+    if (this.playerAirborne && this.playerRegion === F.region) {
+      const rw = F.rw;
+      const fx = Math.sin(rw.heading * DEG);
+      const fz = -Math.cos(rw.heading * DEG);
+      const d = (SPAWN.min + SPAWN.max) / 2;
+      const sx = rw.threshold.x - fx * d;
+      const sz = rw.threshold.z - fz * d + (F.region === 'home' ? 1 : -1) * SPAWN.side;
+      const p = this.playerPos;
+      if (Math.hypot(p.x - sx, p.z - sz) < SPAWN_CLEAR.m + (SPAWN.max - SPAWN.min) / 2 && Math.abs(p.altFt - SPAWN.alt / FT) < SPAWN_CLEAR.ft) return false;
+    }
     for (const f of F.slots) if (f && (f.phase === 'final' || f.phase === 'goaround') && this.toThreshold(F, f) > SPAWN.min - ARR_SEP) return false;
     return true;
   }
@@ -501,8 +564,38 @@ export class Traffic {
     this.say(F, 'tower', fl, `${fl.callsign}, ${ap.geo.atc} Tower, continue approach, number ${n}.`, `${fl.say}, ${ap.geo.atc} Tower, continue approach, number ${digits(n)}.`);
   }
 
+  /**
+   * Keeps arrivals clear of an inbound player: one on final that's not a clear number one ahead
+   * (ARR_SEP when the player is first cleared in, `strict`; about half that as they close up later)
+   * breaks off to the sea side straight away, instead of going around later through them. One very
+   * close to the runway with the player still a little way behind lands.
+   */
+  private sequence(F: Field, strict: boolean) {
+    const pd = F.playerFinal < Infinity ? F.playerFinal : F.playerDist;
+    if (!(pd < Infinity)) return;
+    for (const f of F.slots) {
+      if (!f || f.phase !== 'final' || f.brk) continue;
+      const toGo = this.toThreshold(F, f);
+      const ahead = pd - toGo;
+      if (strict ? ahead >= ARR_SEP : ahead >= ARR_SEP * 0.5 || (toGo < 4000 && ahead > 2500)) continue;
+      this.breakOff(F, f);
+    }
+  }
+
+  /** Off the approach for the player: climbing, and turned out to the sea side straight away. */
+  private breakOff(F: Field, f: Flight) {
+    this.setPhase(f, 'goaround');
+    f.cleared = false;
+    f.brk = true;
+    const turn = F.region === 'home' ? 'left heading one eight zero' : 'right heading three six zero';
+    const turnText = F.region === 'home' ? 'left heading 180' : 'right heading 360';
+    this.say(F, 'tower', f, `${f.callsign}, break off the approach, turn ${turnText}, climb 4000 ft, traffic.`, `${f.say}, break off the approach, turn ${turn}, climb four thousand feet, traffic.`);
+    this.say(F, 'pilot', f, `Breaking off, ${turnText}, climbing 4000 ft, ${f.callsign}.`, `Breaking off, ${turn}, climbing four thousand feet, ${f.say}.`);
+  }
+
   private arrivalsAhead(F: Field, fl: Flight) {
-    let n = F.playerFinal < this.toThreshold(F, fl) ? 1 : 0;
+    const pd = F.playerFinal < Infinity ? F.playerFinal : F.playerDist;
+    let n = pd < this.toThreshold(F, fl) ? 1 : 0;
     for (const f of F.slots) if (f && f !== fl && (f.phase === 'final' || f.phase === 'flare') && this.toThreshold(F, f) < this.toThreshold(F, fl)) n++;
     return n;
   }
@@ -742,6 +835,8 @@ export class Traffic {
   /** May this departure have the runway now? */
   private departureClear(F: Field, me: Flight) {
     if (F.hold || F.playerOnRunway || F.playerFinal < DEP_GAP) return false;
+    // nor while the player is inbound and close: a departure would climb out through their arrival
+    if (F.playerInbound && F.playerDist < DEP_INBOUND && this.playerPos.altFt < 9000) return false;
     for (const f of F.slots) {
       if (!f || f === me) continue;
       if (f.phase === 'lineup' || f.phase === 'takeoff' || f.phase === 'roll' || f.phase === 'flare') return false;
@@ -834,9 +929,11 @@ export class Traffic {
     const vt = f.pos.y < 600 ? V.climb : V.cruiseClimb;
     f.v += Math.max(-0.5 * dt, Math.min(0.9 * dt, vt - f.v));
     if (f.pos.y > 300) f.flaps = Math.max(0, f.flaps - dt / 15);
-    const vsT = f.pos.y < 5000 * FT ? 12.7 : 2;
+    // (one breaking off the approach levels at 4000 ft, turning to the sea side at once)
+    // (a departure keeps climbing to the strait's levels, clear above the arrivals coming in at 3000–5000 ft)
+    const vsT = f.brk ? Math.max(-3, Math.min(12.7, (4000 * FT - f.pos.y) * 0.05)) : f.pos.y < 5000 * FT ? 12.7 : f.pos.y < 11000 * FT ? 10 : 0;
     f.vs += Math.max(-1 * dt, Math.min(1 * dt, vsT - f.vs));
-    if (f.pos.y > 1500 * FT) this.turnTo(f, F.region === 'home' ? 180 : 0, 1.6, dt);
+    if (f.brk || f.pos.y > 1500 * FT) this.turnTo(f, F.region === 'home' ? 180 : 0, f.brk ? 2.5 : 1.6, dt);
     this.move(f, dt, f.vs);
     f.pitch += (Math.atan2(f.vs, f.v) + 5 * DEG - f.pitch) * Math.min(1, dt);
     if (!(f.said & 1) && f.tp > 25) {

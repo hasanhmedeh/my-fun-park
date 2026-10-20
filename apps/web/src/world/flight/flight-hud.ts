@@ -1,6 +1,6 @@
 // The flight's own HUD, around the cockpit's instruments (those are instruments/cockpit.ts): the
-// radio log (the last three lines, coloured by who's talking, fading once they're old), the next
-// step ("Request pushback and start-up · E"), the taxi guide (the next turn, the distance to it,
+// radio log (the last three lines, coloured by who's talking, fading once they're old), the cabin
+// card (the PA and the passengers: their own channel, apart from the radio), the next step ("Request pushback and start-up · E"), the taxi guide (the next turn, the distance to it,
 // the speed to taxi at), the toasts (penalties and bonuses as they happen, and notes such as
 // "Autopilot off"), the camera's name, the desktop key help and the two toggles (the ILS guide and
 // the voices). It's plain DOM inside #hud, before #panel, so the cards still sit on top of it.
@@ -9,11 +9,15 @@ import type { ScoreItem, Utterance } from '../../aviation/types';
 import type { Hint } from './sim';
 import type { TaxiGuideInfo } from './taxi';
 import './flight.css';
+import './flight-extras.css';
 
 /** How long a radio line stays, and how long it takes to fade (s). */
 const LINE_S = 14;
 const LINE_FADE_S = 3;
 const TOAST_S = 3.6;
+/** How long a cabin line stays once it starts, and how long it takes to fade (s). */
+const CABIN_S = 10;
+const CABIN_FADE_S = 2;
 const MAX_TOASTS = 3;
 
 const ARROW: Record<TaxiGuideInfo['turn'], string> = { left: '↰', right: '↱', straight: '↑', stop: '⛔' };
@@ -66,6 +70,11 @@ export class FlightHud {
   private readonly taxiText: HTMLSpanElement;
   private readonly taxiSpeed: HTMLSpanElement;
   private readonly toasts: HTMLDivElement;
+  private readonly paBox: HTMLDivElement;
+  private readonly paFrom: HTMLElement;
+  private readonly paText: HTMLSpanElement;
+  /** The cabin line on show: its key ("from|text") and its age (s); null when there's none. */
+  private pa: { key: string; age: number } | null = null;
   private readonly camEl: HTMLDivElement;
   private readonly keysEl: HTMLDetailsElement;
   private readonly ilsBtn: HTMLButtonElement;
@@ -87,6 +96,7 @@ export class FlightHud {
       <div class="fl-top">
         <div class="fl-hint"><span class="fl-hint-text"></span><kbd class="fl-hint-key" hidden></kbd></div>
         <div class="fl-progress" hidden></div>
+        <div class="fl-pa-box" hidden aria-live="polite"><span class="fl-pa-tag">Cabin</span><div class="fl-pa-body"><b class="fl-pa-from"></b><span class="fl-pa-text"></span></div></div>
         <div class="fl-taxi" hidden><span class="fl-taxi-arrow"></span><span class="fl-taxi-text"></span><span class="fl-taxi-speed"></span></div>
         <div class="fl-toasts" aria-live="polite"></div>
       </div>
@@ -96,6 +106,7 @@ export class FlightHud {
         <div class="fl-tools">
           <button type="button" class="fl-tool" data-fl-ils aria-pressed="false" title="The ILS guide: boxes along the glide path on final">ILS guide</button>
           <button type="button" class="fl-tool" data-fl-voice aria-pressed="false" title="Hear the radio and the cabin (spoken aloud)">Voices</button>
+          <button type="button" class="fl-tool fl-sound" data-fl-sound aria-pressed="true" aria-label="Mute sound" title="Sound">🔊</button>
         </div>
         <details class="fl-keys"${mobile ? ' hidden' : ''}><summary>Keys</summary><dl>${KEY_HELP.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl></details>
       </div>
@@ -113,6 +124,9 @@ export class FlightHud {
     this.taxiText = q('.fl-taxi-text');
     this.taxiSpeed = q('.fl-taxi-speed');
     this.toasts = q('.fl-toasts');
+    this.paBox = q('.fl-pa-box');
+    this.paFrom = q('.fl-pa-from');
+    this.paText = q('.fl-pa-text');
     this.camEl = q('.fl-cam');
     this.keysEl = q('.fl-keys');
     this.ilsBtn = q('[data-fl-ils]');
@@ -120,6 +134,21 @@ export class FlightHud {
     this.fadeEl = q('.fl-fade');
     this.ilsBtn.addEventListener('click', () => this.onIlsGuide?.());
     this.voiceBtn.addEventListener('click', () => this.onVoices?.());
+    // the park's sound button: its corner is the thrust lever's while flying (the park's tools are
+    // hidden then), so the flight's own toggle drives it, and follows it
+    const soundBtn = q<HTMLButtonElement>('[data-fl-sound]');
+    const parkSound = document.getElementById('sound-toggle');
+    if (parkSound) {
+      const sync = () => {
+        const on = parkSound.getAttribute('aria-pressed') !== 'false';
+        soundBtn.textContent = on ? '🔊' : '🔇';
+        soundBtn.setAttribute('aria-pressed', String(on));
+        soundBtn.setAttribute('aria-label', on ? 'Mute sound' : 'Unmute sound');
+      };
+      soundBtn.addEventListener('click', () => parkSound.click());
+      new MutationObserver(sync).observe(parkSound, { attributes: true, attributeFilter: ['aria-pressed'] });
+      sync();
+    } else soundBtn.hidden = true;
     this.keysEl.addEventListener('toggle', () => this.onKeyHelp?.());
   }
 
@@ -139,6 +168,7 @@ export class FlightHud {
     this.hintKey.hidden = true;
     this.taxi.hidden = true;
     this.progressEl.hidden = true;
+    this.cabin(null);
     this.fade(false);
   }
 
@@ -167,6 +197,29 @@ export class FlightHud {
     this.radio.append(li);
     this.lines.push({ el: li, age: 0 });
     while (this.lines.length > 3) this.lines.shift()!.el.remove();
+  }
+
+  /**
+   * A cabin line as it starts (the purser's and the captain's PA, the passengers): its own card
+   * under the progress line, apart from the radio log; the latest replaces the last. null clears
+   * it (a new flight, or leaving).
+   */
+  cabin(u: Utterance | null) {
+    if (!u) {
+      this.pa = null;
+      this.paBox.hidden = true;
+      return;
+    }
+    const key = `${u.from}|${u.text}`;
+    this.paBox.style.opacity = '';
+    this.paBox.hidden = false;
+    // a PA the radio talked over is said again: the same card, kept up from the start
+    if (this.pa?.key !== key) {
+      this.paFrom.textContent = u.from;
+      this.paText.textContent = u.text;
+      this.paBox.classList.toggle('is-pa', u.speaker === 'pa');
+    }
+    this.pa = { key, age: 0 };
   }
 
   /** A penalty or a bonus as it happens: "Heavy landing −10". */
@@ -262,6 +315,14 @@ export class FlightHud {
 
   /** The log's and the toasts' ageing. */
   update(dt: number) {
+    if (this.pa) {
+      this.pa.age += dt;
+      if (this.pa.age > CABIN_S) {
+        const k = Math.min(1, (this.pa.age - CABIN_S) / CABIN_FADE_S);
+        this.paBox.style.opacity = String(1 - k);
+        if (k >= 1) this.cabin(null);
+      }
+    }
     for (let i = this.lines.length - 1; i >= 0; i--) {
       const l = this.lines[i];
       l.age += dt;

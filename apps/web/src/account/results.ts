@@ -16,6 +16,8 @@ export interface RoundResult {
   stats: RoundStats;
   /** How the round ended, when it ended some other way than finishing or hopping off (a coaster that stalled). */
   ending?: { headline: string; lead: string };
+  /** The visitor is across the sea from the Ticket Booth (on Palm Cay): its button says the way there. */
+  boothAway?: boolean;
 }
 
 type Saved = { state: 'saving' } | { state: 'saved'; res: FinishedRound } | { state: 'failed'; message: string };
@@ -182,7 +184,12 @@ class ResultsDialog {
     if (this.status.state === 'saving') return `Saving your round…${left ? ` · ${left}` : ''}`;
     if (this.status.state === 'failed') return `${escapeHtml(this.status.message)}${left ? ` · ${left}` : ''}`;
     const n = this.status.res.history?.rounds ?? 0;
-    const rounds = n ? `Your ${ordinal(n)} completed round of ${escapeHtml(r.title)}` : `No completed rounds of ${escapeHtml(r.title)} yet`;
+    // (a round left early or crashed is not one of them: say how many there are so far, not "your Nth")
+    const rounds = !n
+      ? `No completed rounds of ${escapeHtml(r.title)} yet`
+      : r.completed
+        ? `Your ${ordinal(n)} completed round of ${escapeHtml(r.title)}`
+        : `${n} completed ${n === 1 ? 'round' : 'rounds'} of ${escapeHtml(r.title)} so far`;
     return `${rounds}${left ? ` · ${left}` : ''}`;
   }
 
@@ -191,7 +198,7 @@ class ResultsDialog {
     if (!session.user) return close;
     const cost = session.cost(r.ride);
     const balance = session.balance;
-    if (balance !== null && balance < cost) return `<button type="button" class="btn btn-primary" data-results="booth">Get tickets at the booth 🎟️</button>${close}`;
+    if (balance !== null && balance < cost) return `<button type="button" class="btn btn-primary" data-results="booth">${r.boothAway ? 'Get tickets at the fair ✈️' : 'Get tickets at the booth 🎟️'}</button>${close}`;
     return `<button type="button" class="btn btn-primary" data-results="again">${isGame(r.ride) ? 'Play again' : 'Ride again'} (${cost} 🎟️)</button>${close}`;
   }
 }

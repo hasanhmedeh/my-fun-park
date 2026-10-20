@@ -8,6 +8,8 @@
 //   ?scene=jetski&race=1&until=air                   the first jump you take, frozen in the air
 //   ?scene=jetski&race=1&until=finish                just past the flag
 //   &hud=1                                           with the race HUD over it
+//   &close=x,y,z&freeze=1                            a close camera in your ski's frame (x right, y up, z back), sim held
+//   &people=0                                        the merged stand-in riders (no people loaded)
 // A cam / look in the URL overrides the race camera.
 import * as THREE from 'three';
 import type { PreviewScene } from '../main';
@@ -16,6 +18,8 @@ import type { UI } from '../../world/ui';
 import { SEA_Y } from '../../world/geo';
 import { PalmCay } from '../../world/island/island';
 import { JetSki } from '../../world/attractions/island/jetski';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { GUEST_ANIMS_URL, GUESTS_URL, PeopleFactory, VISITOR_LOOK } from '../../world/crowd/people';
 import { stage } from './island';
 
 const preview: PreviewScene = async (p) => {
@@ -38,6 +42,11 @@ const preview: PreviewScene = async (p) => {
   const park = new PalmCay(ctx);
   ctx.scene.add(park.group);
   const js = new JetSki(ctx);
+  if (q.get('people') !== '0') {
+    const loader = new GLTFLoader();
+    const [guests, anims] = await Promise.all([loader.loadAsync(GUESTS_URL), loader.loadAsync(GUEST_ANIMS_URL)]);
+    js.setPeople(new PeopleFactory(guests, anims), VISITOR_LOOK);
+  }
   stage(p, (k) => {
     park.setNight(k);
     js.setNight(k);
@@ -72,7 +81,16 @@ const preview: PreviewScene = async (p) => {
       settle(Math.round(2.5 / dt));
     } else settle(Math.round(skip / dt));
   }
-  const freeze = q.get('until') === 'air';
+  const freeze = q.get('until') === 'air' || q.get('freeze') === '1';
+  const near = q.get('close')?.split(',').map(Number);
+  const closeUp = () => {
+    if (!near) return;
+    const s = js.ski;
+    const off = new THREE.Vector3(near[0], near[1], near[2]).applyAxisAngle(new THREE.Vector3(0, 1, 0), s.h);
+    camera.position.set(s.x + off.x, s.y + off.y, s.z + off.z);
+    camera.up.set(0, 1, 0);
+    camera.lookAt(s.x, s.y + 0.9, s.z);
+  };
   p.onFrame((dt, ft) => {
     park.update(dt, ft, camera);
     if (!freeze) step(dt);
@@ -80,11 +98,13 @@ const preview: PreviewScene = async (p) => {
     // the shadows and the grass follow the ski
     p.view(camera.position, new THREE.Vector3(js.ski.x, js.ski.y, js.ski.z));
     js.updateCamera(camera, freeze ? 0 : dt);
+    closeUp();
   });
   if (follow) {
     js.updateCamera(camera, 1);
     p.view(camera.position.clone(), new THREE.Vector3(js.ski.x, js.ski.y, js.ski.z));
     js.updateCamera(camera, 0);
+    closeUp();
   } else p.view({ x: 30, y: 4, z: 41420 }, { x: 64, y: 0, z: 41600 });
 };
 export default preview;

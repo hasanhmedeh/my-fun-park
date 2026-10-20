@@ -7,6 +7,11 @@
 // header. Airlines and places are fictional.
 
 import * as THREE from 'three';
+import { AIRFIELDS } from '../../aviation/airports';
+import { SCHEDULE_PAD_S } from '../../aviation/scoring';
+import { TIME_OF_DAY_HOUR, type TimeOfDay } from '../../aviation/types';
+import { bookFlight, clockText } from '../flight/booking';
+import type { Region } from '../geo';
 import { BODY_FONT, canvasTex } from '../textures';
 import type { UvRect } from './terminal-kit';
 
@@ -238,6 +243,82 @@ export const DEFAULT_ARRIVALS: FlightRow[] = [
   { time: '18:20', flight: 'FA124', to: 'Starlight Harbour', gate: '3', status: 'On time' },
   { time: '18:45', flight: 'CN235', to: 'Candy Island', gate: '1', status: 'On time' },
 ];
+
+// ------------------------------------------------------------------------------------------------
+// The day's schedule: Funfair Air's own legs from the booking, the invented traffic round them
+// ------------------------------------------------------------------------------------------------
+
+/** The four departures a day, in the order the booking card offers them. */
+const TIMES_OF_DAY: TimeOfDay[] = ['dawn', 'day', 'dusk', 'night'];
+const BOARD_ROWS = 10;
+/** Boarding starts this long before departure (h): the boards read as at that moment. */
+const BOARDING_LEAD_H = 0.25;
+
+/** "16:40" (or "16:40 …") as hours. */
+const hoursOf = (time: string) => {
+  const m = /^(\d{1,2}):(\d{2})/.exec(time);
+  return m ? Number(m[1]) + Number(m[2]) / 60 : 0;
+};
+
+/**
+ * The boards of one airport, from the same source as the booking card: Funfair Air's four legs a
+ * day out of `region` (FA101 from home, FA102 from the island, at the card's times, bookFlight's
+ * hour) and the four coming in (at departure + the card's block time), among the invented traffic
+ * of `base` (whose own FA101/FA102 rows are dropped). The boards read as they would when the
+ * leg `chosen` (the time of day picked on the card) starts boarding: that one is "Boarding" at the
+ * visitor's gate (its gate screen shows it), the earlier legs have gone, and the invented traffic's
+ * remarks follow the same clock. Ten rows, from a little before that moment.
+ */
+export function scheduleBoards(
+  region: Region,
+  chosen: TimeOfDay,
+  base: { departures: FlightRow[]; arrivals: FlightRow[] },
+  now = new Date(),
+): { departures: FlightRow[]; arrivals: FlightRow[] } {
+  const away: Region = region === 'home' ? 'island' : 'home';
+  const clock = TIME_OF_DAY_HOUR[chosen] - BOARDING_LEAD_H;
+  const gateOf = (r: Region) => String(AIRFIELDS[r].stands.find((s) => s.id === AIRFIELDS[r].playerStand)?.gate ?? '');
+  const placeName = (r: Region) => (r === 'home' ? 'Funfair' : 'Palm Cay');
+  const ownNos = new Set(['FA101', 'FA102']);
+  type Timed = { h: number; row: FlightRow };
+
+  const departures: Timed[] = TIMES_OF_DAY.map((tod) => {
+    const f = bookFlight(region, tod, now);
+    const status = tod === chosen ? 'Boarding' : f.hour < TIME_OF_DAY_HOUR[chosen] ? 'Departed' : 'On time';
+    return { h: f.hour, row: { time: clockText(f.hour), flight: f.flightNo, to: placeName(away), gate: gateOf(region), status } };
+  });
+  for (const r of base.departures) {
+    if (ownNos.has(r.flight)) continue;
+    const h = hoursOf(r.time);
+    const d = h - clock;
+    const status =
+      d < -0.15 ? 'Departed' : d < 0 ? 'Gate closed' : d < 0.12 ? 'Final call' : d < 0.45 ? 'Boarding' : d < 0.75 ? 'Go to gate' : /delay/i.test(r.status) ? r.status : 'On time';
+    departures.push({ h, row: { ...r, status } });
+  }
+
+  // the legs flying in: home's FA102 belt and the island's FA101 belt are the base boards' own
+  const belt = base.arrivals.find((r) => ownNos.has(r.flight))?.gate ?? '1';
+  const arrivals: Timed[] = TIMES_OF_DAY.map((tod) => {
+    const f = bookFlight(away, tod, now);
+    const h = (f.hour + (f.plan.blockTimeS + SCHEDULE_PAD_S) / 3600) % 24;
+    return { h, row: { time: clockText(h), flight: f.flightNo, to: placeName(away), gate: belt, status: '' } };
+  });
+  for (const r of base.arrivals) if (!ownNos.has(r.flight)) arrivals.push({ h: hoursOf(r.time), row: { ...r } });
+  for (const a of arrivals) {
+    const d = a.h - clock;
+    a.row.status = d < -0.5 ? 'Landed' : d < 0 ? 'Baggage in hall' : /expected|delay/i.test(a.row.status) ? a.row.status : 'On time';
+  }
+
+  // ten rows from an hour before the moment (or the day's last ten)
+  const window = (list: Timed[]) => {
+    list.sort((a, b) => a.h - b.h);
+    let i = list.findIndex((t) => t.h >= clock - 1);
+    if (i < 0) i = list.length;
+    i = Math.min(i, Math.max(0, list.length - BOARD_ROWS));
+    return list.slice(i, i + BOARD_ROWS).map((t) => t.row);
+  };
+  return { departures: window(departures), arrivals: window(arrivals) };
+}
 
 const W = 2048;
 const H = 1280;

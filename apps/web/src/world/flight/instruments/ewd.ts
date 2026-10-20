@@ -40,19 +40,20 @@ const LEVER_NAMES = ['', '1+F', '2', '3', 'FULL'];
 const SLAT_STOPS = [0, 18, 22, 27];
 const FLAP_STOPS = [0, 10, 15, 20, 40];
 
-interface MemoLine {
-  text: string;
-  colour: string;
-}
-
 export class Ewd {
   readonly display: Display;
+  private warp = 1;
 
   constructor(className: string, hz = 10) {
     this.display = new Display(className, hz);
   }
 
   update(dt: number, d: CockpitData) {
+    // a time-warp change shows at once rather than at the next 10 Hz redraw
+    if (d.timeWarp !== this.warp) {
+      this.warp = d.timeWarp;
+      this.display.invalidate();
+    }
     if (!this.display.due(dt) || !this.display.begin()) return;
     const g = this.display.g;
     this.engines(g, d);
@@ -237,57 +238,131 @@ export class Ewd {
   // ---------------------------------------------------------------------------------------------- memos
 
   private memos(g: CanvasRenderingContext2D, d: CockpitData) {
-    const left: MemoLine[] = [];
-    for (const w of d.warnings) left.push({ text: w.text, colour: w.level === 'warning' ? C.red : C.amber });
-    if (!left.length) left.push(...this.checklist(d));
-    const right = new Set<string>();
-    const c = d.controls;
-    const s = d.s;
-    if (c?.parkingBrake) right.add('PARK BRK');
-    if (!s.onGround && (c?.speedbrake ?? 0) > 0.05) right.add('SPEED BRK');
-    if (!s.onGround && c?.autobrake && c.autobrake !== 'off' && phaseIndex(d.phase) >= phaseIndex('approach')) right.add(`AUTO BRK ${c.autobrake.toUpperCase()}`);
-    if (d.sys?.autobrakeActive) right.add('AUTO BRK DECEL');
-    if (!s.onGround && c?.spoilersArmed && phaseIndex(d.phase) >= phaseIndex('approach')) right.add('GND SPLRS ARMED');
-    for (const m of d.memos) right.add(m);
-    left.slice(0, 7).forEach((m, i) => text(g, m.text, 34, MEMO_Y + i * MEMO_ROW, m.colour, 33, 'left'));
-    [...right].slice(0, 7).forEach((m, i) => {
-      const amber = m === 'SPEED BRK' && (c?.throttle ?? 0) > 0.05;
-      text(g, m, 548, MEMO_Y + i * MEMO_ROW, amber ? C.amber : C.green, 33, 'left');
-    });
+    const { left, right } = ecamLists(d);
+    left.slice(0, MEMO_ROWS).forEach((m, i) => text(g, m.text, 34, MEMO_Y + i * MEMO_ROW, m.colour, 33, 'left'));
+    right.slice(0, MEMO_ROWS).forEach((m, i) => text(g, m.text, 548, MEMO_Y + i * MEMO_ROW, m.colour, 33, 'left'));
   }
+}
 
-  /** The T.O memo before takeoff and the LDG memo on the approach, item by item. */
-  private checklist(d: CockpitData): MemoLine[] {
-    const { s } = d;
-    const c = d.controls;
-    const p = phaseIndex(d.phase);
-    const running = d.sys ? d.sys.engineRunning[0] && d.sys.engineRunning[1] : s.n1[0] > 0.18 && s.n1[1] > 0.18;
-    const item = (label: string, value: string, done: boolean): MemoLine => ({ text: done ? `${label} ${value}` : `${label}${'.'.repeat(Math.max(2, 15 - label.length - value.length))}${value}`, colour: done ? C.green : C.cyan });
-    if (s.onGround && running && p >= phaseIndex('pushback') && p <= phaseIndex('takeoff') && s.ias < 60) {
-      const lever = c?.flapLever ?? 0;
-      const flapsOk = lever >= 1 && lever <= 3;
-      const ab = c?.autobrake === 'max';
-      const splrs = c?.spoilersArmed ?? false;
-      return [
-        { text: ab ? 'T.O AUTO BRK MAX' : 'T.O AUTO BRK.....MAX', colour: ab ? C.green : C.cyan },
-        item('    SIGNS', 'ON', true),
-        item('    CABIN', 'READY', true),
-        item('    SPLRS', 'ARM', splrs),
-        item('    FLAPS', 'T.O', flapsOk),
-        item('    T.O CONFIG', flapsOk && splrs ? 'NORM' : 'TEST', flapsOk && splrs),
-      ];
+/** One line of the EWD's warning and memo area. */
+export interface MemoLine {
+  text: string;
+  colour: string;
+}
+
+/** The memo rows each side has room for. */
+const MEMO_ROWS = 7;
+/** The flight's memos the EWD works out itself, or shows on the left in the T.O / LDG memo (dropped from its list). */
+const DERIVED_MEMO = /^(TIME ×|PARK BRK$|SPEED BRK$|AUTO BRK|GND SPLRS ARMED$|SEAT BELTS$|NO SMOKING$|SIGNS ON$|CABIN READY$|SPLRS |FLAPS |LDG GEAR |T\.O )/;
+/** Without the controls the EWD can still tell the time warp and the checklist lines itself. */
+const DERIVED_MEMO_NO_CONTROLS = /^(TIME ×|SIGNS ON$|CABIN READY$|SPLRS |FLAPS |LDG GEAR |T\.O )/;
+/** The warnings liveWarnings() decides each frame (the flight's own copies of these are ignored). */
+const LIVE_WARNINGS = new Set(['L/G GEAR NOT DOWN', 'OVERSPEED', 'STALL', 'CONFIG PARK BRK ON', 'CONFIG FLAPS NOT IN T.O CONFIG', 'SPD BRK STILL OUT']);
+
+/**
+ * What the EWD's lower half shows now: the warnings and cautions (or, with none, the T.O / LDG memo)
+ * on the left, the memos on the right.
+ *
+ * Everything the cockpit data can tell is worked out here from this frame's state rather than taken
+ * from the flight's lists, which it rebuilds only a few times a second and which would otherwise keep
+ * a line up after the state behind it has gone (the "TIME ×4" that stayed on after the warp): the
+ * time warp from `timeWarp`; the gear, speed and configuration warnings, the brakes, speed brake,
+ * spoilers and signs from `s` and `controls`; and an "ENG n SHUT DOWN" from the flight is kept only
+ * while `sys` still has that engine stopped and not starting. Any other line the flight sends passes
+ * through as it is. Pure, so it can be checked headless.
+ */
+export function ecamLists(d: CockpitData): { left: MemoLine[]; right: MemoLine[] } {
+  const c = d.controls;
+  const s = d.s;
+  const live = liveWarnings(d);
+  const warnings: CockpitData['warnings'] = live ?? [];
+  for (const w of d.warnings) {
+    if (live && LIVE_WARNINGS.has(w.text)) continue;
+    const eng = /^ENG ([12]) SHUT DOWN$/.exec(w.text);
+    if (eng && d.sys) {
+      const i = Number(eng[1]) - 1;
+      if (d.sys.engineRunning[i] || d.sys.engineStart[i] >= 0) continue;
     }
-    if (!s.onGround && (p >= phaseIndex('approach') || (s.radioAltFt < 2000 && p >= phaseIndex('descent')))) {
-      return [
-        { text: s.gear > 0.99 ? 'LDG GEAR DN' : 'LDG GEAR......DN', colour: s.gear > 0.99 ? C.green : C.cyan },
-        item('    SIGNS', 'ON', true),
-        item('    CABIN', 'READY', true),
-        item('    SPLRS', 'ARM', c?.spoilersArmed ?? false),
-        item('    FLAPS', 'FULL', (c?.flapLever ?? Math.min(4, s.config)) >= 4),
-      ];
-    }
-    return [];
+    if (!warnings.some((x) => x.text === w.text)) warnings.push(w);
   }
+  // red warnings above amber cautions, each in the order raised
+  const left: MemoLine[] = [...warnings.filter((w) => w.level === 'warning'), ...warnings.filter((w) => w.level !== 'warning')].map((w) => ({ text: w.text, colour: w.level === 'warning' ? C.red : C.amber }));
+  const check = checklist(d);
+  if (!left.length) left.push(...check);
+
+  const right: MemoLine[] = [];
+  const add = (t: string, colour: string = C.green) => {
+    if (!right.some((m) => m.text === t)) right.push({ text: t, colour });
+  };
+  if (d.timeWarp > 1) add(`TIME ×${d.timeWarp}`);
+  if (c) {
+    const p = phaseIndex(d.phase);
+    if (c.parkingBrake) add('PARK BRK');
+    // amber with the thrust above idle and the speed brake out
+    if (!s.onGround && c.speedbrake > 0.05) add('SPEED BRK', c.throttle > 0.05 ? C.amber : C.green);
+    if (d.sys?.autobrakeActive) add('AUTO BRK DECEL');
+    else if (!s.onGround && c.autobrake !== 'off' && p >= phaseIndex('approach')) add(`AUTO BRK ${c.autobrake.toUpperCase()}`);
+    if (!s.onGround && c.spoilersArmed && p >= phaseIndex('approach')) add('GND SPLRS ARMED');
+    // the signs are items of the T.O and LDG memos while those apply, their own memos otherwise
+    if (!check.length) {
+      add('SEAT BELTS');
+      add('NO SMOKING');
+    }
+  }
+  const derived = c ? DERIVED_MEMO : DERIVED_MEMO_NO_CONTROLS;
+  for (const m of d.memos) if (!derived.test(m)) add(m);
+  return { left, right };
+}
+
+/** The gear, speed and configuration warnings from this frame's state and controls (null without the controls). */
+function liveWarnings(d: CockpitData): CockpitData['warnings'] | null {
+  const c = d.controls;
+  if (!c) return null;
+  const s = d.s;
+  const det = A320.detents;
+  const out: CockpitData['warnings'] = [];
+  if (!s.onGround && !c.gearDown && s.radioAltFt < 750 && (c.flapLever >= 3 || c.throttle < 0.1)) out.push({ text: 'L/G GEAR NOT DOWN', level: 'warning' });
+  if (s.overspeed) out.push({ text: 'OVERSPEED', level: 'warning' });
+  if (s.stallWarning) out.push({ text: 'STALL', level: 'warning' });
+  if (s.onGround && c.parkingBrake && c.throttle > det.flx - 0.05) out.push({ text: 'CONFIG PARK BRK ON', level: 'warning' });
+  if (s.onGround && c.throttle > det.flx - 0.05 && c.flapLever === 0) out.push({ text: 'CONFIG FLAPS NOT IN T.O CONFIG', level: 'warning' });
+  if (!s.onGround && c.speedbrake > 0 && c.throttle > det.cl + 0.05) out.push({ text: 'SPD BRK STILL OUT', level: 'caution' });
+  return out;
+}
+
+/** The T.O memo before takeoff and the LDG memo on the approach, item by item. */
+function checklist(d: CockpitData): MemoLine[] {
+  const { s } = d;
+  const c = d.controls;
+  const p = phaseIndex(d.phase);
+  const running = d.sys ? d.sys.engineRunning[0] && d.sys.engineRunning[1] : s.n1[0] > 0.18 && s.n1[1] > 0.18;
+  const item = (label: string, value: string, done: boolean): MemoLine => ({ text: done ? `${label} ${value}` : `${label}${'.'.repeat(Math.max(2, 15 - label.length - value.length))}${value}`, colour: done ? C.green : C.cyan });
+  if (s.onGround && running && p >= phaseIndex('pushback') && p <= phaseIndex('takeoff') && s.ias < 60) {
+    const lever = c?.flapLever ?? 0;
+    const flapsOk = lever >= 1 && lever <= 3;
+    const ab = c?.autobrake === 'max';
+    const splrs = c?.spoilersArmed ?? false;
+    return [
+      { text: ab ? 'T.O AUTO BRK MAX' : 'T.O AUTO BRK.....MAX', colour: ab ? C.green : C.cyan },
+      item('    SIGNS', 'ON', true),
+      item('    CABIN', 'READY', true),
+      item('    SPLRS', 'ARM', splrs),
+      item('    FLAPS', 'T.O', flapsOk),
+      item('    T.O CONFIG', flapsOk && splrs ? 'NORM' : 'TEST', flapsOk && splrs),
+    ];
+  }
+  if (!s.onGround && (p >= phaseIndex('approach') || (s.radioAltFt < 2000 && p >= phaseIndex('descent')))) {
+    // down and locked, with the lever down (a lever moved up shows cyan at once)
+    const gearDn = s.gear > 0.99 && (c?.gearDown ?? true);
+    return [
+      { text: gearDn ? 'LDG GEAR DN' : 'LDG GEAR......DN', colour: gearDn ? C.green : C.cyan },
+      item('    SIGNS', 'ON', true),
+      item('    CABIN', 'READY', true),
+      item('    SPLRS', 'ARM', c?.spoilersArmed ?? false),
+      item('    FLAPS', 'FULL', (c?.flapLever ?? Math.min(4, s.config)) >= 4),
+    ];
+  }
+  return [];
 }
 
 /** The thrust limit the FADEC shows: TOGA before takeoff, then by the levers (FLX or TOGA beyond CL, else CLB). */

@@ -751,6 +751,9 @@ class Plan {
       k.b.paint.box(1.7, 1.7, 0.12, '#101a30', place(x, 4.2, Z_AIR + 0.4));
       k.b.signs.add(signPlane(1.6, 1.6, r), '#ffffff', place(x, 4.2, Z_AIR + 0.47));
       k.b.signs.add(signPlane(1.6, 1.6, r), '#ffffff', place(x, 4.0, Z_AIR - 0.12, Math.PI));
+      // hung from the roof on two rods, so it reads as a sign over the door rather than a block in the air
+      const top = Math.abs(x) < WING.inner ? HALL.eave : WING.eave;
+      for (const sx of [-0.6, 0.6]) k.b.metal.box(0.03, top - 5.05, 0.03, '#3a3328', place(x + sx, (top + 5.05) / 2, Z_AIR + 0.4));
     };
     for (const g of GATE_DOORS) {
       gateNumber(g.gate, g.x);
@@ -1019,8 +1022,9 @@ class Plan {
     k.b.timber.box(9.2, 1.9, 0.2, DARK_TIMBER, place(cx, c.eave - 1.2, c.z1 - 0.6));
     k.b.signs.add(signPlane(9, 1.875, r), '#ffffff', place(cx, c.eave - 1.2, c.z1 - 0.48));
     k.b.signs.add(signPlane(9, 1.875, r), '#ffffff', place(cx, c.eave - 1.2, c.z1 - 0.72, Math.PI));
-    // hanging lanterns under the canopy
-    for (const x of [-9, 0, 9])
+    // hanging lanterns under the canopy, in two rows either side of the middle: none on the axis,
+    // where they would hang in front of the Arrivals sign (and over the arrivals spot, x = 0)
+    for (const x of [-13, -6.5, 6.5, 13])
       for (const z of [c.z0 + 8, c.z0 + 22]) {
         k.b.metal.box(0.02, 1.2, 0.02, '#3a3328', place(x, c.eave - 0.6, z));
         k.b.lit.add(new THREE.CylinderGeometry(0.22, 0.18, 0.5, 8), '#ffe1a8', place(x, c.eave - 1.45, z));

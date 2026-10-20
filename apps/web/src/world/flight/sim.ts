@@ -34,6 +34,8 @@ export type Stage = 'boarding' | 'stand' | 'push' | 'taxi' | 'flight' | 'taxi-in
 export interface SimTraffic {
   runwayBusy(region: Region): RunwayStatus;
   holdForPlayer(region: Region, on: boolean): void;
+  /** No new arrivals at the destination while the player is cleared in (descent or approach, until landed or abandoned). */
+  holdArrivals?(region: Region, on: boolean): void;
 }
 
 export interface FlightSimOptions {
@@ -144,6 +146,8 @@ export class FlightSim {
   private scoreSeen = 0;
   private holdDep = false;
   private holdArr = false;
+  /** The destination holds its new arrivals for the player (from the descent or approach clearance until landed). */
+  private seqArr = false;
   private parkFrom: Pose2 | null = null;
   private wasOnGround = true;
   private apEngagedOnce = false;
@@ -490,6 +494,10 @@ export class FlightSim {
           this.holdArr = false;
           this.traffic?.holdForPlayer(this.to, false);
         }
+        if (this.seqArr) {
+          this.seqArr = false;
+          this.traffic?.holdArrivals?.(this.to, false);
+        }
         const st = this.arrStand;
         const near = Math.hypot(s.pos.x - st.x, s.pos.z - st.z);
         const aligned = Math.abs(((((s.heading - st.heading) % 360) + 540) % 360) - 180) < 25;
@@ -576,7 +584,8 @@ export class FlightSim {
   private releaseRunways() {
     if (this.holdDep) this.traffic?.holdForPlayer(this.from, false);
     if (this.holdArr) this.traffic?.holdForPlayer(this.to, false);
-    this.holdDep = this.holdArr = false;
+    if (this.seqArr) this.traffic?.holdArrivals?.(this.to, false);
+    this.holdDep = this.holdArr = this.seqArr = false;
   }
 
   /**
@@ -646,7 +655,14 @@ export class FlightSim {
         this.ap.setHdg(this.depRw.heading);
         break;
       }
+      case 'descent':
       case 'approach':
+        // cleared in: the destination sequences its arrivals round the player from here on
+        if (!this.seqArr) {
+          this.seqArr = true;
+          this.traffic?.holdArrivals?.(this.to, true);
+        }
+        if (kind === 'descent') break;
         // cleared for the approach again after a go-around: the missed approach is over. The
         // navigator would otherwise keep the missed approach altitude as the managed descent's
         // target until established, holding the aircraft at it all the way to the localizer.

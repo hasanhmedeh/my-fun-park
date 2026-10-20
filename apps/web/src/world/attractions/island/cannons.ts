@@ -357,6 +357,11 @@ export class Cannons implements Attraction {
     return this.focusAt;
   }
 
+  /** The clock ran out (the last look at the sea, or done): leaving now is no early exit. */
+  get finished(): boolean {
+    return this.active && (this.done || this.overT >= 0);
+  }
+
   get secondsLeft() {
     return Math.max(0, this.timeLeft);
   }

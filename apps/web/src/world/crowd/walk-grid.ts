@@ -60,9 +60,9 @@ export class WalkGrid {
     readonly bounds: Rect,
     readonly cell: number,
     walk: Rect[],
-    obs: Obstacles,
+    private readonly obs: Obstacles,
     /** How close to a collider a person's centre may come. */
-    margin = 0.3,
+    private readonly margin = 0.3,
   ) {
     this.nx = Math.ceil((bounds.x1 - bounds.x0) / cell);
     this.nz = Math.ceil((bounds.z1 - bounds.z0) / cell);
@@ -199,11 +199,15 @@ export class WalkGrid {
     return best && Math.sqrt(bd) <= maxR ? best : null;
   }
 
-  /** Is the straight line a→b free all the way (sampled at a third of a cell)? */
+  /**
+   * Is the straight line a→b free all the way (sampled at a third of a cell)? And clear of the
+   * colliders themselves: a coarse grid's cells are closed by their centres, so a line between two
+   * open ones can still clip the corner of something narrower than a cell or two.
+   */
   clear(ax: number, az: number, bx: number, bz: number) {
     const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / (this.cell / 3)));
     for (let i = 0; i <= n; i++) if (!this.free(ax + ((bx - ax) * i) / n, az + ((bz - az) * i) / n)) return false;
-    return true;
+    return this.cell < 0.75 || this.obs.clear(ax, az, bx, bz, Math.min(this.margin, 0.3));
   }
 
   /**

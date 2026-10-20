@@ -210,13 +210,18 @@ export function skiGeometry(paintCol: string, accent: string) {
 /** Where the rider sits: the saddle's middle (the rider model's origin). */
 export const SADDLE = new THREE.Vector3(0, station(0.3).crown + 0.17, 0.3);
 
+/** The right grip's middle on the bars (the left one mirrors it in x), in the ski's frame. */
+export const GRIP = new THREE.Vector3(0.36, station(0.55).crown + 0.27, -0.2);
+
+/** The top of the right footwell mat, about where a rider's foot rests (mirrored for the left). */
+export const FOOTWELL = new THREE.Vector3(0.42, station(0.3).gun + 0.035, 0.32);
+
 /**
  * A racer in a full-face helmet, a life vest over a wetsuit and gloves, sitting forward with their
  * hands on the bars and their feet in the footwells. The origin is the saddle (SADDLE), so the
  * model can lean and bob about it.
  */
-export function riderGeometry(vest: string, helmet: string) {
-  const suit = '#1f2329';
+export function riderGeometry(vest: string, helmet: string, suit = '#1f2329') {
   const parts: THREE.BufferGeometry[] = [];
   const barY = station(0.55).crown + 0.27 - SADDLE.y;
   const barZ = -0.2 - SADDLE.z;

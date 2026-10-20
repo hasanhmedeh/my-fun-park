@@ -55,7 +55,7 @@ const RA_CALLS: { ft: number; say: string; text: string }[] = [
   { ft: 500, say: 'five hundred', text: '500' },
   { ft: 400, say: 'four hundred', text: '400' },
   { ft: 300, say: 'three hundred', text: '300' },
-  { ft: 200, say: 'minimums', text: 'MINIMUMS' },
+  { ft: 200, say: 'minimum', text: 'MINIMUM' },
   { ft: 100, say: 'one hundred', text: '100' },
   { ft: 50, say: 'fifty', text: '50' },
   { ft: 40, say: 'forty', text: '40' },

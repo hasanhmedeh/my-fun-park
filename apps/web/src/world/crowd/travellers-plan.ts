@@ -330,6 +330,13 @@ export interface IslandPlan {
   wander: V2[];
   /** Round the games, facing them. */
   watch: Spot[];
+  /** In front of the promenade's huts (the shops, bars and stalls), facing their counters. */
+  browse: Spot[];
+  /**
+   * Places to stop a while and take it in (or chat): over the arrivals plaza, round the Beach
+   * Plaza, along the beach's boardwalk. Strollers' walks go between these too.
+   */
+  linger: Spot[];
   shallows: Shallows[];
   /** Gate 2's queue: from the gate door back past the desk into the lounge. */
   tail: V2[];
@@ -419,6 +426,39 @@ export function islandPlan(term: IslandTerminal, park: PalmCay, obs: Obstacles):
       }
     }
 
+  // the huts along the promenade: from its side walks, out to the first thing solid and wide (a
+  // counter, a shop front; not a palm or a lantern post)
+  const browse: Spot[] = [];
+  const pz = sp.promenade.map((p) => p.z);
+  for (const sx of [-1, 1])
+    for (let z = Math.min(...pz); z <= Math.max(...pz); z += 2.5)
+      for (let x = 11; x < 20; x += 0.5) {
+        const px = sx * x;
+        if (pGrid.free(px, z)) continue;
+        const wide = [-1.5, -0.75, 0.75, 1.5].every((dz) => !pGrid.free(px + sx * 0.5, z + dz));
+        const at = pGrid.nearestLinked(px - sx * 0.9, z, 0.6);
+        if (wide && at) browse.push({ ...at, yaw: sx > 0 ? -Math.PI / 2 : Math.PI / 2 });
+        break;
+      }
+
+  const linger: Spot[] = [];
+  const stop = (x: number, z: number, look: V2) => {
+    const p = pGrid.nearestLinked(x, z, 2);
+    if (p && !tGrid.free(p.x, p.z)) linger.push({ ...p, yaw: yawTo(p, look) });
+  };
+  // the arrivals plaza: facing about the welcome gateway and down the promenade, or the terminal
+  for (let x = -32; x <= 32; x += 8)
+    for (let z = 40699; z <= 40737; z += 7) stop(x + (z % 2) * 2, z, (x * 7 + z) % 3 === 0 ? { x: 0, z: 40680 } : { x: 0, z: 40760 });
+  // round the Beach Plaza (its fountain in the middle)
+  const bp = ISLAND_SPOTS.plaza;
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2;
+    const r = i % 2 ? 16 : 28;
+    stop(bp.x + Math.sin(a) * r, bp.z + Math.cos(a) * r, bp);
+  }
+  // along the boardwalk at the top of the beach, looking out to sea
+  for (let x = -300; x <= 300; x += 12) stop(x, BEACH_WALK_Z - 3, { x, z: BEACH_WALK_Z + 100 });
+
   const shallows: Shallows[] = [];
   for (const [x0, x1] of SWIM)
     for (let x = x0 + 6; x < x1 - 6; x += 9) {
@@ -443,6 +483,19 @@ export function islandPlan(term: IslandTerminal, park: PalmCay, obs: Obstacles):
       if (swim.every((p) => SEA_Y - groundY(p.x, p.z) > 0.8 && p.z < ISLAND.lagoon.z0 - 20)) shallows.push({ edge, wade, swim });
     }
 
+  // down on the sand by the water: little knots of two or three, chatting (facing in), or looking out to sea
+  shallows.forEach((sh, k) => {
+    const c = pGrid.nearestLinked(sh.edge.x + 4, sh.edge.z + 3, 3);
+    if (!c) return;
+    const n = 2 + (k % 2);
+    const sea = k % 3 === 0;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + k;
+      const q = pGrid.nearestLinked(c.x + Math.sin(a) * 0.8, c.z + Math.cos(a) * 0.8, 0.5);
+      if (q) linger.push({ ...q, yaw: sea ? yawTo(q, { x: q.x, z: q.z + 100 }) : yawTo(q, c) });
+    }
+  });
+
   const gx = -30;
   const tail: V2[] = [
     { x: gx, z: Z_AIR + 2.5 },
@@ -466,8 +519,10 @@ export function islandPlan(term: IslandTerminal, park: PalmCay, obs: Obstacles):
     beds: beds.filter((b) => onFoot(b.approach)),
     castles: castles.filter(onFoot),
     promenade: sp.promenade.filter(onFoot).map((p) => ({ ...p })),
-    wander: sp.wander.filter((p) => pGrid.linked(p.x, p.z)).map((p) => ({ ...p })),
+    wander: [...sp.wander.filter((p) => pGrid.linked(p.x, p.z)).map((p) => ({ ...p })), ...linger.map((p) => ({ x: p.x, z: p.z }))],
     watch,
+    browse,
+    linger,
     shallows,
     tail,
     plaza: { ...sp.plaza },

@@ -1,6 +1,6 @@
 // Small helpers shared by the office's views: names, formatting, the toast and the tooltip.
 import { ApiError, type AttractionId } from '../account/api';
-import { ZONES } from '../world/layout';
+import { rideTitle } from '../world/layout';
 
 export const ICONS: Record<AttractionId, string> = {
   coaster: '🎢',
@@ -33,7 +33,7 @@ export const ICONS: Record<AttractionId, string> = {
 };
 
 /** "Thunder Loop" for "coaster", "Plot 3" for "plot3". */
-export const rideName = (id: AttractionId) => ZONES[id].title;
+export const rideName = (id: AttractionId) => rideTitle(id);
 export const rideLabel = (id: AttractionId) => `${ICONS[id]} ${rideName(id)}`;
 
 const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
