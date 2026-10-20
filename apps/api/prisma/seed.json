@@ -110,6 +110,31 @@
       "tickets": 1,
       "open": true,
       "closedMessage": null
+    },
+    "flight": {
+      "tickets": 10,
+      "open": true,
+      "closedMessage": null
+    },
+    "jetski": {
+      "tickets": 1,
+      "open": true,
+      "closedMessage": null
+    },
+    "slides": {
+      "tickets": 1,
+      "open": true,
+      "closedMessage": null
+    },
+    "cannons": {
+      "tickets": 1,
+      "open": true,
+      "closedMessage": null
+    },
+    "volley": {
+      "tickets": 1,
+      "open": true,
+      "closedMessage": null
     }
   },
   "shop": {},

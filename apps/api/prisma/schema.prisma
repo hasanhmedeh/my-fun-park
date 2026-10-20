@@ -19,6 +19,8 @@ datasource db {
 /// Everything that takes a ticket: the rides and the games. Mirrors the zone ids in apps/web/src/world/layout.ts.
 /// plot1 to plot8 are Creators' Valley's plots: each runs whichever player-built coaster staff have
 /// released onto it (see Creation), and is priced and closed like any other attraction.
+/// flight is Funfair Air's flight from the airport to Palm Cay (and back): one round is one flight,
+/// gate to gate. jetski, slides, cannons and volley are Palm Cay's beach park attractions.
 enum Attraction {
   coaster
   falcon
@@ -40,6 +42,11 @@ enum Attraction {
   plot6
   plot7
   plot8
+  flight
+  jetski
+  slides
+  cannons
+  volley
 
   @@map("attraction")
 }

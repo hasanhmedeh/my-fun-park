@@ -9,10 +9,13 @@ import type { Quality } from './quality';
 import { mulberry } from './random';
 import { detailNormalTexture, glowTexture, groundTexture, hdr, PALETTE, lawnPatchTexture, poolTexture, stripeTexture } from './textures';
 import { addWind } from './wind';
-import { FALCON_TRACK, nearTrack } from './rides';
-import { fogSun, installSunFog } from './fog';
-import { CIRCUIT, nearCircuit, WALL } from './attractions/speedway-track';
-import { nearTrail, TRAIL, WALL as TRAIL_WALL } from './attractions/trail-track';
+import { nearTrack } from './rides';
+import { fogSun, installSunFog, withFogSun } from './fog';
+import { nearCircuit, WALL } from './attractions/speedway-track';
+import { nearTrail, WALL as TRAIL_WALL } from './attractions/trail-track';
+import { Terrain, onLand } from './terrain';
+import { Sea } from './sea';
+import { Clouds } from './clouds';
 
 export { mulberry };
 
@@ -31,10 +34,20 @@ const HEMI_SKY = [col('#2c3866'), col('#9a8ee0'), col('#c9cfd6')];
 const HEMI_GROUND = [col('#18131f'), col('#4a3b30'), col('#5e5240')];
 const FOG = [col('#0d1426'), col('#584a70'), col('#7f9fc2')];
 const FOG_SUN = [col('#1c2850'), col('#f0a06a'), col('#c9c3b4')];
+/** The haze seen from the air over tens of kilometres: paler than the park's blue fog, matching the sky at the horizon. */
+const AIR_HAZE = [col('#0f182c'), col('#a08c96'), col('#bccad8')];
 const SUN_WARM = col('#ffbe86');
 const SUN_NOON = col('#fff3e2');
 const MOON = col('#9eb6ff');
 const ENV_GROUND = [col('#0c1410'), col('#24402f'), col('#3d6a48')];
+/** What reflections see below the horizon out over the sea. */
+const ENV_SEA = [col('#05080e'), col('#1c2a3a'), col('#28465a')];
+/** Inside a cloud: the fog closes in to this (m, 98 %) and turns cloud-grey. */
+const IN_CLOUD_VIS = 45;
+/** The walking camera's planes (Game.ts builds the camera with them). */
+const WALK_FAR = 2400;
+const WALK_NEAR = 0.5;
+const SHADOW_SPAN = 46;
 
 /** night → glow → day blend of three colours. */
 function tri(out: THREE.Color, c: THREE.Color[], day: number, glow: number) {
@@ -46,8 +59,31 @@ export class Environment {
   sun: THREE.DirectionalLight;
   hemi: THREE.HemisphereLight;
   grass: Grass;
+  /** The land beyond the park (hills, country, coast, Palm Cay), the sea round it, and cloud layers to fly through. */
+  readonly terrain: Terrain;
+  readonly sea: Sea;
+  readonly clouds: Clouds;
+  /** setVisibility's fog density (null: the park's own). */
+  private visDensity: number | null = null;
+  /** Flying: the park's near-only details (grass, fireflies, balloons) are skipped. */
+  private farFocus = false;
+  /** 1 while the reflections were last baked looking out over the sea, 0 over land. */
+  private bakedSea = 0;
+  private frameDt = 0;
+  /** The day / sunrise-glow blend weights applyTime last worked out. */
+  private day = 1;
+  private glow = 0;
+  /** How far back along the light the shadow camera stands (grows with setShadowSpan). */
+  private shadowReach = 150;
   private sky: Sky;
-  private skyUniforms = { uSpace: { value: 0 }, uSkyExposure: { value: 0.8 }, uNight: { value: 0 } };
+  private skyUniforms = {
+    uSpace: { value: 0 },
+    uSkyExposure: { value: 0.8 },
+    uNight: { value: 0 },
+    /** Flying (a visibility is set): the sky melts into the fog at the horizon, where the sea and the land fade into it. */
+    uHorizonFog: { value: 0 },
+    uFogCol: { value: new THREE.Color() },
+  };
   private stars: THREE.Points;
   private fireflies: THREE.Points;
   private fireflySeeds: Float32Array;
@@ -77,7 +113,7 @@ export class Environment {
   private cubeCam: THREE.CubeCamera;
   private envRT: THREE.WebGLRenderTarget | null = null;
   private tmp = new THREE.Color();
-  /** What's drawn beyond the park too: the sky, the sun and moon, the lights, the far ground and hills (see shareLayer). */
+  /** What's drawn beyond the park too: the sky, the sun and moon, the lights, the land, the sea and the clouds (see shareLayer). */
   private shared: THREE.Object3D[] = [];
 
   constructor(private ctx: Ctx, q: Quality) {
@@ -99,8 +135,12 @@ export class Environment {
     u.cloudSpeed.value = 0.00007; // a gentle breeze: clouds visibly drift across the sky
     this.sky.material.onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, this.skyUniforms);
+      withFogSun(shader);
       shader.fragmentShader = shader.fragmentShader
-        .replace('void main() {', 'uniform float uSpace;\nuniform float uSkyExposure;\nuniform float uNight;\nvoid main() {')
+        .replace(
+          'void main() {',
+          'uniform float uSpace;\nuniform float uSkyExposure;\nuniform float uNight;\nuniform float uHorizonFog;\nuniform vec3 uFogCol;\nuniform vec3 uFogSunDir;\nuniform vec3 uFogSunColor;\nvoid main() {',
+        )
         .replace(
           'gl_FragColor = vec4( texColor, 1.0 );',
           `vec3 spaceCol = mix( vec3( 0.004, 0.002, 0.012 ), vec3( 0.02, 0.01, 0.05 ), smoothstep( -0.3, 0.6, direction.y ) );
@@ -112,6 +152,9 @@ export class Environment {
           // night: a deep blue dome, a touch lighter toward the zenith
           vec3 nightCol = mix( vec3( 0.006, 0.008, 0.02 ), vec3( 0.016, 0.026, 0.065 ), smoothstep( -0.1, 0.6, direction.y ) );
           skyCol = mix( skyCol, nightCol, uNight );
+          // flying: the haze at the horizon is the fog's colour (sun-tinted as fog.ts tints it)
+          vec3 hazeCol = mix( uFogCol, uFogSunColor, pow( max( dot( direction, uFogSunDir ), 0.0 ), 5.0 ) );
+          skyCol = mix( skyCol, hazeCol, ( 1.0 - smoothstep( -0.03, 0.12, direction.y ) ) * uHorizonFog );
           gl_FragColor = vec4( mix( skyCol, spaceCol, uSpace ), 1.0 );`,
         );
     };
@@ -241,12 +284,13 @@ export class Environment {
       valley.receiveShadow = true;
       scene.add(valley);
     }
-    const far = new THREE.Mesh(new THREE.CircleGeometry(900, 64), std('#2b5c40', { roughness: 1 }));
-    far.rotation.x = -Math.PI / 2;
-    far.position.y = -0.05;
-    scene.add(far);
-    this.shared.push(far);
-    this.buildHills();
+    // the world beyond the park: the ring hills and the country out to the mountains, the coast and
+    // Palm Cay (terrain.ts), the sea to the horizon (sea.ts) and, when the weather has them, clouds
+    this.terrain = new Terrain(ctx, q);
+    this.sea = new Sea(ctx, q);
+    this.clouds = new Clouds(ctx, q);
+    scene.add(this.terrain.group, this.sea.mesh, this.clouds.mesh);
+    this.shared.push(this.terrain.group, this.sea.mesh, this.clouds.mesh);
 
     const groundBody = new CANNON.Body({ mass: 0, material: ctx.mats.ground });
     groundBody.addShape(new CANNON.Plane());
@@ -297,63 +341,7 @@ export class Environment {
     scene.add(this.fireflies);
   }
 
-  /** Rolling hills on the horizon, round the park, give the scene depth (fog does the rest). */
-  private buildHills() {
-    const seg = 180;
-    const radii = [200, 290, 430, 610, 860];
-    const amps = [0, 3, 9, 18, 30];
-    const colors = ['#2b5c40', '#2a5038', '#2e4836', '#3a4250', '#4c4562'].map((c) => new THREE.Color(c));
-    const pos: number[] = [];
-    const col: number[] = [];
-    const idx: number[] = [];
-    const h = (a: number, k: number) =>
-      (Math.sin(a * 3 + k) * 0.5 + Math.sin(a * 7.3 + k * 2.1) * 0.3 + Math.sin(a * 13.7 + k) * 0.2) * 0.5 + 0.5;
-    // the hills flatten into a plain out past whatever stands beyond the fence, `spread` sectors either side
-    const reach = new Float32Array(seg);
-    const clear = (x: number, z: number, pad: number, spread: number) => {
-      const r = Math.hypot(x - PARK.x, z - PARK.z) + pad;
-      if (r < 150) return;
-      const si = Math.round(((((Math.atan2(z - PARK.z, x - PARK.x) / (Math.PI * 2)) % 1) + 1) % 1) * seg);
-      for (let d = -spread; d <= spread; d++) {
-        const j = (((si + d) % seg) + seg) % seg;
-        reach[j] = Math.max(reach[j], r);
-      }
-    };
-    // wherever the Sky Falcon runs out into the desert…
-    for (let k = 0; k < FALCON_TRACK.pos.length; k += 4) clear(FALCON_TRACK.pos[k].x, FALCON_TRACK.pos[k].z, 0, 6);
-    // …behind the kart circuit and the Rally Trail, so no hillside rises through their far walls…
-    for (let k = 0; k < CIRCUIT.n; k += 4) clear(CIRCUIT.px[k], CIRCUIT.pz[k], WALL, 4);
-    for (let k = 0; k < TRAIL.n; k += 4) clear(TRAIL.px[k], TRAIL.pz[k], TRAIL_WALL, 4);
-    // …and round the giant wheel and its legs
-    const wheel = LAYOUT.ferris;
-    for (let x = -130; x <= 130; x += 10) for (const dz of [-50, 0, 50]) clear(wheel.x + x, wheel.z + dz, 10, 2);
-    // …and over Creators' Valley, whose coasters climb 35 m
-    for (const l of VALLEY.lawns) for (let x = l.x0; x <= l.x1; x += 15) for (let z = l.z0; z <= l.z1; z += 15) clear(x, z, 40, 3);
-    radii.forEach((r, row) => {
-      for (let i = 0; i <= seg; i++) {
-        const a = (i / seg) * Math.PI * 2;
-        const flat = row === 0 || r < reach[i % seg] + 140;
-        pos.push(PARK.x + Math.cos(a) * r, flat ? -0.1 : h(a, row) * amps[row] + amps[row] * 0.15, PARK.z + Math.sin(a) * r);
-        col.push(colors[row].r, colors[row].g, colors[row].b);
-      }
-    });
-    for (let row = 0; row < radii.length - 1; row++)
-      for (let i = 0; i < seg; i++) {
-        const a = row * (seg + 1) + i;
-        const b = a + seg + 1;
-        idx.push(a, b, a + 1, a + 1, b, b + 1);
-      }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-    g.setIndex(idx);
-    g.computeVertexNormals();
-    const hills = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
-    this.ctx.scene.add(hills);
-    this.shared.push(hills);
-  }
-
-  /** Draws the sky, the lights and the far hills on another render layer too (the Builder's Yard's). */
+  /** Draws the sky, the lights, the land beyond the park and the sea on another render layer too (the Builder's Yard's). */
   shareLayer(layer: number) {
     for (const o of this.shared) o.traverse((c) => c.layers.enable(layer));
   }
@@ -761,7 +749,7 @@ export class Environment {
 
   /** Keep the shadow camera centred on what matters. */
   follow(target: THREE.Vector3) {
-    this.sun.position.copy(target).addScaledVector(this.lightDir, 150);
+    this.sun.position.copy(target).addScaledVector(this.lightDir, this.shadowReach);
     this.sun.target.position.copy(target);
   }
 
@@ -797,6 +785,8 @@ export class Environment {
     const day = smooth(sun.y, -0.1, 0.22);
     const glow = smooth(sun.y, -0.2, 0) * (1 - smooth(sun.y, 0.06, 0.4)); // sunrise / sunset
     this.night = 1 - smooth(sun.y, -0.24, -0.02);
+    this.day = day;
+    this.glow = glow;
     const space = this.space;
 
     // sky
@@ -810,8 +800,6 @@ export class Environment {
     this.skyUniforms.uSpace.value = space;
     (this.stars.material as THREE.PointsMaterial).opacity = Math.max(this.night * 0.85, smooth(space, 0.15, 0.8));
     this.stars.rotation.y = (this.hours / 24) * Math.PI * 2 * 0.25;
-    this.moon.position.copy(moon).multiplyScalar(780);
-    this.moon.lookAt(0, 0, 0);
     this.moon.visible = moon.y > -0.05;
 
     // direct light: the sun by day, the moon by night (one shadow-casting light)
@@ -833,38 +821,120 @@ export class Environment {
     tri(this.hemi.groundColor, HEMI_GROUND, day, glow);
     this.hemi.intensity = lerp(0.85, 0.45, day) * (1 - space * 0.7);
     this.ctx.scene.environmentIntensity = (lerp(0.42, 0.4, day) + 0.35 * glow) * (1 - space * 0.8);
-    tri(this.envGround.color, ENV_GROUND, day, glow);
+    tri(this.envGround.color, ENV_GROUND, day, glow).lerp(tri(this.tmp, ENV_SEA, day, glow), this.bakedSea);
 
-    // fog: colour, sun-side tint and density
+    // fog: colour, sun-side tint and density (the park's haze, or a visibility set for flying)
     const fog = this.ctx.scene.fog as THREE.FogExp2;
     tri(fog.color, FOG, day, glow);
     tri(fogSun.uFogSunColor.value, FOG_SUN, day, glow);
     fogSun.uFogSunDir.value.copy(sun.y > -0.05 ? sun : moon);
-    fog.density = FOG_DENSITY * lerp(1, 0.3, day) * this.haze * (1 - space);
+    fog.density = (this.visDensity ?? FOG_DENSITY * lerp(1, 0.3, day) * this.haze) * (1 - space);
+    const aloft = this.visDensity === null ? 0 : 1;
+    if (aloft) fog.color.lerp(tri(this.tmp, AIR_HAZE, day, glow), 0.85);
+    // inside a cloud the world closes in to a grey-white murk
+    const cloud = this.clouds.inside;
+    if (cloud > 0) {
+      fog.density = lerp(fog.density, 1.978 / IN_CLOUD_VIS, cloud);
+      fog.color.lerp(this.tmp.copy(this.hemi.color).multiplyScalar(lerp(0.25, 0.95, day)), cloud);
+    }
+    // the sky's horizon melts into the same haze the sea and the land fade into
+    this.skyUniforms.uHorizonFog.value = aloft * (1 - space);
+    this.skyUniforms.uFogCol.value.copy(fog.color);
+    this.clouds.light(sunW > 0.001 ? sun : moon, this.sun.color, this.sun.intensity, this.hemi.color, this.hemi.groundColor);
+    this.terrain.setNight(this.night);
 
     // the park's own lights: dimmer by day, full glow at night
     const lights = 1 - 0.6 * day;
     this.lampMat.color.copy(this.tmp.set('#ffd59a')).multiplyScalar(7 * lights);
     this.poolMat.opacity = lerp(0.15, 1, this.night);
     (this.fireflies.material as THREE.PointsMaterial).opacity = this.night;
-    this.fireflies.visible = this.night > 0.02;
+    this.fireflies.visible = this.night > 0.02 && !this.farFocus;
   }
 
-  /** Re-renders the sky into the reflection map whenever the clock has moved ~6 game minutes. */
+  /**
+   * Re-renders the sky into the reflection map whenever the clock has moved ~6 game minutes, or
+   * the camera has gone out over the sea or back over land (what's reflected below the horizon).
+   */
   private bakeEnvironment() {
+    const c = this.ctx.camera.position;
+    const sea = onLand(c.x, c.z, -150) ? 0 : 1;
     const d = Math.abs(this.hours - this.bakedHours) % 24; // circular: 23:59 is next to 00:00
-    if (Math.min(d, 24 - d) < 0.1) return;
+    if (Math.min(d, 24 - d) < 0.1 && sea === this.bakedSea) return;
     this.bakedHours = this.hours;
+    if (sea !== this.bakedSea) {
+      this.bakedSea = sea;
+      // the ground colour was set for the old view this frame: set it again for the new one
+      tri(this.envGround.color, ENV_GROUND, this.day, this.glow).lerp(tri(this.tmp, ENV_SEA, this.day, this.glow), sea);
+    }
     this.cubeCam.update(this.ctx.renderer, this.envScene);
     this.envRT = this.pmrem.fromCubemap(this.cubeRT.texture, this.envRT);
     this.ctx.scene.environment = this.envRT.texture;
   }
 
+  /** The camera's far (and near) plane: ~60 km to fly, then restoreViewRange for walking again. */
+  setViewRange(far: number, near?: number) {
+    const cam = this.ctx.camera;
+    cam.far = far;
+    if (near !== undefined) cam.near = near;
+    cam.updateProjectionMatrix();
+  }
+
+  restoreViewRange() {
+    this.setViewRange(WALK_FAR, WALK_NEAR);
+  }
+
+  /**
+   * Overrides the fog: 98 % fogged at `m` metres (e.g. ~35 km on a clear day aloft). null gives
+   * the park its own haze back. Keep m at or below 0.9 × the far plane so the sea meets the sky.
+   */
+  setVisibility(m: number | null) {
+    this.visDensity = m === null ? null : 1.978 / Math.max(1, m);
+  }
+
+  /** The sun's shadow box half-size in metres (46 by default; ~60 round an airliner on the apron). */
+  setShadowSpan(half: number) {
+    const cam = this.sun.shadow.camera;
+    cam.left = cam.bottom = -half;
+    cam.right = cam.top = half;
+    // the box's depth grows with it, so a long shadow from a low sun isn't cut off
+    cam.far = Math.max(320, half * 7);
+    this.shadowReach = Math.max(150, half * 3.3);
+    cam.updateProjectionMatrix();
+  }
+
+  resetShadowSpan() {
+    this.setShadowSpan(SHADOW_SPAN);
+  }
+
+  /** Flying: the park's grass stays hidden and its near-only details (fireflies, balloons) are skipped. */
+  setFarFocus(on: boolean) {
+    this.farFocus = on;
+    this.grass.setHidden(on);
+    if (on) this.fireflies.visible = false;
+  }
+
   update(t: number, focus: THREE.Vector3) {
+    this.frameDt = this.lastT === null ? 0 : Math.min(0.1, Math.max(0, t - this.lastT));
     this.sky.material.uniforms.time.value = t;
     this.applyTime(t);
     this.bakeEnvironment();
-    this.grass.update(focus);    this.grass.update(focus);
+    this.grass.update(focus);
+
+    // the sky box, the stars and the moon travel with the camera (the box is only 900 m across),
+    // the stars and the moon just inside the far plane so they never draw over distant land
+    const cam = this.ctx.camera;
+    const R = cam.far * 0.9;
+    this.sky.position.copy(cam.position);
+    this.stars.position.copy(cam.position);
+    this.stars.scale.setScalar(R / 820);
+    this.moon.position.copy(this.moonDir).multiplyScalar(R).add(cam.position);
+    this.moon.scale.setScalar(R / 780);
+    this.moon.lookAt(cam.position);
+
+    this.terrain.update(cam);
+    this.sea.update(this.frameDt, t, cam);
+    this.clouds.update(this.frameDt, cam);
+    if (this.farFocus) return;
 
     for (let i = 0; i < this.balloons.length; i++) {
       const b = this.balloons[i];

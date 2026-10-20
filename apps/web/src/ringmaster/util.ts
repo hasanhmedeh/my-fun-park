@@ -24,6 +24,12 @@ export const ICONS: Record<AttractionId, string> = {
   plot6: '🎢',
   plot7: '🎢',
   plot8: '🎢',
+  // the airport and Palm Cay
+  flight: '✈️',
+  jetski: '🚤',
+  slides: '🌊',
+  cannons: '🏴‍☠️',
+  volley: '🏐',
 };
 
 /** "Thunder Loop" for "coaster", "Plot 3" for "plot3". */

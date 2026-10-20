@@ -43,7 +43,8 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
-function finish(canvas: HTMLCanvasElement, renderer?: THREE.WebGLRenderer) {
+/** A canvas as an sRGB texture, ready to draw (anisotropic filtering from the renderer when given). */
+export function canvasTex(canvas: HTMLCanvasElement, renderer?: THREE.WebGLRenderer) {
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = renderer ? Math.min(8, renderer.capabilities.getMaxAnisotropy()) : 4;
@@ -102,7 +103,7 @@ export function signTexture(title: string, o: LabelOptions = {}) {
     ctx.fillStyle = o.subColor ?? PALETTE.violet;
     ctx.fillText(o.sub, w / 2, h * 0.72);
   }
-  const tex = finish(c);
+  const tex = canvasTex(c);
 
   // Emissive mask: a faintly back-lit board with the marquee bulbs fully lit (they bloom).
   const e = document.createElement('canvas');
@@ -126,7 +127,7 @@ export function signTexture(title: string, o: LabelOptions = {}) {
       dot(ectx, w - pad * 1.5, y);
     }
   }
-  tex.userData.emissive = finish(e);
+  tex.userData.emissive = canvasTex(e);
   return tex;
 }
 
@@ -171,7 +172,7 @@ export function floatingTextTexture(text: string, sub?: string, color = PALETTE.
     ctx.fillStyle = PALETTE.mustard;
     ctx.fillText(sub, 512, 245);
   }
-  return finish(c);
+  return canvasTex(c);
 }
 
 export function makeSprite(tex: THREE.Texture, worldWidth: number) {
@@ -209,7 +210,7 @@ export function crateTexture(label: string, color: string) {
     ctx.font = `${size}px ${DISPLAY_FONT}`;
   }
   ctx.fillText(label, 128, 134);
-  return finish(c);
+  return canvasTex(c);
 }
 
 /** Vertical candy stripes, used on tents, canopies and the rocket. */
@@ -223,7 +224,7 @@ export function stripeTexture(a: string, b: string, stripes = 8, horizontal = fa
     if (horizontal) ctx.fillRect(0, i * step, 256, step);
     else ctx.fillRect(i * step, 0, step, 256);
   }
-  const t = finish(c);
+  const t = canvasTex(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   return t;
 }
@@ -361,7 +362,7 @@ export function groundTexture(
 
   paintSand(ctx, toX, toZ, k, paths, plazas, rnd, inlays);
 
-  const t = finish(c);
+  const t = canvasTex(c);
   t.anisotropy = 8;
 
   // Low-res mask of sandy areas (+ a margin) so grass never grows on the paths.
@@ -456,7 +457,7 @@ export function lawnPatchTexture(
   ctx.fillRect(0, 0, w, h);
   ctx.globalCompositeOperation = 'source-over';
 
-  const t = finish(c);
+  const t = canvasTex(c);
   t.anisotropy = 8;
   return t;
 }
@@ -530,7 +531,7 @@ export function poolTexture() {
   g.addColorStop(1, 'rgba(255,170,100,0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 128, 128);
-  return finish(c);
+  return canvasTex(c);
 }
 
 export function glowTexture(color = '#ffe9a8') {
@@ -543,5 +544,5 @@ export function glowTexture(color = '#ffe9a8') {
   g.addColorStop(1, color + '00');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 64, 64);
-  return finish(c);
+  return canvasTex(c);
 }

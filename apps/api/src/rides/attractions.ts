@@ -32,6 +32,13 @@ export const DEFAULT_TICKET_COSTS: Readonly<Record<Attraction, number>> = {
   plot6: 1,
   plot7: 1,
   plot8: 1,
+  // Funfair Air: one round is one whole flight, boarding at the gate to the stand at the other end
+  flight: 10,
+  // Palm Cay's beach park
+  jetski: 1,
+  slides: 1,
+  cannons: 1,
+  volley: 1,
 };
 
 /** Tickets in one pack, and hours between two purchases, when park_settings has no row. */

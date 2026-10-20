@@ -57,6 +57,8 @@ interface Chunk {
 export class Grass {
   private chunks: Chunk[] = [];
   private material: THREE.Material;
+  /** Set while flying: the lawn stays hidden whatever the LOD would show (see setHidden). */
+  private hidden = false;
 
   /**
    * `growth` gives how densely grass grows at (x, z), from 0 (bare: paths, outside the grounds) to 1,
@@ -118,6 +120,7 @@ export class Grass {
 
   /** Distance LOD: thin far chunks out (instances are random, so a prefix is a uniform subset). */
   update(cameraTarget: THREE.Vector3) {
+    if (this.hidden) return;
     for (const c of this.chunks) {
       const d = Math.hypot(c.center.x - cameraTarget.x, c.center.y - cameraTarget.z);
       if (d > this.maxDistance) {
@@ -132,5 +135,11 @@ export class Grass {
 
   hideAll() {
     for (const c of this.chunks) c.mesh.visible = false;
+  }
+
+  /** Keeps every chunk hidden until set back (from the air the LOD, which only measures across the ground, would draw the lot). */
+  setHidden(on: boolean) {
+    this.hidden = on;
+    if (on) this.hideAll();
   }
 }

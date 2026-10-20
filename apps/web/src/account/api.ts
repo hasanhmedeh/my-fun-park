@@ -6,14 +6,42 @@ import type { Design, Issue, Part, Parts, RideStats as CoasterStats } from '../w
 export const PLOT_IDS = ['plot1', 'plot2', 'plot3', 'plot4', 'plot5', 'plot6', 'plot7', 'plot8'] as const;
 export type PlotId = (typeof PLOT_IDS)[number];
 
-/** Every attraction that costs tickets (they match the zone ids in world/layout.ts). */
-export const ATTRACTION_IDS = ['coaster', 'falcon', 'rocket', 'ferris', 'flip', 'ship', 'speedway', 'trail', 'drone', 'crates', 'striker', 'ducks', ...PLOT_IDS] as const;
+/**
+ * Every attraction that costs tickets (they match the zone ids in world/layout.ts), in the order of
+ * the server's enum: the park's, Creators' Valley's plots, then Funfair Air's flight (one round is
+ * one flight, gate to gate, either way) and Palm Cay's beach park.
+ */
+export const ATTRACTION_IDS = [
+  'coaster',
+  'falcon',
+  'rocket',
+  'ferris',
+  'flip',
+  'ship',
+  'speedway',
+  'trail',
+  'drone',
+  'crates',
+  'striker',
+  'ducks',
+  ...PLOT_IDS,
+  'flight',
+  'jetski',
+  'slides',
+  'cannons',
+  'volley',
+] as const;
 export type AttractionId = (typeof ATTRACTION_IDS)[number];
 
 export const isAttraction = (id: string | null | undefined): id is AttractionId => !!id && (ATTRACTION_IDS as readonly string[]).includes(id);
 
-/** The Midway's games (played, rather than ridden). */
-export const isGame = (id: AttractionId) => id === 'crates' || id === 'striker' || id === 'ducks';
+/**
+ * The attractions that are played rather than ridden: the Midway's games, and Palm Cay's jet-ski
+ * race, pirate cannons and beach volley. The flight and the water slides are rides ("Ride again"),
+ * even though the visitor flies the plane.
+ */
+export const isGame = (id: AttractionId) =>
+  id === 'crates' || id === 'striker' || id === 'ducks' || id === 'jetski' || id === 'cannons' || id === 'volley';
 
 export const isPlot = (id: string | null | undefined): id is PlotId => !!id && (PLOT_IDS as readonly string[]).includes(id);
 /** plot3 → 3. */
@@ -42,6 +70,11 @@ export const DEFAULT_COSTS: Record<AttractionId, number> = {
   plot6: 1,
   plot7: 1,
   plot8: 1,
+  flight: 10,
+  jetski: 1,
+  slides: 1,
+  cannons: 1,
+  volley: 1,
 };
 /** One free pack per purchase, and one purchase per cool-down (until GET /park sends the live rules). */
 export const PACK_SIZE = 20;
