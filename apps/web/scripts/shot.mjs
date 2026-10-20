@@ -7,7 +7,7 @@
 // prints the page's console errors, and writes the PNG.
 
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -38,6 +38,16 @@ const CHROME = [
 ].find((p) => p && existsSync(p));
 if (!CHROME) throw new Error('Chrome not found (set CHROME)');
 
+// Sweep profiles left behind by runs that were killed (each is tens of MB)
+for (const name of readdirSync(tmpdir())) {
+  if (!name.startsWith('shot-')) continue;
+  const dir = join(tmpdir(), name);
+  try {
+    if (Date.now() - statSync(dir).mtimeMs > 10 * 60_000) rmSync(dir, { recursive: true, force: true });
+  } catch {
+    /* in use */
+  }
+}
 const profile = mkdtempSync(join(tmpdir(), 'shot-'));
 const chrome = spawn(
   CHROME,
@@ -65,11 +75,14 @@ async function cleanup(code) {
   if (done) return;
   done = true;
   chrome.kill();
-  await sleep(300);
-  try {
-    rmSync(profile, { recursive: true, force: true });
-  } catch {
-    /* Chrome may still hold files */
+  // Chrome on Windows holds its profile's files for a moment after it's killed: keep trying
+  for (let i = 0; i < 20 && existsSync(profile); i++) {
+    await sleep(250);
+    try {
+      rmSync(profile, { recursive: true, force: true });
+    } catch {
+      /* still held */
+    }
   }
   process.exit(code);
 }
