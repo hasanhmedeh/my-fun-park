@@ -47,15 +47,25 @@ function caseGeometry() {
     painted(new THREE.CylinderGeometry(0.035, 0.035, 0.03, 10).rotateZ(Math.PI / 2).translate(w / 2 - 0.04, 0.035, -0.035), DARK),
     painted(new THREE.BoxGeometry(0.05, 0.03, 0.04).translate(-w / 2 + 0.05, 0.02, -d + 0.03), DARK),
     painted(new THREE.BoxGeometry(0.05, 0.03, 0.04).translate(w / 2 - 0.05, 0.02, -d + 0.03), DARK),
-    // the telescopic handle: two rods out of the top at the back, and the grip
-    painted(new THREE.BoxGeometry(0.018, CASE.grip - h - 0.035, 0.018).translate(-0.11, h + 0.035 + (CASE.grip - h - 0.035) / 2, -0.03), '#8d949b'),
-    painted(new THREE.BoxGeometry(0.018, CASE.grip - h - 0.035, 0.018).translate(0.11, h + 0.035 + (CASE.grip - h - 0.035) / 2, -0.03), '#8d949b'),
-    painted(new THREE.BoxGeometry(0.26, 0.035, 0.035).translate(0, CASE.grip, -0.03), DARK),
+    // (the telescopic handle is a mesh of its own, so it can slide down into the shell: handleGeometry)
     // the carry handle on top
     painted(new THREE.BoxGeometry(0.14, 0.02, 0.03).translate(0, h + 0.045, -d / 2 - 0.03), DARK),
   ];
   return mergeGeometries(parts)!;
 }
+
+/** The telescopic handle, fully out: two rods out of the top at the back, and the grip (the case's frame). */
+function handleGeometry() {
+  const { h } = CASE;
+  const rod = CASE.grip - h - 0.035;
+  return mergeGeometries([
+    painted(new THREE.BoxGeometry(0.018, rod, 0.018).translate(-0.11, h + 0.035 + rod / 2, -0.03), '#8d949b'),
+    painted(new THREE.BoxGeometry(0.018, rod, 0.018).translate(0.11, h + 0.035 + rod / 2, -0.03), '#8d949b'),
+    painted(new THREE.BoxGeometry(0.26, 0.035, 0.035).translate(0, CASE.grip, -0.03), DARK),
+  ])!;
+}
+/** How far the handle slides down when pushed home: the grip comes to rest just above the shell's top. */
+const HANDLE_TRAVEL = CASE.grip - CASE.h - 0.035 - 0.03;
 
 function backpackGeometry() {
   // origin at the wearer's back between the shoulder blades; the pack hangs behind (+z)
@@ -112,12 +122,17 @@ const GEOMETRY: Record<PropKind, () => THREE.BufferGeometry> = {
 const ROUGH: Record<PropKind, number> = { suitcase: 0.45, backpack: 0.85, tote: 0.9, strawHat: 0.95, pilotCap: 0.6 };
 
 const HIDDEN = new THREE.Matrix4().makeScale(0, 0, 0);
+const SLIDE = new THREE.Matrix4();
 
 export class Luggage {
   readonly group = new THREE.Group();
   private meshes = {} as Record<PropKind, THREE.InstancedMesh>;
   private used = {} as Record<PropKind, number>;
   private dirty = new Set<PropKind>();
+  /** The suitcases' telescopic handles (one per case, same index), out or pushed home. */
+  private readonly handles: THREE.InstancedMesh;
+  private handlesDirty = false;
+  private readonly hm = new THREE.Matrix4();
 
   constructor(counts: Record<PropKind, number>, shadows: boolean) {
     this.group.name = 'luggage';
@@ -135,6 +150,15 @@ export class Luggage {
       this.used[kind] = 0;
       this.group.add(mesh);
     }
+    const cases = this.meshes.suitcase;
+    const hmat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.5 });
+    this.handles = new THREE.InstancedMesh(handleGeometry(), hmat, cases.count);
+    this.handles.name = 'luggage-handle';
+    this.handles.castShadow = shadows;
+    this.handles.frustumCulled = false;
+    for (let i = 0; i < cases.count; i++) this.handles.setMatrixAt(i, HIDDEN);
+    this.handles.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.group.add(this.handles);
   }
 
   /** Reserve one instance of a kind, in a colour. */
@@ -147,9 +171,15 @@ export class Luggage {
     return { kind, index, scale };
   }
 
-  set(item: PropItem, m: THREE.Matrix4) {
+  /** Place an item; a suitcase's handle `handle` of the way out (1 pulled up, 0 pushed home). */
+  set(item: PropItem, m: THREE.Matrix4, handle = 1) {
     this.meshes[item.kind].setMatrixAt(item.index, m);
     this.dirty.add(item.kind);
+    if (item.kind === 'suitcase') {
+      // (in the case's own frame, so it slides along the case however it's turned or laid)
+      this.handles.setMatrixAt(item.index, m === HIDDEN ? HIDDEN : this.hm.copy(m).multiply(SLIDE.makeTranslation(0, -(1 - handle) * HANDLE_TRAVEL, 0)));
+      this.handlesDirty = true;
+    }
   }
 
   hide(item: PropItem) {
@@ -160,6 +190,8 @@ export class Luggage {
   flush() {
     for (const k of this.dirty) this.meshes[k].instanceMatrix.needsUpdate = true;
     this.dirty.clear();
+    if (this.handlesDirty) this.handles.instanceMatrix.needsUpdate = true;
+    this.handlesDirty = false;
   }
 
   /** Hide or show the lot (the region the visitor isn't in). */

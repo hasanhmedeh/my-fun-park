@@ -1,12 +1,15 @@
 // The voices of the flight: ATC, the first officer's calls and readbacks, the cabin crew's and the
 // captain's announcements, and the aircraft's own synthetic voice (radio altitude callouts, GPWS).
 //
-// Every line is shown as text (onLine feeds the HUD's radio log) and, where the browser has
-// speechSynthesis and the game isn't muted, spoken with a voice that suits the speaker. Lines are
-// spoken one at a time from a short priority queue: a GPWS warning cuts into an ATC call, which
-// cuts into a cabin announcement, and the queue never holds more than a few lines so the radio
-// never falls behind what's happening. Without speech the same queue runs on estimated durations,
-// so conversations keep their rhythm (and the logic tests can run in node).
+// Two channels. The radio and the flight deck (say(): ATC, the crew's calls and readbacks, the
+// callouts, GPWS) are shown as text by onLine, the HUD's radio log, and spoken one at a time from a
+// short priority queue: a GPWS warning cuts into an ATC call, and the queue never holds more than a
+// few lines so the radio never falls behind what's happening. The cabin (announce(): the purser's
+// and the captain's PA, what the passengers do) runs beside it on its own queue and its own
+// onCabin, so a PA never holds up the radio or sits in its log. The cabin's voice gives way to the
+// radio's (a browser speaks one line at a time), and a PA the radio talked over is offered back
+// (lastCut) to be said again. Without speech both run on estimated durations, so conversations
+// keep their rhythm (and the logic tests can run in node).
 //
 // The helpers at the bottom write numbers the way they are said on the radio: "two seven",
 // "one one eight decimal three", "niner", "five thousand", "flight level one two zero".
@@ -20,6 +23,8 @@ const MAX_QUEUE = 3;
 const GAP_S = 0.45;
 /** Lines kept for the log. */
 const LOG_MAX = 200;
+/** How many announcements may wait behind the one being made. */
+const CABIN_MAX_QUEUE = 8;
 
 /** The default priority of each speaker's lines (an utterance's own `priority` wins). */
 const PRIORITY: Record<Speaker, number> = { gpws: 3, atc: 1, fo: 0, captain: 0, cabin: 0, pa: 0 };
@@ -62,11 +67,23 @@ function onRadio(u: Utterance) {
   return (u.speaker === 'fo' || u.speaker === 'captain') && u.from !== FO_NAME && u.from !== CAPTAIN_NAME;
 }
 
+/** The cabin line being made: its time left, and its voice while it has one. */
+interface CabinLine {
+  u: Utterance;
+  left: number;
+  utter: SpeechSynthesisUtterance | null;
+  done: boolean;
+}
+
 export class Speech {
-  /** Every line spoken (or shown) so far, oldest first (the last LOG_MAX). */
+  /** Every radio and flight-deck line spoken (or shown) so far, oldest first (the last LOG_MAX). */
   readonly log: Utterance[] = [];
-  /** Called as each line starts (the HUD's radio log shows it). */
+  /** Every cabin line (the PA and the passengers), oldest first (the last LOG_MAX). */
+  readonly cabinLog: Utterance[] = [];
+  /** Called as each radio or flight-deck line starts (the HUD's radio log shows it). */
   onLine: ((u: Utterance) => void) | null = null;
+  /** Called as each cabin line starts (the PA and the passengers: shown apart from the radio). */
+  onCabin: ((u: Utterance) => void) | null = null;
   /** Speak aloud when speech is available (text is always shown). */
   enabled = true;
   /** The last line cut short by a more important one (its owner may say it again). */
@@ -83,6 +100,9 @@ export class Speech {
   private utterDone = false;
   private radioOpen = false;
   private quiet = 0;
+  private cabinQueue: Utterance[] = [];
+  private cabinNow: CabinLine | null = null;
+  private cabinGap = 0;
 
   constructor(private readonly sfx: Sfx) {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -94,8 +114,13 @@ export class Speech {
     }
   }
 
-  /** Say a line (it's queued behind anything as important, and interrupts anything less so). */
+  /** Say a line on the radio or the flight deck (queued behind anything as important, interrupting anything less so; a 'pa' or 'cabin' line goes to announce()). */
   say(u: Utterance) {
+    // the purser and the passengers are the cabin's, wherever they come from
+    if (u.speaker === 'pa' || u.speaker === 'cabin') {
+      this.announce(u);
+      return;
+    }
     // the same warning repeating while it's already being said or waiting is one line, not a pile-up
     if (this.current && this.current.text === u.text && this.current.speaker === u.speaker) return;
     if (this.queue.some((q) => q.text === u.text && q.speaker === u.speaker)) return;
@@ -124,6 +149,33 @@ export class Speech {
   cancel(minPriority = Infinity) {
     if (this.current && prio(this.current) < minPriority) this.stopCurrent();
     this.queue = this.queue.filter((q) => prio(q) >= minPriority);
+    // the cabin's lines are the least important of all: any cancel takes them too
+    if (minPriority > 0) {
+      this.silenceCabin();
+      this.cabinNow = null;
+      this.cabinQueue = [];
+    }
+  }
+
+  /**
+   * A cabin line (the PA, or what the passengers do): on the cabin's own queue, first come first
+   * served, never in the radio's way and never in its log.
+   */
+  announce(u: Utterance) {
+    if (this.cabinNow?.u.text === u.text || this.cabinQueue.some((q) => q.text === u.text)) return;
+    this.cabinQueue.push(u);
+    // a long backlog (the cabin is never this far behind): the oldest goes straight to the log
+    if (this.cabinQueue.length > CABIN_MAX_QUEUE) this.recordCabin(this.cabinQueue.shift()!);
+  }
+
+  /** No announcement being made or waiting. */
+  get cabinIdle() {
+    return !this.cabinNow && this.cabinQueue.length === 0;
+  }
+
+  /** The announcement being made now, if any. */
+  get announcing(): Utterance | null {
+    return this.cabinNow?.u ?? null;
   }
 
   /** Drop the waiting lines that match (stale callouts superseded by a newer one, say). */
@@ -162,6 +214,72 @@ export class Speech {
   }
 
   update(dt: number) {
+    this.updateCabin(dt);
+    this.updateRadio(dt);
+  }
+
+  private updateCabin(dt: number) {
+    const now = this.cabinNow;
+    if (now) {
+      if (now.utter && (this.sfx.muted || !this.enabled)) this.silenceCabin();
+      now.left -= dt;
+      if (now.utter ? now.done || now.left <= 0 : now.left <= 0) {
+        this.cabinGap = GAP_S;
+        this.cabinNow = null;
+      }
+      return;
+    }
+    if (!this.cabinQueue.length) return;
+    this.cabinGap -= dt;
+    if (this.cabinGap > 0) return;
+    this.startCabin(this.cabinQueue.shift()!);
+  }
+
+  private startCabin(u: Utterance) {
+    this.recordCabin(u);
+    const words = spoken(u);
+    const prof = PROFILES[u.speaker];
+    const estimate = words ? words.length / (prof.cps * prof.rate) + 0.35 : Math.min(4, 1 + u.text.length / 30);
+    const line: CabinLine = { u, left: estimate, utter: null, done: false };
+    this.cabinNow = line;
+    // a browser speaks one line at a time: the cabin only gets the voice while the radio is silent
+    const synth = this.synth;
+    if (!words || !synth || !this.enabled || this.sfx.muted || this.current) return;
+    const su = this.utterance(u, words);
+    line.left = estimate * 2.5 + 3;
+    const end = () => {
+      if (line.utter === su) line.done = true;
+    };
+    su.onend = end;
+    su.onerror = end;
+    line.utter = su;
+    synth.speak(su);
+  }
+
+  /** The radio needs the voice: a PA being spoken stops (offered back as lastCut, to be said again). */
+  private yieldCabinVoice() {
+    const now = this.cabinNow;
+    if (!now?.utter) return;
+    this.lastCut = now.u;
+    this.silenceCabin();
+    this.cabinNow = null;
+    this.cabinGap = GAP_S;
+  }
+
+  private silenceCabin() {
+    const now = this.cabinNow;
+    if (!now?.utter) return;
+    now.utter = null;
+    this.synth?.cancel();
+  }
+
+  private recordCabin(u: Utterance) {
+    this.cabinLog.push(u);
+    if (this.cabinLog.length > LOG_MAX) this.cabinLog.splice(0, this.cabinLog.length - LOG_MAX);
+    this.onCabin?.(u);
+  }
+
+  private updateRadio(dt: number) {
     this.quiet = this.idle ? this.quiet + dt : 0;
     if (this.current) {
       // muting mid-line silences it at once; the line still runs its course as text
@@ -217,16 +335,8 @@ export class Speech {
     // without a voice the ground proximity warnings still sound, as tones
     if (!voiced && words && prio(u) >= 3) this.sfx.gpwsAlert(/PULL UP|STALL/.test(u.text));
     if (!voiced || !synth) return;
-    const su = new SpeechSynthesisUtterance(words);
-    su.lang = 'en-GB';
-    const voice = this.voiceFor(u);
-    if (voice) {
-      su.voice = voice;
-      su.lang = voice.lang;
-    }
-    su.rate = prof.rate;
-    su.pitch = prof.pitch;
-    su.volume = prof.volume;
+    this.yieldCabinVoice();
+    const su = this.utterance(u, words);
     // a watchdog in case the browser never says it has finished (it happens)
     this.left = estimate * 2.5 + 3;
     this.utterDone = false;
@@ -237,6 +347,22 @@ export class Speech {
     su.onerror = end;
     this.utter = su;
     synth.speak(su);
+  }
+
+  /** A browser utterance of the words, in the speaker's voice. */
+  private utterance(u: Utterance, words: string) {
+    const prof = PROFILES[u.speaker];
+    const su = new SpeechSynthesisUtterance(words);
+    su.lang = 'en-GB';
+    const voice = this.voiceFor(u);
+    if (voice) {
+      su.voice = voice;
+      su.lang = voice.lang;
+    }
+    su.rate = prof.rate;
+    su.pitch = prof.pitch;
+    su.volume = prof.volume;
+    return su;
   }
 
   private stopCurrent() {

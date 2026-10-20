@@ -257,20 +257,43 @@ export class Terrain {
     this.towns.setNight(k);
   }
 
+  /** How far the camera sees: the far plane, or less in thick fog. */
+  private seeing(cam: THREE.PerspectiveCamera) {
+    const far = cam.far ?? 2400;
+    const fog = this.ctx.scene.fog as THREE.FogExp2 | null;
+    return Math.min(far, fog && fog.density > 0 ? 2.6 / fog.density : far);
+  }
+
+  /** Tiles wholly beyond what can be seen from `p` (fog or the far plane) aren't drawn at all. */
+  private cull(p: THREE.Vector3, seeing: number) {
+    for (const t of this.tiles) {
+      this.box.copy(t.geometry.boundingBox!);
+      t.visible = this.box.distanceToPoint(p) < seeing;
+    }
+  }
+
   update(camera: THREE.Camera) {
     const cam = camera as THREE.PerspectiveCamera;
     const far = cam.far ?? 2400;
     LAND_UNIFORMS.uWalk.value = far < 5000 ? 1 : 0;
     LAND_UNIFORMS.uFarFade.value.set(far * 0.8, far * 0.96);
-    // tiles wholly beyond the fog (or the far plane) aren't drawn at all
-    const fog = this.ctx.scene.fog as THREE.FogExp2 | null;
-    const seeing = Math.min(far, fog && fog.density > 0 ? 2.6 / fog.density : far);
-    const p = camera.position;
-    for (const t of this.tiles) {
-      this.box.copy(t.geometry.boundingBox!);
-      t.visible = this.box.distanceToPoint(p) < seeing;
-    }
+    const seeing = this.seeing(cam);
+    this.cull(camera.position, seeing);
     this.vegetation.update(camera, seeing);
     this.towns.update();
+  }
+
+  /**
+   * Call right after a teleport or a region change (once the camera's far plane and the fog are
+   * set for where it's going): plants the trees round (x, z) at once, nearest first, within
+   * `budgetMs`, so they're there on the first frame instead of filling in over seconds; the far
+   * fringe follows over the next frames as usual. `y` is the camera's height there (default:
+   * standing on the ground). Returns the time taken (ms).
+   */
+  warm(x: number, z: number, budgetMs = 45, y?: number): number {
+    const pos = new THREE.Vector3(x, y ?? groundY(x, z) + 1.7, z);
+    const seeing = this.seeing(this.ctx.camera as THREE.PerspectiveCamera);
+    this.cull(pos, seeing);
+    return this.vegetation.warm(pos, seeing, budgetMs);
   }
 }

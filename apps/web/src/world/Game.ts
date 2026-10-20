@@ -46,6 +46,27 @@ import { SkyFlip } from './attractions/sky-flip';
 import { Ship } from './attractions/ship';
 import { Speedway } from './attractions/speedway';
 import { Trail } from './attractions/trail';
+import { AIRFIELDS } from '../aviation/airports';
+import { Traffic } from '../aviation/traffic';
+import { Airfield } from './airport/airfield';
+import { Airside, reservedStands } from './airport/airside';
+import { HomeTerminal } from './airport/terminal';
+import { Landside } from './airport/landside';
+import { SkyLink, type SkyLinkRide } from './airport/skylink';
+import { createA320, LIVERIES, warmA320 } from './airport/a320-model';
+import { PalmCay, PALM_CAY_WALK } from './island/island';
+import { IslandTerminal } from './island/island-terminal';
+import { JetSki } from './attractions/island/jetski';
+import { JETSKI_WALK } from './attractions/island/jetski-dock';
+import { Slides } from './attractions/island/slides';
+import { Cannons } from './attractions/island/cannons';
+import { Volley } from './attractions/island/volley';
+import { Travellers } from './crowd/travellers';
+import { Flight } from './attractions/flight';
+import { flightGround } from './flight/ground';
+import { PARK, canTravel, registerWalkAreas, ZONE_REGION } from './layout';
+import { regionAt, type Region } from './geo';
+import { FOOT_VIEW } from './minimap';
 import { boardListHtml, leaderboard, resetClock, resetIn, trailTime } from '../account/leaderboard';
 import {
   api,
@@ -80,13 +101,43 @@ const TIME_CONTROLS = false;
 /** How many guests walk the park, by graphics tier. */
 const CROWD_SIZE = { high: 80, medium: 56, low: 32, lowest: 14 } as const;
 
-type Mode = 'drive' | 'coaster' | 'rocket' | 'striker' | 'ducks' | 'wheel' | 'drone' | 'flip' | 'ship' | 'race' | 'trail' | 'shop' | 'ideas' | 'museum' | 'workshop';
+type Mode =
+  | 'drive'
+  | 'coaster'
+  | 'rocket'
+  | 'striker'
+  | 'ducks'
+  | 'wheel'
+  | 'drone'
+  | 'flip'
+  | 'ship'
+  | 'race'
+  | 'trail'
+  | 'shop'
+  | 'ideas'
+  | 'museum'
+  | 'workshop'
+  | 'flight'
+  | 'jetski'
+  | 'slides'
+  | 'cannons'
+  | 'volley'
+  | 'skylink';
+
+/** The SkyLink ride lasts about 80 s door to door; skipping it runs the rest of it in steps this long. */
+const SKYLINK_SKIP_DT = 0.1;
+/** Beyond this far from the fair (the camera, in flight) the park's own scenery isn't drawn. */
+const FAIR_DRAW_M = 14000;
+/** The player's collision sphere sits this high over the floor (player.ts BODY_R). */
+const BODY_R = 0.42;
+/** The modes the minimap shows in (it's the visitor's, or their vehicle's, map). */
+const MAP_MODES: ReadonlySet<Mode> = new Set<Mode>(['drive', 'drone', 'race', 'trail', 'flight', 'jetski', 'slides', 'skylink']);
 
 const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
 
 /** What the "Press E" prompt offers at an attraction: its price, or why it can't be played right now. */
-function zoneAction(id: AttractionId) {
-  const z = ZONES[id];
+function zoneAction(id: AttractionId, zone: ZoneId = id) {
+  const z = ZONES[zone];
   const price = `${session.cost(id)} 🎟️`;
   const closed = !session.parkOpen || session.maintenance(id) !== undefined;
   if (closed && session.isStaff) return `🎩 Staff test · ${price}`;
@@ -208,6 +259,35 @@ export class Game {
   private parkBanner = document.getElementById('park-banner')!;
   private parkBannerDismissed = false;
 
+  // Funfair International, the A320neo and Palm Cay
+  private airfields!: Record<Region, Airfield>;
+  private homeTerminal!: HomeTerminal;
+  private landside!: Landside;
+  private skylink!: SkyLink;
+  private airside!: Record<Region, Airside>;
+  private traffic!: Traffic;
+  private palmCay!: PalmCay;
+  private islandTerminal!: IslandTerminal;
+  private travellers: Travellers | null = null;
+  private flight!: Flight;
+  private jetski!: JetSki;
+  private slides!: Slides;
+  private cannons!: Cannons;
+  private volley!: Volley;
+  /** The Pirate Cannons' HUD badge, as last drawn. */
+  private cannonsBadge = '';
+  /** The landmass the visitor is on (or flying over): the far one's people and games sleep. */
+  private region: Region = 'home';
+  /** The SkyLink ride the visitor is on, and which station it ends at. */
+  private skyRide: { ride: SkyLinkRide; to: 'skylink' | 'skylinkBack'; aboard: boolean; yaw: number } | null = null;
+  /** The fair's own scenery (everything built between the environment and the airport), hidden when the camera is far away. */
+  private fairObjects: THREE.Object3D[] = [];
+  private fairHidden: boolean[] | null = null;
+  /** The night level the airport and the island were last told (they're told again when it moves). */
+  private worldNight = -1;
+  /** The last round's results are on their way to the server: the next round waits for them (one open round per member). */
+  private finishing: Promise<unknown> | null = null;
+
   constructor(private container: HTMLElement) {}
 
   /** Builds the whole fair in small steps so the progress bar can update. */
@@ -221,8 +301,13 @@ export class Game {
 
     step(1, () => this.setupRenderer());
     step(1, () => this.setupPhysics());
+    // (everything the fair builds from here to the airport is its own scenery: see fairObjects)
+    let fairFrom = 0;
     step(3, () => {
       this.env = new Environment(this.ctx, this.quality);
+      fairFrom = this.scene.children.length;
+      // the post pipeline (the flight switches its AO off at height)
+      this.post = new Post(this.renderer, this.scene, this.camera, this.quality);
     });
     step(1, () => {
       // Bruno-style physical letters in front of the spawn point.
@@ -380,6 +465,61 @@ export class Game {
       this.striker = new Striker(this.ctx);
       this.ducks = new Ducks(this.ctx);
       this.updatables.push(this.crates, this.striker, this.ducks);
+      this.fairObjects = this.scene.children.slice(fairFrom);
+    });
+    // Funfair International on the south coast, the SkyLink out to it, and Palm Cay 40 km south
+    step(3, () => {
+      this.airfields = { home: new Airfield(this.ctx, AIRFIELDS.home), island: new Airfield(this.ctx, AIRFIELDS.island) };
+      this.scene.add(this.airfields.home.group, this.airfields.island.group);
+    });
+    step(3, () => {
+      this.homeTerminal = new HomeTerminal(this.ctx);
+      this.landside = new Landside(this.ctx);
+      this.skylink = new SkyLink(this.ctx);
+      this.scene.add(this.homeTerminal.group, this.landside.group, this.skylink.group);
+      registerWalkAreas('home', this.homeTerminal.walk, 'terminal');
+      registerWalkAreas('home', this.skylink.walk, 'skylink');
+    });
+    step(2, () => {
+      this.airside = {
+        home: new Airside(this.ctx, AIRFIELDS.home, { reserved: reservedStands('home') }),
+        island: new Airside(this.ctx, AIRFIELDS.island, { reserved: reservedStands('island') }),
+      };
+      this.scene.add(this.airside.home.group, this.airside.island.group);
+      // the parked fleet's doors are on their bridges
+      for (const id of this.airside.home.parkedStands) this.homeTerminal.bridges[id]?.dock(true);
+    });
+    step(2, () => {
+      // the AI fleet's geometry and paint, built now rather than on the first arrival
+      warmA320(['ai', 'parked'], Object.values(LIVERIES));
+      this.traffic = new Traffic(this.ctx, {
+        createPlane: (o) => createA320(o),
+        onStand: (r, id, state) => {
+          // the player's stand is the flight's to dock and undock
+          if (id === AIRFIELDS[r].playerStand) return;
+          if (r === 'home') this.homeTerminal.bridges[id]?.dock(state === 'arrived');
+          this.airside[r].setStandService(id, state === 'arrived');
+        },
+      });
+      this.scene.add(this.traffic.group);
+    });
+    step(3, () => {
+      this.palmCay = new PalmCay(this.ctx);
+      this.islandTerminal = new IslandTerminal(this.ctx);
+      this.scene.add(this.palmCay.group, this.islandTerminal.group);
+      registerWalkAreas('island', this.islandTerminal.walk, 'island-terminal');
+      registerWalkAreas('island', PALM_CAY_WALK, 'palm-cay');
+    });
+    step(3, () => {
+      // Palm Cay's four games (each adds itself to the scene)
+      this.jetski = new JetSki(this.ctx);
+      this.slides = new Slides(this.ctx);
+      this.cannons = new Cannons(this.ctx);
+      this.volley = new Volley(this.ctx);
+      this.updatables.push(this.jetski, this.slides, this.cannons, this.volley);
+      registerWalkAreas('island', JETSKI_WALK, 'jetski');
+      // until the visitor gets there, the island sleeps
+      for (const g of [this.jetski, this.slides, this.cannons, this.volley]) g.setAwake(false);
     });
     step(1, () => {
       // the districts' signs and the fingerposts (once everything they keep clear of is standing)
@@ -393,9 +533,32 @@ export class Game {
       // Rosa behind the booth's counter, and what the visitor wears from her shop
       this.booth.setVendor(people.create(VENDOR_LOOK));
       this.wardrobe = new Wardrobe(this.player.rig, this.scene);
+      // the airport's and the island's travellers (they map the colliders, so everything stands by now)
+      this.travellers = new Travellers(this.ctx, people, {
+        home: this.homeTerminal,
+        island: this.islandTerminal,
+        palmCay: this.palmCay,
+        shadows: this.quality.shadows && this.quality.tier !== 'low',
+        tier: this.quality.tier,
+      });
+      this.volley.setPeople(people, this.player.rig.look);
+      // the flight, with the world's ground under it: the terrain and the sea, the airfields' pavement
+      this.flight = new Flight(this.ctx, {
+        env: this.env,
+        post: this.post,
+        airfields: this.airfields,
+        homeTerminal: this.homeTerminal,
+        islandTerminal: this.islandTerminal,
+        airside: this.airside,
+        traffic: this.traffic,
+        travellers: this.travellers,
+        ground: flightGround({ home: (x, z) => this.airfields.home.surfaceAt(x, z), island: (x, z) => this.airfields.island.surfaceAt(x, z) }),
+      });
+      this.updatables.push(this.flight);
       this.wire();
       // the crowd: queues, riders, families, kids and dogs (fewer on modest hardware)
       const dogs = await dogModels;
+      const crowdFrom = this.scene.children.length;
       const crowd = new Crowd(this.ctx, people, dogs && new DogFactory({ shiba: dogs[0], husky: dogs[1] }), [this.stack, this.falcon], this.striker, {
         count: CROWD_SIZE[this.quality.tier],
         shadows: this.quality.shadows && this.quality.tier !== 'low',
@@ -405,10 +568,10 @@ export class Game {
       this.player.onKick = () => crowd.shove(this.player.position, this.player.forward);
       this.updatables.push(crowd); // after the coasters, so riders sit where their seats are now
       this.crowd = crowd;
+      this.fairObjects.push(...this.scene.children.slice(crowdFrom));
     });
     step(2, () => {
       // warm up: upload textures/compile shaders before the user enters
-      this.post = new Post(this.renderer, this.scene, this.camera, this.quality);
       this.resize();
       this.updateDriveCamera(1, true);
       this.renderer.compile(this.scene, this.camera);
@@ -446,7 +609,8 @@ export class Game {
       'wheel',
       (e) => {
         if (this.mode === 'drone') return this.drone.zoomBy(e.deltaY);
-        if (this.mode !== 'drive') return;
+        if (this.mode === 'flight') return this.flight.zoomBy(e.deltaY);
+        if (this.mode !== 'drive' && this.mode !== 'skylink') return;
         this.zoom = THREE.MathUtils.clamp(this.zoom + e.deltaY * 0.001, 0.55, 1.7);
       },
       { passive: true },
@@ -455,7 +619,7 @@ export class Game {
     const canvas = this.renderer.domElement;
     let drag: { id: number; x: number; y: number } | null = null;
     canvas.addEventListener('pointerdown', (e) => {
-      if ((this.mode !== 'drive' && this.mode !== 'drone') || drag) return;
+      if ((this.mode !== 'drive' && this.mode !== 'drone' && this.mode !== 'flight' && this.mode !== 'skylink') || drag) return;
       drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
       canvas.setPointerCapture(e.pointerId);
     });
@@ -463,6 +627,7 @@ export class Game {
       if (!drag || e.pointerId !== drag.id) return;
       const k = 4 / Math.max(1, canvas.clientHeight);
       if (this.mode === 'drone') this.drone.look((e.clientX - drag.x) * k, (e.clientY - drag.y) * k);
+      else if (this.mode === 'flight') this.flight.look((e.clientX - drag.x) * k, (e.clientY - drag.y) * k);
       else {
         this.camYaw -= (e.clientX - drag.x) * k;
         this.camPitch = THREE.MathUtils.clamp(this.camPitch + (e.clientY - drag.y) * k, 0.04, 1.1);
@@ -526,16 +691,18 @@ export class Game {
       if (this.mode === 'drive') this.teleport('entrance');
       else if (this.mode === 'race') this.speedway.rescue();
       else if (this.mode === 'trail') this.trail.rescue();
+      else if (this.mode === 'jetski') this.jetski.rescue();
     });
     this.input.on('restart', () => this.mode === 'trail' && this.trail.restart());
     this.input.on('honk', () => {
       if (this.mode === 'drive') this.player.wave();
       else if (this.mode === 'drone') this.drone.flyHome();
     });
-    // Space rolls on foot, climbs in the drone and drifts a kart or the buggy; on rides and the striker it keeps working as the action key
+    // Space rolls on foot, climbs in the drone, drifts a kart or the buggy and hops the jet-ski, and
+    // does nothing in the A320's cockpit; on rides and the striker it keeps working as the action key
     this.input.on('roll', () => {
       if (this.mode === 'drive') this.player.roll();
-      else if (this.mode !== 'drone' && this.mode !== 'race' && this.mode !== 'trail') this.onAction();
+      else if (this.mode !== 'drone' && this.mode !== 'race' && this.mode !== 'trail' && this.mode !== 'jetski' && this.mode !== 'flight') this.onAction();
     });
     this.input.on('kick', () => this.mode === 'drive' && this.player.kick());
     this.input.on('camera', () => {
@@ -546,7 +713,17 @@ export class Game {
       else if (this.mode === 'ship') this.ship.cycleCamera();
       else if (this.mode === 'race') this.speedway.cycleCamera();
       else if (this.mode === 'trail') this.trail.cycleCamera();
+      else if (this.mode === 'flight') this.flight.cycleCamera();
+      else if (this.mode === 'jetski') this.jetski.cycleCamera();
+      else if (this.mode === 'slides') this.slides.cycleCamera();
+      else if (this.mode === 'cannons') this.cannons.cycleCamera();
+      else if (this.mode === 'volley') this.volley.cycleCamera();
     });
+    this.flight.input = this.input;
+    this.jetski.input = this.input;
+    this.slides.input = this.input;
+    this.cannons.input = this.input;
+    this.volley.input = this.input;
     this.wheel.input = this.input;
     this.flip.input = this.input;
     this.ship.input = this.input;
@@ -592,7 +769,7 @@ export class Game {
       if (!round || this.lockedOut) return;
       this.round = null;
       // a trail run already over the line ran to its end (its time still counts)
-      const done = round.ride === 'trail' && this.trail.crossedLine;
+      const done = (round.ride === 'trail' && this.trail.crossedLine) || (round.ride === 'flight' && this.flight.arrived);
       session.finishOnExit(round.id, done, this.measuredStats(round.ride));
     });
     // the sign-up form, the results screen and "leave early?" have the keyboard while they're open
@@ -663,6 +840,7 @@ export class Game {
     if (TIME_CONTROLS) this.timeControl = new TimeControl(this.env);
     else document.getElementById('clock')?.remove();
     this.worldMap = new WorldMap(document.getElementById('world-map')!);
+    // (on either landmass, on foot: not from the cockpit, nor from a seat at a game)
     this.worldMap.canOpen = () => this.inFair && this.mode === 'drive' && !authDialog.isOpen && !results.isOpen;
     this.worldMap.onToggle = (open) => {
       this.input.paused = open;
@@ -692,8 +870,20 @@ export class Game {
     this.ship.onFinish = () => this.endRide();
     this.speedway.onFinish = () => this.endRide();
     this.trail.onFinish = () => this.endRide();
+    this.flight.onFinish = () => this.endRide();
+    this.jetski.onFinish = () => this.endRide();
+    this.slides.onFinish = () => this.endRide();
+    this.cannons.onFinish = () => this.endRide();
+    this.volley.onFinish = () => this.endRide();
+    // the first shot puts the Pirate Cannons' card away too
+    this.cannons.onShot = () => {
+      if (this.ui.panelOpenKey === 'cannons-play') this.ui.hidePanel();
+    };
     // each attraction ends on its own after one round: back to walking, with the results
-    for (const a of [this.stack, this.falcon, this.rocket, this.wheel, this.flip, this.ship, this.speedway, this.trail, this.striker, this.crates, this.ducks]) a.onComplete = () => this.leave(true);
+    for (const a of [this.stack, this.falcon, this.rocket, this.wheel, this.flip, this.ship, this.speedway, this.trail, this.striker, this.crates, this.ducks, this.jetski, this.slides, this.cannons, this.volley])
+      a.onComplete = () => this.leave(true);
+    // a flight ends gate to gate (completed), or after a failure's aftermath and its report (not)
+    this.flight.onComplete = () => this.leave(this.flight.completed);
     // the Rally Trail's leaderboard: on its boards and its HUD, and on its card while that's open
     leaderboard.onChange((board) => {
       this.trail.setBoard(board);
@@ -768,6 +958,16 @@ export class Game {
       trail: `🚙 <strong>Rally Trail</strong> — a buggy time trial with jumps, mud and crates: beat today's fastest on the leaderboard ${cost('trail')}`,
       workshop:
         "🛠️ <strong>Coaster Workshop</strong> — out of the west gate: build your own coaster from parts, ride it for free, and send it to staff. Released ones open here, and you earn tickets each time someone rides them",
+      skylink: '🚝 <strong>SkyLink</strong> — the driverless train from the south gate to the airport, along an elevated guideway. Free, no ticket',
+      skylinkBack: '🚝 <strong>SkyLink</strong> — back from the airport to the fair. Free, no ticket',
+      airport: '🛫 <strong>Funfair International</strong> — the airport on the south coast: check-in, security, the shops and Gate 3',
+      flight: `✈️ <strong>Funfair Air FA101</strong> — at Gate 3: fly the A320neo yourself, 40 km south to Palm Cay (pushback, taxi, take-off, landing) ${cost('flight')}`,
+      flightBack: `✈️ <strong>Funfair Air FA102</strong> — the flight home from Palm Cay ${cost('flight')}`,
+      palmcay: '🌴 <strong>Palm Cay</strong> — the tropical island at the end of the flight: beaches, palms and four games',
+      jetski: `🌊 <strong>Jet-Ski Race</strong> — three laps of a buoy course in the lagoon, against the island's riders ${cost('jetski')}`,
+      slides: `🛝 <strong>Splash Tower</strong> — climb the 24 m tower and pick a slide: the Kamikaze drop, the Typhoon tube or the Lazy Loop ${cost('slides')}`,
+      cannons: `💣 <strong>Pirate Cannons</strong> — man the old fort's guns and sink the pirate ships against the clock ${cost('cannons')}`,
+      volley: `🏐 <strong>Beach Volley</strong> — ten serves with an island partner against two locals: time your serves, digs and spikes ${cost('volley')}`,
     };
     for (const r of this.valley.coasters)
       line[r.plot] = `🎢 <strong>${escapeHtml(r.creation.name)}</strong> — a coaster by @${escapeHtml(r.creation.creator)}, built in the Coaster Workshop ${cost(r.plot)}`;
@@ -799,6 +999,12 @@ export class Game {
     if (this.mode === 'race') return this.speedway.cycleCamera();
     if (this.mode === 'trail') return this.trail.cycleCamera();
     if (this.mode === 'museum') return this.gallery?.step(1);
+    if (this.mode === 'flight') return this.flight.action();
+    if (this.mode === 'jetski') return this.jetski.action();
+    if (this.mode === 'slides') return this.slides.action();
+    if (this.mode === 'cannons') return this.cannons.action();
+    if (this.mode === 'volley') return this.volley.action();
+    if (this.mode === 'skylink') return this.skipSkyLink();
     if (this.mode !== 'drive') return;
     const z = this.zones.active;
     // inside the museum, at a frame: a closer look (the tour, from there)
@@ -819,6 +1025,16 @@ export class Game {
         this.showZonePanel(z);
         this.sfx.chime();
       }
+    } else if (z === 'flight' || z === 'flightBack') {
+      // E at the gate desk shows the booking card; E again (or its Board button) boards
+      if (this.panelZone === z && this.ui.panelOpenKey.startsWith('flight-offer')) this.board('flight');
+      else {
+        this.player.interact();
+        this.showZonePanel(z);
+        this.sfx.chime();
+      }
+    } else if (z === 'skylink' || z === 'skylinkBack') {
+      this.rideSkyLink(z === 'skylink' ? 'park' : 'airport');
     } else if (isAttraction(z)) this.board(z);
   }
 
@@ -840,7 +1056,9 @@ export class Game {
     const balance = session.balance;
     if (balance !== null && balance < cost) return this.showShort(ride, cost, balance);
     this.boarding = ride;
-    session.board(ride).then(
+    // a member has one open round at a time: the last one (a flight that just landed, say) is closed first
+    const ready = this.finishing ?? Promise.resolve();
+    ready.then(() => session.board(ride)).then(
       ({ round }) => {
         this.boarding = null;
         this.begin(ride, round.id, round.ticketsSpent);
@@ -934,6 +1152,55 @@ export class Game {
         this.ducksBadge = '';
         this.panelZone = 'ducks';
         this.ui.panel('ducks-play', this.ducks.panelHtml(this.mobile), { accent: PALETTE.mustard });
+        break;
+      }
+      case 'flight': {
+        // the leg from the desk the visitor stands at, at the hour picked on the card
+        const from = regionAt(this.player.position.x, this.player.position.z);
+        this.flight.booking = { from, timeOfDay: this.flight.booking?.timeOfDay ?? 'day' };
+        this.ui.hidePanel();
+        this.panelZone = null;
+        this.startRide('flight', () => {
+          // the visitor is in the captain's seat now, not at the desk
+          this.player.group.visible = false;
+          this.flight.start();
+        });
+        break;
+      }
+      case 'jetski':
+        this.startRide('jetski', () => this.jetski.start());
+        break;
+      case 'slides':
+        this.startRide('slides', () => this.slides.start());
+        break;
+      case 'cannons': {
+        // the visitor steps up behind the guns (the camera is their eyes)
+        this.player.interact();
+        const spot = this.cannons.standSpot;
+        this.player.reset(spot.x, spot.z, spot.heading);
+        this.mode = 'cannons';
+        this.player.enabled = false;
+        this.player.group.visible = false;
+        this.ui.rideExit(true);
+        this.ui.prompt('', '', '');
+        this.cannons.start();
+        this.cannonsBadge = '';
+        this.panelZone = 'cannons';
+        this.ui.panel('cannons-play', this.cannons.panelHtml(this.mobile), { accent: PALETTE.mustard });
+        break;
+      }
+      case 'volley': {
+        // the visitor takes the server's spot (the game draws them as its own player)
+        this.player.interact();
+        const spot = this.volley.standSpot;
+        this.player.reset(spot.x, spot.z, spot.heading);
+        this.mode = 'volley';
+        this.player.enabled = false;
+        this.player.group.visible = false;
+        this.ui.rideExit(true);
+        this.ui.prompt('', '', '');
+        this.volley.start();
+        this.panelZone = 'volley';
         break;
       }
       case 'crates':
@@ -1146,9 +1413,10 @@ export class Game {
     } else if (this.mode === 'drive' && key.startsWith('trail-board') && this.panelZone === 'trail') {
       // the trail's card keeps its leaderboard; only its button follows the gates
       this.showZonePanel('trail');
-    } else if (this.mode === 'drive' && /^(gate|short|drone-offer|crates)-/.test(key) && !session.isStaff && !this.boarding && !this.round) {
+    } else if (this.mode === 'drive' && /^(gate|short|drone-offer|flight-offer|crates)-/.test(key) && !session.isStaff && !this.boarding && !this.round) {
       // closed while its offer is up (the office pushes it live): the sign replaces the offer
-      const ride = this.panelZone;
+      // (the desk on Palm Cay sells the same flight)
+      const ride = this.panelZone === 'flightBack' ? 'flight' : this.panelZone;
       if (ride && isAttraction(ride)) {
         if (!open) this.showClosed(ride);
         else if (session.maintenance(ride) !== undefined) this.showMaintenance(ride);
@@ -1203,7 +1471,8 @@ export class Game {
     if (!user || !ride) return;
     // the wallet decides what happens next (a brand-new account has to visit the booth first)
     await session.loadTickets();
-    if (this.mode === 'drive' && this.zones.active === ride) this.board(ride);
+    const at = this.zones.active === 'flightBack' ? 'flight' : this.zones.active;
+    if (this.mode === 'drive' && at === ride) this.board(ride);
   }
 
   /** Cards that depend on the account redraw when someone signs in or out (or their wallet changes). */
@@ -1220,6 +1489,7 @@ export class Game {
       this.ui.hidePanel();
       this.panelZone = null;
     } else if (switched && (key.startsWith('drone-offer') || (key.startsWith('crates') && !this.round))) this.showZonePanel(key.startsWith('drone') ? 'drone' : 'crates');
+    else if (switched && key.startsWith('flight-offer') && (this.panelZone === 'flight' || this.panelZone === 'flightBack')) this.showZonePanel(this.panelZone);
     else if (key.startsWith('trail-board') && this.panelZone === 'trail') this.showZonePanel('trail');
     else if (key.startsWith('short-') && !this.ui.panelElement.querySelector('.ticket-wait')) {
       // the wallet arrived: add the countdown to the next pack
@@ -1251,6 +1521,17 @@ export class Game {
         : `<p class="drone-gate">🎟️ A flight costs ${ticketsText(cost)}, and tickets come free with an account. Sign up or log in, and the drone is yours.</p>${accountButtons('drone')}`;
       this.ui.panel(`drone-offer-${Date.now()}`, this.drone.offerHtml(cost, gate), { accent: PALETTE.teal });
       this.ui.panelElement.querySelector('[data-drone-launch]')?.addEventListener('click', () => this.board('drone'));
+      return;
+    }
+    if (z === 'flight' || z === 'flightBack') {
+      // the gate desk's booking card: the leg from here, its weather, and the hour to fly at
+      const cost = session.cost('flight');
+      const gate = session.user
+        ? null
+        : `<p class="drone-gate">🎟️ A flight costs ${ticketsText(cost)}, and tickets come free with an account. Sign up or log in, and the left seat is yours.</p>${accountButtons('flight')}`;
+      const from = z === 'flightBack' ? 'island' : 'home';
+      this.ui.panel(`flight-offer-${Date.now()}`, this.flight.offerHtml(from, cost, gate), { accent: PALETTE.teal });
+      this.flight.wireOffer(this.ui.panelElement, () => this.board('flight'));
       return;
     }
     if (z === 'crates') {
@@ -1617,6 +1898,9 @@ export class Game {
     if (this.mode === 'workshop') return this.workshop?.escape();
     // past the line already: the run's done, so this is no early exit
     if (this.mode === 'trail' && this.trail.finished) return this.leave(true);
+    // on the ground at the far gate: the flight's done, Esc just deplanes
+    if (this.mode === 'flight' && this.flight.arrived) return this.leave(true);
+    if (this.mode === 'skylink') return this.skipSkyLink();
     if (this.mode !== 'drive' || this.round?.ride === 'crates') return this.askToLeave();
     if (this.zones.active === 'crates') this.cratesDismissed = true;
     if (this.zones.active === 'trail') this.trailDismissed = true;
@@ -1661,7 +1945,12 @@ export class Game {
       this.leaving = false;
       return this.leaveWorkshop();
     }
-    const exit: Record<Exclude<Mode, 'drive' | 'striker' | 'ducks' | 'shop' | 'ideas' | 'museum' | 'workshop'>, () => void> = {
+    if (this.mode === 'skylink') {
+      // no round on the SkyLink: leaving it is arriving straight away
+      this.leaving = false;
+      return this.skipSkyLink();
+    }
+    const exit: Record<Exclude<Mode, 'drive' | 'striker' | 'ducks' | 'cannons' | 'volley' | 'skylink' | 'shop' | 'ideas' | 'museum' | 'workshop'>, () => void> = {
       coaster: () => this.ride.exit(),
       rocket: () => this.rocket.exit(),
       wheel: () => this.wheel.exit(),
@@ -1670,10 +1959,15 @@ export class Game {
       ship: () => this.ship.exit(),
       race: () => this.speedway.exit(),
       trail: () => this.trail.exit(),
+      flight: () => this.flight.exit(),
+      jetski: () => this.jetski.exit(),
+      slides: () => this.slides.exit(),
     };
     // each exit() hands back to endRide() (its onFinish)
     if (this.mode === 'striker') this.striker.exit();
     else if (this.mode === 'ducks') this.ducks.exit();
+    else if (this.mode === 'cannons') this.cannons.exit();
+    else if (this.mode === 'volley') this.volley.exit();
     else this.fade(exit[this.mode]);
   }
 
@@ -1681,7 +1975,8 @@ export class Game {
     this.camera.up.set(0, 1, 0);
     this.ui.endIntro();
     const wasRide =
-      this.mode === 'coaster' || this.mode === 'rocket' || this.mode === 'wheel' || this.mode === 'drone' || this.mode === 'flip' || this.mode === 'ship' || this.mode === 'race' || this.mode === 'trail';
+      this.mode === 'coaster' || this.mode === 'rocket' || this.mode === 'wheel' || this.mode === 'drone' || this.mode === 'flip' || this.mode === 'ship' || this.mode === 'race' || this.mode === 'trail' ||
+      this.mode === 'flight' || this.mode === 'jetski' || this.mode === 'slides';
     if (this.mode === 'wheel' || this.mode === 'drone' || this.mode === 'flip') this.env.setHaze(1);
     const from = this.mode;
     if (from === 'ducks') {
@@ -1690,13 +1985,34 @@ export class Game {
       this.camYaw = ZONES.ducks.heading;
       this.ui.score(null);
     }
+    if (from === 'cannons' || from === 'volley') {
+      this.player.group.visible = true;
+      this.camYaw = ZONES[from].heading;
+      this.ui.score(null);
+    }
+    let flightZone: ZoneId = 'flight';
+    if (from === 'flight') {
+      // off the aircraft: in the arrivals hall it landed at (or still at the desk, if it never left)
+      this.player.group.visible = true;
+      const a = this.flight.arrival;
+      const pos = a ?? this.player.position;
+      flightZone = regionAt(pos.x, pos.z) === 'island' ? 'flightBack' : 'flight';
+      if (a) {
+        this.player.reset(a.x, a.z, a.heading, ZONES[flightZone].y ?? 0);
+        this.camYaw = a.heading;
+        this.camPitch = 0.2;
+      }
+      this.minimap.markers = [];
+      this.minimap.arrow = 'visitor';
+      this.minimap.setView(FOOT_VIEW);
+    }
     this.mode = 'drive';
     // a ride that ended because the park went under maintenance lands at the intro, not on foot
     this.player.enabled = this.inFair;
     this.ui.cinematic(false);
     this.ui.rideExit(false);
     this.ui.countdown(null);
-    const zoneOf: Partial<Record<Mode, ZoneId>> = { striker: 'striker', ducks: 'ducks', drone: 'drone', flip: 'flip', ship: 'ship', race: 'speedway', trail: 'trail', wheel: 'ferris' };
+    const zoneOf: Partial<Record<Mode, ZoneId>> = { striker: 'striker', ducks: 'ducks', drone: 'drone', flip: 'flip', ship: 'ship', race: 'speedway', trail: 'trail', wheel: 'ferris', jetski: 'jetski', slides: 'slides', cannons: 'cannons', volley: 'volley', flight: flightZone };
     this.panelZone =
       from === 'coaster' ? (this.ride === this.falcon ? 'falcon' : this.ride === this.stack ? 'coaster' : (this.plotRound?.plot ?? 'coaster')) : (zoneOf[from] ?? 'rocket');
     // a member's coaster taken out of the park while it was ridden can go now
@@ -1734,7 +2050,8 @@ export class Game {
     this.panelZone = null;
     const result: RoundResult = {
       ride: round.ride,
-      title: plotRound?.name ?? ZONES[round.ride].title,
+      // (the flight's zone is its gate desk: the round is the flight itself)
+      title: plotRound?.name ?? (round.ride === 'flight' ? 'Funfair Air' : ZONES[round.ride].title),
       completed,
       stats,
       ...(stalled === null
@@ -1747,13 +2064,17 @@ export class Game {
           }),
     };
     void results.open(result).then((choice) => this.afterResults(round.ride, choice));
-    session.finish(round.id, completed, stats).then(
+    const finishing = session.finish(round.id, completed, stats).then(
       (res) => results.saved(result, res),
       (err: unknown) => {
         if (err instanceof ApiError && err.status === 401) session.expire();
         results.failed(result, err);
       },
     );
+    this.finishing = finishing;
+    void finishing.finally(() => {
+      if (this.finishing === finishing) this.finishing = null;
+    });
   }
 
   /** What the attraction measured of its round, ready for the server. */
@@ -1773,6 +2094,11 @@ export class Game {
       crates: this.crates,
       striker: this.striker,
       ducks: this.ducks,
+      flight: this.flight,
+      jetski: this.jetski,
+      slides: this.slides,
+      cannons: this.cannons,
+      volley: this.volley,
     };
     return cleanStats(measured[ride].roundStats());
   }
@@ -1780,8 +2106,16 @@ export class Game {
   /** The results screen's buttons: another round, or the way to more tickets. */
   private afterResults(ride: AttractionId, choice: ResultsChoice) {
     if (this.mode !== 'drive') return;
-    if (choice === 'again') this.board(ride);
-    else if (choice === 'booth') this.goToBooth();
+    if (choice === 'again') {
+      // another flight is booked at this side's gate desk (the leg home, after landing): over to it,
+      // and its card (the hour to fly at is picked there)
+      // (the island games are only played there: not from across the sea)
+      if (ride === 'flight') {
+        const desk: ZoneId = this.region === 'island' ? 'flightBack' : 'flight';
+        if (this.zones.active === desk) this.showZonePanel(desk);
+        else this.teleport(desk, () => this.showZonePanel(desk));
+      } else if (ZONE_REGION[ride] === this.region) this.board(ride);
+    } else if (choice === 'booth') this.goToBooth();
   }
 
   private fade(mid: () => void) {
@@ -1794,17 +2128,104 @@ export class Game {
 
   /** Fast travel to a zone; `then` runs once the visitor is there (behind the fade). */
   teleport(id: ZoneId, then?: () => void) {
-    if (this.mode === 'striker' || this.mode === 'ducks') this.leave(false);
+    if (this.mode === 'striker' || this.mode === 'ducks' || this.mode === 'cannons' || this.mode === 'volley') this.leave(false);
     if (this.mode !== 'drive') return;
+    // no walking across the sea: Palm Cay is reached by air only
+    if (!canTravel(regionAt(this.player.position.x, this.player.position.z), id)) return;
     const z = ZONES[id];
     this.fade(() => {
       // park just in front of the trigger ring so the prompt shows up immediately
-      this.player.reset(z.x, z.z, z.heading);
+      this.player.reset(z.x, z.z, z.heading, z.y ?? 0);
       this.camYaw = z.heading; // behind the visitor, facing the attraction
       this.camPitch = 0.2;
       this.updateDriveCamera(1, true);
       then?.();
     });
+  }
+
+  /**
+   * Takes the SkyLink between the fair and the airport (free, no round): the visitor is carried
+   * through the scripted trip (into the lift, up, aboard at the windscreen, along the guideway, and
+   * down and out at the far hall). E, Esc or the exit button skips to the far hall.
+   */
+  private rideSkyLink(from: 'park' | 'airport') {
+    if (this.mode !== 'drive' || this.round || this.boarding || !this.player.enabled) return;
+    this.player.interact();
+    this.ui.hidePanel();
+    this.panelZone = null;
+    this.ui.prompt('', '', '');
+    this.skyRide = { ride: this.skylink.ride(from), to: from === 'park' ? 'skylinkBack' : 'skylink', aboard: false, yaw: 0 };
+    this.mode = 'skylink';
+    this.player.enabled = false;
+    this.ui.rideExit(true);
+    this.ui.cinematic(true);
+    this.sfx.chime();
+  }
+
+  /** One frame of the SkyLink trip: the visitor moves with the pose; at the far hall, back on foot. */
+  private updateSkyRide(dt: number) {
+    const sr = this.skyRide;
+    if (!sr) return;
+    const before = this.player.position;
+    const bx = before.x;
+    const bz = before.z;
+    const pose = sr.ride.update(dt);
+    const moved = Math.hypot(pose.pos.x - bx, pose.pos.z - bz);
+    // strolling on the scripted legs (not while the lift or the train carries them)
+    const walking = !pose.aboard && pose.phase !== 'lift-up' && pose.phase !== 'lift-down' && dt > 0 && moved / dt > 0.3 && moved / dt < 3;
+    this.player.carry(pose.pos.x, pose.pos.y, pose.pos.z, pose.yaw, walking ? moved / dt : 0);
+    sr.aboard = pose.aboard;
+    sr.yaw = pose.yaw;
+    if (pose.done) this.endSkyRide();
+  }
+
+  /** E, Esc or the exit button on the SkyLink: the rest of the trip runs on, out of sight, to the far hall. */
+  private skipSkyLink() {
+    const sr = this.skyRide;
+    if (!sr || this.mode !== 'skylink') return;
+    this.fade(() => {
+      if (this.skyRide !== sr) return;
+      // the trains and the lifts run with it, so the lane and the lift it claimed are let go as usual
+      let t = 0;
+      for (let i = 0; i < 6000 && this.skyRide === sr; i++) {
+        t += SKYLINK_SKIP_DT;
+        this.skylink.update(SKYLINK_SKIP_DT, t);
+        this.updateSkyRide(SKYLINK_SKIP_DT);
+      }
+      // (in case the trip never finished: the visitor is put at the far hall all the same)
+      if (this.skyRide === sr) this.endSkyRide();
+    });
+  }
+
+  private endSkyRide() {
+    const sr = this.skyRide;
+    if (!sr) return;
+    this.skyRide = null;
+    this.player.release();
+    const z = ZONES[sr.to];
+    // just outside the far hall's ring, facing out of it (so E there doesn't send them straight back)
+    const pos = this.player.position;
+    this.player.reset(pos.x, pos.z, sr.to === 'skylinkBack' ? Math.PI : 0, z.y ?? 0);
+    this.camYaw = sr.to === 'skylinkBack' ? Math.PI : 0;
+    this.camPitch = 0.2;
+    this.mode = 'drive';
+    this.player.enabled = this.inFair;
+    this.ui.rideExit(false);
+    this.ui.cinematic(false);
+    this.updateDriveCamera(1, true);
+  }
+
+  /** Aboard the SkyLink: the view from the leading car's windscreen. */
+  private updateSkyCamera(dt: number) {
+    const p = this.player.position;
+    const yaw = this.skyRide?.yaw ?? this.camYaw;
+    const eye = new THREE.Vector3(p.x, p.y - 0.42 + 1.65, p.z);
+    const look = new THREE.Vector3(eye.x - Math.sin(yaw) * 10, eye.y - 0.4, eye.z - Math.cos(yaw) * 10);
+    const k = 1 - Math.exp(-dt * 6);
+    this.camPos.lerp(eye, k);
+    this.camTarget.lerp(look, k);
+    this.camera.position.copy(this.camPos);
+    this.camera.lookAt(this.camTarget);
   }
 
   private resize() {
@@ -1839,11 +2260,14 @@ export class Game {
     const dist = 8.5 * this.zoom * (portrait ? 1.25 : 1);
     const cp = Math.cos(this.camPitch);
     const offset = new THREE.Vector3(Math.sin(this.camYaw) * cp, Math.sin(this.camPitch), Math.cos(this.camYaw) * cp).multiplyScalar(dist);
-    const target = new THREE.Vector3(p.x + vel.x * 0.3, 1.7, p.z + vel.z * 0.3);
+    // eye height over the floor they stand on (a terminal's, the SkyLink's platform, the island's beach)
+    const floor = Math.max(0, p.y - BODY_R);
+    const target = new THREE.Vector3(p.x + vel.x * 0.3, floor + 1.7, p.z + vel.z * 0.3);
     this.player.camYaw = this.camYaw;
     const goal = target.clone().add(offset);
-    // in the museum's hall the camera stays between its walls, under the roof
+    // in the museum's hall the camera stays between its walls, under the roof (and the terminal's)
     if (this.museum.inside(p)) this.museum.clampCamera(target, goal);
+    else if (this.region === 'home' && this.homeTerminal.inside(p)) this.homeTerminal.clampCamera(target, goal);
     const k = snap ? 1 : 1 - Math.exp(-dt * 4);
     this.camTarget.lerp(target, k);
     this.camPos.lerp(goal, k);
@@ -1873,10 +2297,17 @@ export class Game {
 
     // the demo buggy's engine is heard from the park, not over the kart you're racing
     this.trail.ambient = this.mode === 'drive';
+    // where the visitor is: the aircraft's region while flying it, else where they stand
+    if (this.mode === 'skylink') this.updateSkyRide(dt);
+    const region = this.flight.active ? this.flight.region : regionAt(this.player.position.x, this.player.position.z);
+    if (region !== this.region) this.enterRegion(region);
+    // the AI traffic first: the flight reads where everyone is this frame
+    this.traffic.update(dt, t, this.flight.trafficPlayer, region);
     for (const u of this.updatables) u.update(dt, t);
+    this.updateAirports(dt, t, region);
     this.wardrobe?.update(dt);
     this.updateCoasterAudio();
-    if (this.mode === 'drive' || this.mode === 'drone' || this.mode === 'race' || this.mode === 'trail') this.updateMinimap(dt);
+    if (MAP_MODES.has(this.mode)) this.updateMinimap(dt);
     wind.uTime.value = t;
     wind.uCar.value.copy(this.player.position);
 
@@ -1957,6 +2388,44 @@ export class Game {
       this.env.follow(new THREE.Vector3(LAYOUT.ducks.x, 0, LAYOUT.ducks.z));
       const badge = `🦆 ${Math.ceil(this.ducks.secondsLeft)} s left · ${this.ducks.score} points · ${this.ducks.hits} ducks down`;
       if (badge !== this.ducksBadge) this.ui.score((this.ducksBadge = badge));
+    } else if (this.mode === 'flight') {
+      this.zones.setVisible(false);
+      this.flight.updateCamera(this.camera, dt);
+      this.env.follow(this.flight.focus);
+    } else if (this.mode === 'jetski') {
+      this.camera.up.set(0, 1, 0);
+      this.zones.setVisible(false);
+      this.jetski.updateCamera(this.camera, dt);
+      this.env.follow(this.jetski.focus);
+    } else if (this.mode === 'slides') {
+      this.camera.up.set(0, 1, 0);
+      this.zones.setVisible(false);
+      this.slides.updateCamera(this.camera, dt);
+      this.env.follow(this.slides.focus);
+    } else if (this.mode === 'cannons') {
+      this.camera.up.set(0, 1, 0);
+      this.zones.setVisible(false);
+      this.cannons.updateCamera(this.camera, dt);
+      this.env.follow(this.cannons.focus);
+      const badge = `💥 ${Math.ceil(this.cannons.secondsLeft)} s left · ${this.cannons.score} points · ${this.cannons.sunk} sunk`;
+      if (badge !== this.cannonsBadge) this.ui.score((this.cannonsBadge = badge));
+    } else if (this.mode === 'volley') {
+      this.camera.up.set(0, 1, 0);
+      this.zones.setVisible(false);
+      this.volley.updateCamera(this.camera, dt);
+      this.env.follow(this.volley.focus);
+    } else if (this.mode === 'skylink' && this.skyRide?.aboard) {
+      // at the leading car's windscreen
+      this.camera.up.set(0, 1, 0);
+      this.zones.setVisible(false);
+      this.updateSkyCamera(dt);
+      this.env.follow(this.player.position);
+    } else if (this.mode === 'skylink') {
+      // walking to the lift, riding it, along the platform: the usual camera, on the carried visitor
+      this.camera.up.set(0, 1, 0);
+      this.zones.setVisible(false);
+      this.updateDriveCamera(dt);
+      this.env.follow(this.player.position);
     } else if (this.mode === 'striker') {
       this.camera.up.set(0, 1, 0);
       this.zones.setVisible(false);
@@ -1996,22 +2465,114 @@ export class Game {
     this.post.render(dt);
   }
 
+  /**
+   * The visitor crossed between the mainland and Palm Cay (by air): the far side's games sleep.
+   */
+  private enterRegion(region: Region) {
+    this.region = region;
+    const island = region === 'island';
+    for (const g of [this.jetski, this.slides, this.cannons, this.volley]) g.setAwake(island);
+    // (the park map opens on the visitor's own landmass by itself)
+  }
+
+  /**
+   * The airports, the SkyLink, Palm Cay and their people, each frame (as the flight preview does),
+   * with the far side's heavy scenery hidden while the visitor's on foot (in flight both stay: the
+   * flight sets its own view range) and the fair hidden once the camera is far from it.
+   */
+  private updateAirports(dt: number, t: number, region: Region) {
+    const cam = this.camera;
+    const flying = this.flight.active;
+    const n = this.env.night;
+    if (Math.abs(n - this.worldNight) > 0.005) {
+      this.worldNight = n;
+      for (const r of ['home', 'island'] as const) this.airside[r].setNight(n);
+      this.traffic.setNight(n);
+      this.homeTerminal.setNight(n);
+      this.landside.setNight(n);
+      this.skylink.setNight(n);
+      this.islandTerminal.setNight(n);
+      this.palmCay.setNight(n);
+      this.travellers?.setNight(n);
+      for (const g of [this.jetski, this.slides, this.cannons, this.volley]) g.setNight(n);
+      // the flight lights its own field (and both in low visibility); otherwise they follow the dusk
+      if (!flying) for (const r of ['home', 'island'] as const) this.airfields[r].setLights(n);
+    }
+    const showHome = flying || region === 'home';
+    const showIsland = flying || region === 'island';
+    this.airfields.home.group.visible = this.airside.home.group.visible = showHome;
+    this.homeTerminal.group.visible = this.landside.group.visible = this.skylink.group.visible = showHome;
+    this.airfields.island.group.visible = this.airside.island.group.visible = showIsland;
+    this.islandTerminal.group.visible = this.palmCay.group.visible = showIsland;
+    for (const r of ['home', 'island'] as const) {
+      this.airside[r].setAircraft(this.traffic.bodies(r));
+      if (r === 'home' ? showHome : showIsland) {
+        this.airside[r].update(dt, t, cam);
+        this.airfields[r].update(dt, t, cam);
+      }
+    }
+    if (showHome) {
+      this.homeTerminal.update(dt, t, cam);
+      this.landside.visitor = this.mode === 'drive' ? this.player.position : null;
+      this.landside.update(dt, t, cam);
+      this.skylink.update(dt, t, cam);
+    }
+    if (showIsland) {
+      this.islandTerminal.update(dt, t);
+      this.palmCay.update(dt, t, cam);
+    }
+    if (this.travellers) {
+      this.travellers.setVisitor(this.mode === 'drive' || this.mode === 'skylink' ? this.player.position : null);
+      this.travellers.update(dt, t, cam, region);
+    }
+    // the fair's own scenery (rides, stalls, crowd), from far out to sea or over Palm Cay: not drawn
+    const far = Math.hypot(cam.position.x - PARK.x, cam.position.z - PARK.z) > FAIR_DRAW_M;
+    if (far && !this.fairHidden) {
+      this.fairHidden = this.fairObjects.map((o) => o.visible);
+      for (const o of this.fairObjects) o.visible = false;
+    } else if (!far && this.fairHidden) {
+      this.fairObjects.forEach((o, i) => (o.visible = this.fairHidden![i]));
+      this.fairHidden = null;
+    }
+  }
+
   private updateMinimap(dt: number) {
     const q = this.player.group.quaternion;
     // yaw from the quaternion (the visitor only ever turns about y); in the air the map follows the
-    // drone, on the circuit your kart
-    const flying = this.mode === 'drone';
+    // drone (or the airliner), on the circuit your kart, on the lagoon your jet-ski
+    const mover =
+      this.mode === 'drone'
+        ? this.drone
+        : this.mode === 'race'
+          ? this.speedway
+          : this.mode === 'trail'
+            ? this.trail
+            : this.mode === 'flight'
+              ? this.flight
+              : this.mode === 'jetski'
+                ? this.jetski
+                : this.mode === 'slides'
+                  ? this.slides
+                  : null;
     const racing = this.mode === 'race';
     const trailing = this.mode === 'trail';
-    const heading = flying
-      ? this.drone.yaw
-      : racing
-        ? this.speedway.yaw
-        : trailing
-          ? this.trail.yaw
-          : Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.y * q.y + q.z * q.z));
-    const p = flying ? this.drone.position : racing ? this.speedway.position : trailing ? this.trail.position : this.player.position;
+    const heading = mover ? mover.yaw : Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.y * q.y + q.z * q.z));
+    const p = mover ? mover.position : this.player.position;
     const visitor = { x: p.x, z: p.z, heading };
+    // how far the map reaches: on foot, on the water or taxiing, and up to 15 km at cruise
+    if (this.mode === 'flight') {
+      const alt = this.flight.altitude;
+      this.minimap.setView(alt < 15 ? 300 : THREE.MathUtils.clamp(3000 + alt * 1.2, 3000, 15000));
+      this.minimap.arrow = 'aircraft';
+      this.minimap.markers = this.flight.markers;
+    } else if (this.mode === 'jetski') {
+      this.minimap.setView(300);
+      if (this.minimap.markers.length) this.minimap.markers = [];
+    } else {
+      this.minimap.setView(FOOT_VIEW);
+      if (this.minimap.markers.length) this.minimap.markers = [];
+      this.minimap.arrow = 'visitor';
+    }
     const karts = this.speedway.markers;
     const trains = [
       { x: this.stack.trainPosition.x, z: this.stack.trainPosition.z, color: PALETTE.mustard },
@@ -2022,6 +2583,8 @@ export class Game {
       ...(racing ? karts.slice(1) : karts),
       // the trail's demo buggy (yours is the arrow)
       ...(trailing ? [] : [this.trail.marker]),
+      // the lagoon's skis (yours is the arrow)
+      ...(this.mode === 'jetski' ? this.jetski.markers.slice(1) : []),
     ];
     this.minimap.update(visitor, trains);
     this.worldMap.update(dt, visitor, trains);
@@ -2036,6 +2599,16 @@ export class Game {
     }
     if (this.mode === 'ship') {
       this.sfx.setCoaster(this.ship.speed01, false, true);
+      return;
+    }
+    // the rush of water down the flume
+    if (this.mode === 'slides') {
+      this.sfx.setCoaster(Math.min(1, this.slides.speed / 22), false, true);
+      return;
+    }
+    // no coasters to hear across the sea, nor from the cockpit
+    if (this.region === 'island' || this.mode === 'flight') {
+      this.sfx.setCoaster(0, false, false);
       return;
     }
     let best = 0;
@@ -2093,7 +2666,9 @@ export class Game {
               : 'Finish your Crate Smash round first'
             : isAttraction(zone)
               ? zoneAction(zone)
-              : z.action;
+              : zone === 'flightBack'
+                ? zoneAction('flight', 'flightBack')
+                : z.action;
       this.museumStop = -1;
       this.ui.prompt(`${zone}:${action}`, z.title, action);
       if (zone === 'crates' && this.panelZone !== 'crates' && !this.cratesDismissed) this.showZonePanel('crates');

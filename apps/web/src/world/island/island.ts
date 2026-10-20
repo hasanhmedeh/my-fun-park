@@ -17,7 +17,7 @@ import { staticCylinder, type Ctx } from '../context';
 import { ISLAND, ISLAND_SPOTS, SEA_Y, islandShoreDist } from '../geo';
 import { mulberry } from '../random';
 import { PALETTE } from '../textures';
-import { Palms, Shrubs, type PalmSpot, type ShrubKind, type ShrubSpot } from './flora';
+import { Palms, Shrubs, canMultiDraw, type PalmSpot, type ShrubKind, type ShrubSpot } from './flora';
 import { Batches, SignAtlas, at, hipRoof, islandMaterials, litLevel, place, roundRect, signPlane, type V2, type WalkRect } from './kit';
 import { NightLights } from './lights';
 import {
@@ -51,6 +51,8 @@ import {
 const PARK = ISLAND.park;
 /** The park's meshes are stored relative to this point (its middle). */
 const ORIGIN = { x: 0, y: 0, z: (PARK.z0 + PARK.z1) / 2 };
+/** The static batches' culling cells (m), where the GPU can multi-draw (kit.ts, Batch.build). */
+const BATCH_CELL = 64;
 
 /** The arrivals plaza in front of the terminal, the promenade south of it, and the Beach Plaza. */
 const ARRIVALS = { x0: -70, x1: 70, z0: 40672.5, z1: 40742 };
@@ -138,6 +140,8 @@ export class PalmCay {
   private lights: NightLights;
   private palms: Palms;
   private shrubs: Shrubs;
+  /** The static batches (their small parts are hidden by distance, see kit.ts). */
+  private batches: Batches;
   /** Bobbing buoys (high and medium tiers; the low ones float still, merged into the static paint). */
   private buoys: Buoys | null = null;
   private night = -1;
@@ -158,11 +162,12 @@ export class PalmCay {
     const buoys = plan.buoyLine();
     if (lean) for (const [i, b] of buoys.entries()) k.b.paint.add(BUOY, BUOY_COLOURS[i % 2], place(b.x, SEA_Y + 0.06, b.z));
     this.signMat = atlas.material(0.08);
-    k.b.build(this.group, this.mats, this.signMat, q.shadows, lean);
+    k.b.build(this.group, this.mats, this.signMat, q.shadows, lean, canMultiDraw(ctx.renderer) ? BATCH_CELL : 0);
+    this.batches = k.b;
     this.lights.build();
     this.group.add(this.lights.group);
     this.palms = new Palms(palms, { origin: ORIGIN, tier: q.tier, shadows: q.shadows, renderer: ctx.renderer, seed: 31 });
-    this.shrubs = new Shrubs(shrubs, { origin: ORIGIN, tier: q.tier, shadows: q.shadows && q.tier === 'high', seed: 32 });
+    this.shrubs = new Shrubs(shrubs, { origin: ORIGIN, tier: q.tier, shadows: q.shadows && q.tier === 'high', seed: 32, renderer: ctx.renderer });
     this.group.add(this.palms.group, this.shrubs.group);
     if (!lean) {
       this.buoys = new Buoys(buoys);
@@ -189,6 +194,7 @@ export class PalmCay {
     // only the near side of the world needs anything done
     const dz = camera.position.z - ORIGIN.z;
     if (Math.abs(dz) > 8000) return;
+    this.batches.update(camera);
     this.palms.update(camera);
     this.shrubs.update(camera);
     this.lights.update(t);

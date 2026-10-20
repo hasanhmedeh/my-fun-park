@@ -375,6 +375,10 @@ kbd {
   display: flex;
   gap: 8px;
 }
+/* in the A320's seat the account chip would sit over the engine display: the wallet waits for the gate */
+.is-piloting .hud-account {
+  display: none;
+}
 .hud-icon,
 .hud-pill {
   height: 44px;

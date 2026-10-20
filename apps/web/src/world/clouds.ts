@@ -22,6 +22,8 @@ const TILE = 30000;
 /** How much of the sky each cover hides (FEW 1–2 oktas … OVC 8). */
 const COVER = { FEW: 0.16, SCT: 0.38, BKN: 0.7, OVC: 0.97 };
 const WHITE = new THREE.Color(1, 1, 1);
+/** Moonlight on a cloud: the moon's blue, greyed (linear). */
+const MOON_GREY = new THREE.Color(0.42, 0.45, 0.5);
 
 /** A soft, lumpy puff (alpha) with a little internal density variation (rgb). */
 function puffTexture() {
@@ -93,6 +95,7 @@ export class Clouds {
     uFar: { value: 2400 },
     uFogSunDir: fogSun.uFogSunDir,
     uFogSunColor: fogSun.uFogSunColor,
+    uWrap: { value: 0.35 },
   };
 
   constructor(
@@ -148,6 +151,7 @@ export class Clouds {
         uniform sampler2D uMap;
         uniform vec3 uSunDir;
         uniform vec3 uSunColor;
+        uniform float uWrap;
         uniform vec3 uSkyColor;
         uniform vec3 uGroundColor;
         uniform vec3 uFogColor;
@@ -170,14 +174,14 @@ export class Clouds {
           float sa = vSeed * 6.2832;
           vec2 uv2 = mat2(cos(sa), sin(sa), -sin(sa), cos(sa)) * (vUv - 0.5) * 1.9 + 0.5 + vSeed;
           float billow = texture2D(uMap, uv2).r;
-          float a = 0.85 * tex.a * smoothstep(0.05, 0.55, billow * 0.8 + tex.a * 0.6) * vFade * smoothstep(vBase - 25.0, vBase + 35.0, vWorld.y);
+          float a = min(1.0, 1.2 * tex.a) * smoothstep(0.05, 0.55, billow * 0.8 + tex.a * 0.6) * vFade * smoothstep(vBase - 25.0, vBase + 35.0, vWorld.y);
           if (a < 0.004) discard;
           // light the puff as a soft, bulging mass (its normal from where on the disc this pixel
           // is, bent upward) with wrapped lighting: clouds scatter, they have no hard terminator
           vec2 q = vUv * 2.0 - 1.0;
           float r2 = min(dot(q, q), 1.0);
           vec3 n = normalize((vRight * q.x + vUp * q.y) * 0.7 - vView * sqrt(1.0 - r2) * 0.5 + vec3(0.0, 0.45, 0.0));
-          float sun = 0.35 + 0.65 * (0.5 + 0.5 * dot(n, uSunDir));
+          float sun = uWrap + (1.0 - uWrap) * (0.5 + 0.5 * dot(n, uSunDir));
           // light through the thin edges when looking towards the sun (the silver lining)
           float rim = pow(max(dot(vView, uSunDir), 0.0), 6.0) * (1.0 - tex.r) * 1.2;
           // darker towards the cloud's base, where little light gets through from above
@@ -255,14 +259,34 @@ export class Clouds {
     }
   }
 
-  /** The light the clouds are lit by: the sun (or moon) direction and colour, the sky and the ground. */
-  light(sunDir: THREE.Vector3, sun: THREE.Color, intensity: number, sky: THREE.Color, ground: THREE.Color) {
+  /**
+   * The light the clouds are lit by, straight from the scene's lights: the sun's (or at night the
+   * moon's) direction, colour and intensity, and the hemisphere light's sky and ground colours.
+   * `moon` says the direct light is moonlight: the game's moon is far brighter than a real one
+   * (so the park stays playable at night), but a cloud is a near-white reflector seen against a
+   * black sky, so it gets only the share a moonlit cloud really shows: dim grey-blue. A low sun
+   * reaches the clouds through a long, reddening path (gold to salmon), and the sky light is the
+   * whole dome's: paler than the zenith tint by day, none of that at dusk or at night.
+   */
+  light(sunDir: THREE.Vector3, sun: THREE.Color, intensity: number, sky: THREE.Color, ground: THREE.Color, moon = false) {
     const u = this.uniforms;
+    const smooth = THREE.MathUtils.smoothstep;
     u.uSunDir.value.copy(sunDir);
-    u.uSunColor.value.copy(sun).multiplyScalar(Math.min(1.6, intensity * 0.55));
-    // the sky light on a cloud is the whole dome's, paler than the zenith tint the hemisphere light carries
-    u.uSkyColor.value.copy(sky).lerp(WHITE, 0.35);
-    u.uGroundColor.value.copy(ground);
+    const d = u.uSunColor.value.copy(sun);
+    // how high the sun is: 0 at dusk, dawn and at night .. 1 by day
+    const dome = moon ? 0 : smooth(sunDir.y, 0.04, 0.35);
+    if (moon) d.lerp(MOON_GREY, 0.6).multiplyScalar(Math.min(0.4, intensity * 0.2));
+    else {
+      const low = 1 - smooth(sunDir.y, 0.0, 0.3);
+      d.multiplyScalar(Math.min(1.6, intensity * 0.55));
+      d.g *= 1 - 0.22 * low;
+      d.b *= 1 - 0.5 * low;
+    }
+    // the shade side: wrapped half-lit by day, darker against a low sun or the moon
+    u.uWrap.value = 0.15 + 0.2 * dome;
+    const k = 0.55 + 0.45 * dome;
+    u.uSkyColor.value.copy(sky).lerp(WHITE, 0.35 * dome).multiplyScalar(k);
+    u.uGroundColor.value.copy(ground).multiplyScalar(k);
   }
 
   update(dt: number, camera: THREE.Camera) {

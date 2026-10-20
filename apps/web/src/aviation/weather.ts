@@ -24,9 +24,14 @@ const VEER_DEG = 12;
 // The day's weather
 // ------------------------------------------------------------------------------------------------
 
+/** The windiest day the game rolls (kt): a mean wind and gusts a player can still land in for fun. */
+export const MAX_WIND_KT = 18;
+export const MAX_GUST_KT = 25;
+
 /**
- * Rolls the weather for a flight: winds 4–22 kt from varied directions (mostly the trade winds'
- * east and south-east, sometimes a westerly sea breeze), gusts on the windier days, a few
+ * Rolls the weather for a flight: winds 4–18 kt from varied directions (mostly the trade winds'
+ * east and south-east, sometimes a westerly sea breeze), gusts to at most 25 kt on the windier days
+ * (the crosswind on either runway is then 25 kt at worst, well inside the A320's 38 kt demonstrated), a few
  * fair-weather cumulus at 2,000–4,500 ft, good visibility with a morning mist now and then, and
  * warm tropical temperatures. The same seed always gives the same weather.
  */
@@ -39,9 +44,12 @@ export function makeWeather(seed: number, tod: TimeOfDay): Weather {
   const windFrom = trades ? 60 + rnd() * 90 : rnd() * 360;
   // Calmer at dawn and night, freshest in the afternoon.
   const todWind = tod === 'day' ? 1 : tod === 'dusk' ? 0.9 : 0.75;
-  const windKt = Math.round(4 + 18 * Math.pow(rnd(), 1.3) * todWind);
-  const gusty = windKt >= 10 && rnd() < 0.4;
-  const gustKt = gusty ? windKt + Math.round(8 + rnd() * 6) : 0;
+  const windKt = Math.min(MAX_WIND_KT, Math.round(4 + (MAX_WIND_KT - 4) * Math.pow(rnd(), 1.3) * todWind));
+  // a METAR reports gusts 10 kt or more above the mean; the game keeps them to 25 kt (so the gusty
+  // days are the moderate ones, 10–15 kt mean: on a stronger day the gusts would be past the cap)
+  const gustRoll = windKt >= 10 && rnd() < 0.4;
+  const gustKt = gustRoll ? Math.min(MAX_GUST_KT, windKt + Math.round(9 + rnd() * 5)) : 0;
+  const gusty = gustKt >= windKt + 8;
 
   // Clouds: zero to two layers of FEW/SCT cumulus, a broken layer one day in seven.
   const clouds: Weather['clouds'] = [];
@@ -67,7 +75,7 @@ export function makeWeather(seed: number, tod: TimeOfDay): Weather {
   // Over the sea the air is smooth to light chop; more on windy and gusty days and afternoons.
   const turbulence = Math.min(1, 0.08 + windKt / 45 + (gusty ? 0.2 : 0) + (tod === 'day' ? 0.08 : 0) + rnd() * 0.08);
 
-  return { windFrom: Math.round(windFrom / 10) * 10 || 360, windKt, gustKt, visibilityM, clouds, tempC, dewC, qnh, turbulence };
+  return { windFrom: Math.round(windFrom / 10) * 10 || 360, windKt, gustKt: gusty ? gustKt : 0, visibilityM, clouds, tempC, dewC, qnh, turbulence };
 }
 
 /** International Standard Atmosphere, calm: the reference conditions the A320's numbers assume. */
@@ -213,11 +221,15 @@ export class Air implements Atmosphere {
     }
     const agl = Math.max(0.5, pos.y - this.gy);
 
-    // Mean wind: a 1/7 power law through the surface layer, veering with height.
+    // Mean wind: a 1/7 power law through the surface layer, veering with height. The gusts are the
+    // surface layer's (thermals and the island's lee): they fade above it to a quarter by 3,000 ft,
+    // so the cruise isn't a ride on a 15-knot swell the autothrust can't keep up with.
     const surf = this.surfaceWind();
     const hp = Math.min(agl, SURFACE_LAYER_M);
     const profile = Math.pow(hp / WIND_REF_M, 1 / 7);
-    const speed = surf.kt * KT * profile;
+    const gustPart = Math.max(0, w.gustKt - w.windKt) * this.gustFactor();
+    const fade = Math.max(0.25, Math.min(1, 1 - (agl - SURFACE_LAYER_M) / 800));
+    const speed = Math.max(0, surf.kt - gustPart * (1 - fade)) * KT * profile;
     const veer = VEER_DEG * Math.min(1, agl / 600);
     const to = headingVec(surf.fromDeg + veer + 180);
     let wx = to.x * speed;

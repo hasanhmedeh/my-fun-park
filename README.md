@@ -20,6 +20,14 @@ Walk around a low-poly funfair at dusk as a fully animated visitor:
 | 🎟️ Ticket Booth | Park guide |
 | 🛠️ Coaster Workshop | **Build your own coaster**, piece by piece, from parts bought with tickets: test-ride it for free, send it to staff, and if they release it in Creators' Valley your name goes on the station and you earn tickets every time someone rides it |
 | 🏛️ Career Museum | Hasan Hmedeh's CV as a walk-in gallery at the end of the East Avenue: a framed picture per job, project and achievement, year by year from 2019 to today, and a guided tour. Free |
+| 🚝 SkyLink | A free driverless people mover on an elevated guideway, from the fair's south gate to the airport |
+| 🛫 Funfair International | **XFUN**, a full airport on the south coast: forecourt, buses and car parks, check-in, security, shops, six gates with jet bridges, a tower, hangars and AI airliners coming and going |
+| ✈️ Funfair Air FA101 / FA102 | **Fly the Airbus A320neo yourself**, 40 km south to Palm Cay and back: pushback, taxi, take-off, cruise, an ILS approach and a hand-flown landing, with real instruments, ATC and a scored landing |
+| 🌴 Palm Cay | **XPCY**, a tropical island 40 km out to sea: a regional airport, beaches, palms and four games |
+| 🌊 Jet-Ski Race | Three laps of a buoy course in Palm Cay's lagoon against the island's riders |
+| 🛝 Splash Tower | A 24 m water-slide tower with three slides: the Kamikaze drop, the Typhoon tube and the Lazy Loop |
+| 💣 Pirate Cannons | Man the old fort's guns and sink the pirate ships before the clock runs out |
+| 🏐 Beach Volley | Ten serves with an island partner against two locals: timed serves, digs and spikes, and coconuts to hit |
 
 ## The park's layout
 
@@ -37,6 +45,8 @@ The park is a round lawn 280 m across inside a fence (`PARK` in `apps/web/src/wo
 | 🎢 Thrill Ridge | west | the Thunder Loop and the Sky Flip |
 | 🏁 Motor Town | south-west | the kart garage and, down the Rally Lane, the Rally Trail's shed (their circuits lie outside the fence) |
 | 🛠️ Creators' Valley | out of the west gate | the Valley Road, the Coaster Workshop's kiosk and eight 70 × 70 m plots where the coasters members build are released (`VALLEY`) |
+| 🛫 Funfair International | the south coast, past the south gate | the SkyLink's park station, the airport's forecourt and terminal, Gate 3's desk (FA101) |
+| 🌴 Palm Cay | an island 40 km south | the island terminal (FA102 home), the Beach Plaza, the Jet-Ski Race, the Splash Tower, the Pirate Cannons and Beach Volley |
 
 Lamps line every path at even spacing, avenues of trees line North Avenue and the East and West Avenues, groves fill the gardens between the paths and a green belt runs inside the fence. Scenery lays itself out from the paths and from each attraction's footprint (`FOOTPRINTS`), so moving an attraction in `LAYOUT` moves its trigger ring, its queue and the space kept clear round it too. The rides outside the fence are placed the same way: each coaster's track starts where `LAYOUT.coaster` / `LAYOUT.falcon` puts its station, and `LAYOUT.circuit` moves the kart circuit (the Rally Trail stays where it is: its ghost runs are kept in world coordinates).
 
@@ -48,7 +58,7 @@ Anyone can walk in as a guest and explore the park, knock over the letters and v
 
 - **Ticket counter:** the 🎟️ Ticket Booth hands out packs of **20 tickets**, free for now. A pack is added to whatever you have left. You can take **one every 5 hours**, counted from your last purchase (skipped windows don't stack up).
 - **The booth's shop:** press `E` at the booth to step up to the counter. The camera moves to **Rosa**, the vendor behind the kiosk window, who chats as you browse and buy, and the shop opens beside her with three aisles: **🎟️ Tickets** (the free pack, a countdown to the next, prices and your history), **🍭 Treats**, eaten on the spot (🍭 Cotton Candy: run 40% faster for 3 min · 🍿 Popcorn: kicks twice as hard for 3 min · 🥤 Fizzy Soda: +60 s on your next drone flight · 🍎 Candy Apple: just tasty), and **🎈 Souvenirs**, kept forever and worn round the fair (🎩 Top Hat, 🧢 Fair Cap, 🕶️ Star Shades, 🎈 Balloon, 👆 Foam Finger; one per spot). Everything is paid for in tickets; the catalog is `apps/api/src/shop/catalog.ts`.
-- **Prices:** every ride and game costs **1 ticket**; the **Giant Wheel** and **Sky Falcon** cost **5**. Prices, the pack size and the cooldown are database rows, changed in The Ringmaster's Office without a deploy.
+- **Prices:** every ride and game costs **1 ticket**; the **Giant Wheel** and **Sky Falcon** cost **5**, and a **flight** (FA101 or FA102) **10**. The SkyLink is free. Prices, the pack size and the cooldown are database rows, changed in The Ringmaster's Office without a deploy.
 - **One round per ticket:** boarding spends the tickets, the attraction runs one round and ends on its own (leaving early still uses the ticket), and a results screen shows that round's statistics with personal bests. Riding again costs another ticket.
 - **💡 The Idea Box:** a kiosk with a giant light bulb on the entrance plaza's west side. Press `E` and a sheet opens beside it: pick what the idea is about (rides & games, treats & souvenirs, the park, something wrong, something else), write up to 500 characters and post it (an envelope flies into the slot). **My ideas** lists everything the member has shared, with where each one stands (waiting → accepted → in development → done, or declined) and staff's answer. When staff answer, a card pops up in the fair straight away ("Staff answered your idea"), and the kiosk opens on the news. Members only; up to 5 ideas a day.
 - **Saved per user:** every purchase and every round, with its statistics. Players can delete their account from the account menu in the HUD; a copy of their data is given on request by email.
@@ -223,7 +233,7 @@ Every route is under `/api`. While private access is on, every route but `/api/h
 | `GET` | `/api/health` | | **200** `{ ok: true, db: 'up' }`, or **503** if the database is unreachable |
 | | `/api/ringmaster/*` | staff | The office: `GET overview?days=7\|30\|90`, `GET`/`PATCH park`, `GET attractions`, `PATCH attractions/:ride` `{ tickets?, open?, closedMessage? }`, `GET shop`, `PATCH shop/:item` `{ tickets?, stock? }` (`stock: null` for no limit), `GET users?q=&limit=&offset=`, `GET`/`PATCH`/`DELETE users/:id`, `GET purchases`, `GET rounds?ride=`, `GET suggestions?status=&limit=&offset=` (→ `{ suggestions, total, counts }`), `PATCH suggestions/:id` `{ status?, reply? }` (the reply only once: **409** if it has one), `GET trail?day=YYYY-MM-DD` (one of the Rally Trail's boards, today's without `day`: `{ day, startsAt, endsAt, current, board, disqualified, stats, record, daily }`), `PATCH trail/runs/:id` `{ disqualified }` (take a run off its board, or put it back), `GET access` (→ `{ enabled, entries, you: { ip, allowed } }`), `PATCH access` `{ enabled }` (switching on adds the caller's address), `POST access/ips` `{ ip, label? }`, `DELETE access/ips/:id` (**409** for the last entry letting the caller in while it's on), `GET creations?status=&limit=&offset=` (→ `{ creations, total, counts, plots }`), `GET creations/:id`, `POST creations/:id/release` `{ plot?, replace?, tickets? }` (onto a free plot, or `replace: true` in place of the version of the same design running now), `POST creations/:id/decline` `{ reply }`, `POST creations/:id/remove`, `GET workshop/parts`, `PATCH workshop/parts/:part` `{ tickets?, stock? }`, `GET actions`. **401** for guests, **403** for players |
 
-`user` is `{ id, email, username, role, createdAt }` (`role` is `player` or `admin`, i.e. staff). Attraction ids are `coaster`, `falcon`, `rocket`, `ferris`, `flip`, `ship`, `speedway`, `trail`, `drone`, `crates`, `striker` and `ducks`, plus `plot1` to `plot8` for Creators' Valley's plots (each priced and closed like any attraction while a coaster runs on it). Prices, maintenance, the pack size and the cooldown are rows in `attraction_settings` and `park_settings`; the defaults for a missing row live in `apps/api/src/rides/attractions.ts`. Signup, login and account deletion are each limited to 10 requests a minute per IP (**429**, with `Retry-After`).
+`user` is `{ id, email, username, role, createdAt }` (`role` is `player` or `admin`, i.e. staff). Attraction ids are `coaster`, `falcon`, `rocket`, `ferris`, `flip`, `ship`, `speedway`, `trail`, `drone`, `crates`, `striker` and `ducks`, plus `plot1` to `plot8` for Creators' Valley's plots (each priced and closed like any attraction while a coaster runs on it), then `flight` (Funfair Air, either way: one round is one whole flight, gate to gate) and Palm Cay's `jetski`, `slides`, `cannons` and `volley`. Prices, maintenance, the pack size and the cooldown are rows in `attraction_settings` and `park_settings`; the defaults for a missing row live in `apps/api/src/rides/attractions.ts`. Signup, login and account deletion are each limited to 10 requests a minute per IP (**429**, with `Retry-After`).
 
 ## The coaster
 
@@ -280,6 +290,43 @@ A shooting gallery on the Midway (`apps/web/src/world/attractions/ducks.ts`): st
 - **Aim** with the mouse, or `WASD` / the arrows (the joystick on touch); **fire** with a click, `E` or `Space` (or tap a duck). The gun takes a third of a second to reload; the sight dims meanwhile. The card with how to play goes away with the first shot.
 - **Results**: score, ducks down, accuracy, best streak and golden ducks, with personal bests like every other game.
 
+## Funfair International, the A320neo and Palm Cay
+
+Out of the park's south gate, the **SkyLink** (`apps/web/src/world/airport/skylink.ts`) runs on an elevated guideway to **Funfair International (XFUN)** on the south coast. Press `E` between the lifts in either station's hall: the visitor takes the lift up, boards at the leading car's windscreen and rides to the far station (about 80 s; `E`, `Esc` or the exit button skips to the far hall). It's free. The airport (`apps/web/src/world/airport/`) is a full one: the forecourt with its buses and car parks, the terminal (check-in, security, shops, six gates with jet bridges), runway 09/27 with its lights and signs, the tower, hangars, airside vehicles, and AI airliners of invented carriers that push back, taxi, take off and land round you.
+
+- **Booking:** at **Gate 3**'s desk (`E`), the card shows **FA101** to Palm Cay: the weather at both ends, the runway in use, the block time, and the time of day to fly at (dawn, day, dusk or night; the clock goes back to 16:00 afterwards). A flight costs **10 tickets** (one round, gate to gate). Passengers board through the jet bridge while you settle into the left seat.
+- **The flight** (`apps/web/src/world/attractions/flight.ts`, the model in `apps/web/src/aviation/`): real A320neo numbers, Airbus normal law, autopilot (HDG, ALT, SPD, V/S, NAV, LOC, APPR) and autothrust. Pushback is automatic; the taxi follows the greens to the runway; then take-off, a climb to 5000 ft, a cruise over the sea (time warp allowed with the autopilot on), an ILS approach (the autopilot comes off by 200 ft) and a hand-flown landing. The taxi-in can be skipped. ATC (Funfair Ground and Tower, Sea Radar, Palm Cay Tower) and the cabin crew talk to you, as text and speech. The cockpit shows the PFD, ND and EWD; `C` steps through the cockpit, chase, wing, tower and cabin views.
+- **Scoring:** comfort, the landing (vertical speed, G, centreline, touchdown point), violations and delays make a score and 1 to 5 stars. A hard landing, a tailstrike or an overspeed cost points; a **crash or ditching fails the round**: the passengers don't arrive and the visitor is back at the departure gate.
+- **Palm Cay (XPCY)** (`apps/web/src/world/island/`), 40 km south: a regional airport (airstairs; passengers walk across the apron) and a beach park with palms, the Beach Plaza and four games, each 1 ticket with results and personal bests. **FA102** flies home from the desk in the island terminal. Fast travel only works on the landmass you're on (on Palm Cay the park map takes you round the island; the flight is the way across).
+  - **🌊 Jet-Ski Race** (`apps/web/src/world/attractions/island/jetski.ts`): three laps of a buoy course in the lagoon against the island's riders. `R` puts you back on course.
+  - **🛝 Splash Tower** (`apps/web/src/world/attractions/island/slides.ts`): climb the 24 m tower and pick a slide (`1`–`3`): the Kamikaze, the Typhoon or the Lazy Loop. On the slide, `W` tucks (faster), `S` sits up (slower), `A`/`D` lean.
+  - **💣 Pirate Cannons** (`apps/web/src/world/attractions/island/cannons.ts`): from the fort's battery, aim and fire (`E` / `Space`) at the pirate ships before the clock runs out.
+  - **🏐 Beach Volley** (`apps/web/src/world/attractions/island/volley.ts`): ten serves with an island partner against two locals; aim, then strike (`E` / `Space`) as the meter says, dig, and spike past the block. Coconuts on the shy beyond the far end pay 5 each.
+
+### Flying the A320 (keyboard; physical keys)
+
+| Control | Keys | Touch |
+| --- | --- | --- |
+| Sidestick pitch (push = nose down) | `W` / `↑` push, `S` / `↓` pull | stick (left) |
+| Sidestick roll | `A` / `←` left, `D` / `→` right | stick |
+| Rudder (air) / nosewheel tiller (ground; below 40 kt `A`/`D` steer too) | `,` left, `.` right | stick x on the ground |
+| Thrust levers | `PageUp` / `=` up, `PageDown` / `-` down; `Y` TOGA, `U` CL detent, `J` IDLE | thrust lever (right) |
+| Reverse thrust (on the ground, levers idle) | `R` hold | REV (hold) |
+| Flaps | `F` retract one step, `V` extend one step | FLAPS − / + |
+| Gear | `G` | GEAR |
+| Brakes | `B` hold; `Shift`+`B` parking brake | BRK (hold) |
+| Speed brake | `/` cycles 0 → ½ → full → 0; `Shift`+`/` arms the ground spoilers | SPD BRK |
+| Autobrake | `O` cycles OFF → LO → MED → MAX | (in the panel) |
+| Autopilot / autothrust | `P` AP1, `Shift`+`P` A/THR | AP, A/THR |
+| FCU | `1` SPD, `2` HDG, `3` ALT, `4` V/S select a knob; `[` / `]` turn it (`Shift` ×10); `\` push (managed); `'` pull (selected); `L` LOC, `K` APPR | tap the FCU |
+| Radio / next step | `E`: request pushback, taxi, ready for departure, skip the taxi-in | the action button |
+| Camera | `C` cycles cockpit → chase → wing → tower → cabin | camera button |
+| Time warp (cruise, AP on, above 2000 ft) | `T` cycles ×1 → ×2 → ×4 | ×2 button |
+| Look around | mouse drag; the wheel zooms (chase) | drag |
+| Leave | `Esc` (on the ground at the far gate it just deplanes) | exit button |
+
+`Shift` is only a modifier, and `Space` does nothing in the cockpit.
+
 ## Coaster Workshop and Creators' Valley
 
 Out of the park's west gate, the Valley Road runs between the eight plots of **Creators' Valley**, four either side, where coasters built by members run. Press `E` at the pink **Coaster Workshop** kiosk where the road starts to go to the **Builder's Yard**: a flat 70 × 70 m plot of its own, the size of a valley plot (members only; the park isn't drawn there). The rules (pieces, limits, parts, checks and physics) are one module, `apps/api/src/workshop/design.ts`, which the game imports too (`apps/web/src/workshop/rules.ts`), so the builder and the server always agree.
@@ -309,7 +356,7 @@ Out of the park's west gate, the Valley Road runs between the eight plots of **C
 
 ## Controls
 
-`WASD`/arrows walk · `Shift` run · `Space` dodge-roll · `F` kick · `E`/`Enter` interact · `H` wave · `R` back to entrance · `M` park map · `I` info · `Esc` exit a ride. Touch devices get a joystick + action button. Mouse wheel zooms.
+`WASD`/arrows walk · `Shift` run · `Space` dodge-roll · `F` kick · `E`/`Enter` interact · `H` wave · `R` back to entrance · `M` park map · `I` info · `Esc` exit a ride. The A320 has its own keys: see [Flying the A320](#flying-the-a320-keyboard-physical-keys). Touch devices get a joystick + action button. Mouse wheel zooms.
 
 Info: the guide to the fair, and each ride's intro (its story and controls), open by themselves only the first time this browser meets them. After that they're behind the **ℹ️** button in the top-right corner (or `I`), which shows the guide on foot and the ride's intro while riding, and glows briefly when a ride's intro is there to read again.
 

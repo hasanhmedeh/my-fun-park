@@ -32,6 +32,8 @@ export class FlightTouch {
   private readonly buttons = new Map<string, HTMLButtonElement>();
   private shown = -1;
   private lastDetent = -1;
+  /** The lit states last drawn (update's key), -1 for none yet. */
+  private litKey = -1;
 
   constructor(touch: HTMLElement, private readonly onDetent: () => void) {
     const el = document.createElement('div');
@@ -117,31 +119,30 @@ export class FlightTouch {
     track.addEventListener('pointercancel', end);
   }
 
-  /** The lever's position as the flight has it (the keyboard and the autothrust move it too), and the buttons' lit states. */
+  /**
+   * The lever's position as the flight has it (the keyboard and the autothrust move it too), and the
+   * buttons' lit states. Called every frame: the DOM is only touched when something changed.
+   */
   update(throttle: number, lit: { gear: boolean; ap: boolean; athr: boolean; speedbrake: boolean; warp: number; flaps: number }) {
     const pct = Math.round(throttle * 200) / 2;
     if (pct !== this.shown) {
       this.shown = pct;
       this.handle.style.bottom = `${pct}%`;
     }
+    const key = (lit.gear ? 1 : 0) | (lit.ap ? 2 : 0) | (lit.athr ? 4 : 0) | (lit.speedbrake ? 8 : 0) | (lit.warp << 4) | (lit.flaps << 8);
+    if (key === this.litKey) return;
+    this.litKey = key;
     this.buttons.get('gear')?.classList.toggle('is-on', lit.gear);
     this.buttons.get('ap')?.classList.toggle('is-on', lit.ap);
     this.buttons.get('athr')?.classList.toggle('is-on', lit.athr);
     this.buttons.get('speedbrake')?.classList.toggle('is-on', lit.speedbrake);
     const warp = this.buttons.get('warp');
     if (warp) {
-      const t = `×${lit.warp === 1 ? 2 : lit.warp === 2 ? 4 : 1}`;
-      if (warp.textContent !== t) warp.textContent = t;
+      warp.textContent = `×${lit.warp === 1 ? 2 : lit.warp === 2 ? 4 : 1}`;
       warp.classList.toggle('is-on', lit.warp > 1);
     }
     const fl = this.buttons.get('flaps-down');
-    if (fl) {
-      const t = `FLAPS + ${['0', '1', '2', '3', 'F'][lit.flaps] ?? ''}`;
-      if (fl.dataset.t !== t) {
-        fl.dataset.t = t;
-        fl.textContent = t;
-      }
-    }
+    if (fl) fl.textContent = `FLAPS + ${['0', '1', '2', '3', 'F'][lit.flaps] ?? ''}`;
   }
 
   /** Lets go of everything (the round ends, or the page loses focus). */

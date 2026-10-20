@@ -9,7 +9,6 @@
 // keys and touches through `pilot` and the autopilot) and in node (scripts/flight-check.mjs feeds
 // it a scripted crew, flight/crew.ts), so the whole flight can be checked without a browser.
 
-import * as THREE from 'three';
 import { A320 } from '../../aviation/a320';
 import { AIRFIELDS, onRunway, runwayFrame, type Airport, type RunwayEnd, type Stand } from '../../aviation/airports';
 import { Atc, type RunwayStatus } from '../../aviation/atc';
@@ -68,8 +67,6 @@ const AFTERMATH_S = 10;
 const DEPLANE_S = 10;
 /** Time warp only cruising (AP on, above this height, no alert sounding). */
 export const WARP_MIN_FT = 2000;
-/** Standard gravity (m/s²), for the load factors. */
-const G = 9.80665;
 /** The thrust levers count as in a detent within this much of it. */
 const DETENT_TOL = 0.03;
 
@@ -153,10 +150,10 @@ export class FlightSim {
   private lastGoArounds = 0;
   /** The go-around the FCU's modes were last set up for (nav.goArounds), and the levers' last frame, for TOGA's edge. */
   private gaModes = 0;
+  /** Where radar sent the aircraft after the go-around (the clearance's directTo holds the arrival's earlier one until then). */
+  private missedDirect: string | null = null;
   private wasToga = false;
   /** The reference point's velocity after the last flight-model step, for the load factors (not valid after a tow). */
-  private readonly lastVel = new THREE.Vector3();
-  private lastVelOk = false;
 
   constructor(o: FlightSimOptions) {
     const info = o.info;
@@ -333,10 +330,9 @@ export class FlightSim {
     if (this.towing || this.parkFrom) {
       if (this.towing) this.tow(dt);
       else this.slideOntoStand(dt);
-      this.lastVelOk = false;
     } else {
+      // (the load factors the scorer, the cabin and the PFD read are the flight model's own)
       const events = this.fm.step(dt, ctl);
-      this.loadFactors(dt);
       for (let i = 0; i < events.length; i++) {
         const e = events[i];
         this.scorer.event(e, s);
@@ -348,38 +344,6 @@ export class FlightSim {
     this.callouts.update(dt, s, fcu, this.nav.ils(s), this.nav.phase, this.pilot.throttle);
     this.scorer.update(dt, s, fcu);
     this.afterStep();
-  }
-
-  /**
-   * The load factors the passengers feel, from the reference point's acceleration over the step.
-   * The flight model projects its specific force onto the rows of its rotation matrix instead of its
-   * columns (aviation/fdm.ts, nz and ny), which reads 0.7 g and a 0.8 g side force in every 25° turn
-   * and sank the comfort score to 0 on every flight; the scorer, the cabin and the PFD read these.
-   */
-  private loadFactors(dt: number) {
-    const s = this.fm.state;
-    const v = s.vel;
-    const ax = (v.x - this.lastVel.x) / dt;
-    const ay = (v.y - this.lastVel.y) / dt;
-    const az = (v.z - this.lastVel.z) / dt;
-    // (more than 8 g is no flight's acceleration: the aircraft was put somewhere new, a skipped taxi-in)
-    if (this.lastVelOk && dt > 0 && ax * ax + ay * ay + az * az < 64 * G * G) {
-      const fx = ax;
-      const fy = ay + G;
-      const fz = az;
-      // the body's up (0, 1, 0) and right (1, 0, 0) axes in the world: the rotation's columns
-      const { x, y, z, w } = s.quat;
-      const ux = 2 * (x * y - z * w);
-      const uy = 1 - 2 * (x * x + z * z);
-      const uz = 2 * (y * z + x * w);
-      const rx = 1 - 2 * (y * y + z * z);
-      const ry = 2 * (x * y + z * w);
-      const rz = 2 * (x * z - y * w);
-      s.nz = (ux * fx + uy * fy + uz * fz) / G;
-      s.ny = (rx * fx + ry * fy + rz * fz) / G;
-    }
-    this.lastVel.copy(v);
-    this.lastVelOk = true;
   }
 
   // ---------------------------------------------------------------------------------------------- the ground crew and the automatics
@@ -567,6 +531,7 @@ export class FlightSim {
    */
   private goAroundModes() {
     this.gaModes = this.nav.goArounds;
+    this.missedDirect = null;
     const ap = this.ap;
     const fcu = ap.fcu;
     const s = this.fm.state;
@@ -595,7 +560,6 @@ export class FlightSim {
     this.releaseRunways();
     // the score first: a skipped taxi-in still counts the time it would have taken
     this.scorer.finish(s);
-    this.lastVelOk = false;
     if (skipped) {
       this.skippedTaxiIn = true;
       this.fm.placeOnGround(st.x, st.z, st.heading, { enginesRunning: true });
@@ -702,6 +666,7 @@ export class FlightSim {
         break;
       case 'direct':
         // round again after a go-around: from the runway heading onto the plan (NAV) to the fix
+        if (this.nav.goingAround) this.missedDirect = c.directTo;
         if (this.nav.goingAround && this.ap.fcu.fma.lateral === 'HDG') {
           this.ap.pushHdg();
           this.onNote?.(`NAV: direct ${c.directTo ?? ''}`.trim());
@@ -780,8 +745,12 @@ export class FlightSim {
           if (!cl && (fcu.fma.thrust === 'TOGA LK' || (p.throttle > A320.detents.cl && s.radioAltFt > 1500))) return { text: 'Thrust levers to CL', keys: 'U' };
           if (!fcu.ap && s.radioAltFt > 100) return { text: 'Engage the autopilot (or follow the flight director bars)', keys: 'P' };
           const c = this.atc.clearance;
-          if (c.directTo) return { text: `Going around: direct ${c.directTo} for another approach` };
-          return { text: `Going around: climb to ${c.altitudeFt.toLocaleString('en-GB')} ft${c.heading !== null ? `, heading ${String(c.heading).padStart(3, '0')}` : ''}` };
+          if (this.missedDirect) return { text: `Going around: direct ${this.missedDirect} for another approach` };
+          // until ATC's readback the clearance still holds the approach's altitude: the missed
+          // approach's own (as set on the FCU) on the runway heading
+          const alt = c.heading !== null ? c.altitudeFt : (this.nav.nextAltitude(s) ?? 3000);
+          const hdg = c.heading ?? this.arrRw.heading;
+          return { text: `Going around: climb to ${alt.toLocaleString('en-GB')} ft, heading ${String(Math.round(hdg) % 360 || 360).padStart(3, '0')}` };
         }
         if (phase === 'climb' || phase === 'cruise') {
           if (p.flapLever > 0 && s.ias > s.speeds.s) return { text: 'Retract the flaps', keys: 'F' };

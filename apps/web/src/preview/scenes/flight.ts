@@ -14,11 +14,13 @@
 //   ?scene=flight&phase=climb                        climbing out
 //   ?scene=flight&phase=cruise&cam=chase             cruising over the sea
 //   ?scene=flight&phase=final                        2 NM final at Palm Cay
+//   ?scene=flight&phase=goaround                     climbing away from a go-around at 500 ft: FMA, hint
 //   ?scene=flight&phase=flare                        the flare
 //   ?scene=flight&phase=rollout                      the rollout
 //   ?scene=flight&phase=deplane                      passengers leaving at Palm Cay
 //   ?scene=flight&phase=report                       the flight report card on the stand
 //   ?scene=flight&phase=ditch&cam=chase              a ditching's aftermath: afloat, slides out (at=seconds after)
+//   ?scene=flight&phase=abandon                      Esc in the cruise: exit(), the hero back on its stand, stats logged
 //   &tod=night (dawn, day, dusk), &leg=back (FA102 from Palm Cay), &touch=1 (phone controls),
 //   &cam=cockpit|chase|wing|tower|cabin, &extra=<s> more real-time seconds after the moment
 import * as THREE from 'three';
@@ -44,7 +46,7 @@ import type { Post } from '../../world/post';
 import type { UI } from '../../world/ui';
 import type { Boarding, Travellers } from '../../world/crowd/travellers';
 
-type Phase = 'offer' | 'boarding' | 'pushback' | 'taxi' | 'lineup' | 'rotate' | 'climb' | 'cruise' | 'final' | 'flare' | 'rollout' | 'deplane' | 'report' | 'ditch';
+type Phase = 'offer' | 'boarding' | 'pushback' | 'taxi' | 'lineup' | 'rotate' | 'climb' | 'cruise' | 'final' | 'flare' | 'rollout' | 'deplane' | 'report' | 'ditch' | 'goaround' | 'abandon';
 
 /** The game's HUD markup that the flight hangs its overlays on (index.html's #hud, #panel and #touch). */
 function hudDom(touch: boolean) {
@@ -198,7 +200,7 @@ const preview: PreviewScene = async (p: PreviewApi) => {
   ctx.ui.hidePanel();
   flight.start();
   const sim = flight.simulation!;
-  const crew = new Crew(sim, { skipTaxiIn: true });
+  const crew = new Crew(sim, { skipTaxiIn: true, goAroundFt: phase === 'goaround' ? 500 : 0 });
   flight.pilotOverride = crew.frame;
 
   // run ahead to the moment
@@ -232,6 +234,10 @@ const preview: PreviewScene = async (p: PreviewApi) => {
         return st === 'deplaning' && sim.stageT > Number(params.get('at') ?? 5);
       case 'report':
         return st === 'done';
+      case 'goaround':
+        return sim.nav.goArounds > 0 && s.radioAltFt > 1200;
+      case 'abandon':
+        return sim.nav.phase === 'cruise';
       case 'ditch':
         return st === 'failed' && sim.stageT > Number(params.get('at') ?? 4);
       default:
@@ -262,6 +268,18 @@ const preview: PreviewScene = async (p: PreviewApi) => {
   console.warn(`[flight] ${phase}: ${reached() ? 'reached' : 'NOT reached'} after ${(n * dt).toFixed(0)} s real, ${sim.t.toFixed(0)} s sim · ${sim.stage}/${sim.nav.phase} · ${s.altFt.toFixed(0)} ft ${s.ias.toFixed(0)} kt · score ${sim.scorer.score()}`);
   sim.warp = 1;
   if (phase === 'deplane' || phase === 'report') flight.pilotOverride = null;
+  if (phase === 'abandon') {
+    flight.exit();
+    const f = flight.focus;
+    console.warn(`[flight] abandoned: completed ${flight.completed}, arrival ${JSON.stringify(flight.arrival)}, focus ${f.x.toFixed(0)},${f.z.toFixed(0)} (${flight.region}), stats ${JSON.stringify(flight.roundStats())}, hud ${document.body.classList.contains('is-piloting') ? 'piloting' : 'off'}`);
+    const a = flight.arrival ?? { x: f.x, z: f.z };
+    p.view({ x: a.x + 10, y: 4, z: a.z + (from === 'home' ? -6 : 6) }, { x: f.x, y: 4, z: f.z });
+    p.onFrame((fdt) => {
+      frame(fdt, true);
+      sky?.position.copy(ctx.camera.position);
+    });
+    return;
+  }
 
   const cam = params.get('cam') as CamMode | null;
   // the round starts in the captain's seat: step round to the camera asked for

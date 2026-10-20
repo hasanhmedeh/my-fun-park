@@ -171,7 +171,7 @@ export class OverviewView {
       const records = d.records[id];
       if (!records) continue;
       for (const [key, rec] of Object.entries(records)) {
-        const dir = betterOf(key);
+        const dir = betterOf(key, id);
         if (dir === 'none') continue;
         const best = rec[dir];
         if (!best) continue;

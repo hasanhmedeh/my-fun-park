@@ -111,15 +111,25 @@ export class Batch {
     this.add(unitBox(), color, M2.multiplyMatrices(m, S.makeScale(w, h, d)), uv);
   }
 
-  /** Merges everything added so far into one mesh, standing at the origin (null when empty). */
-  build(material: THREE.Material, cast = true, receive = true): THREE.Mesh | null {
+  /**
+   * Merges everything added so far into one mesh, standing at the origin (null when empty).
+   *
+   * With `cell` (metres; only where the GPU can multi-draw, see flora.ts's `canMultiDraw`) it is a
+   * BatchedMesh instead: the parts are sorted into square cells of that size on the ground (a part
+   * longer than a cell gets one of its own), and three culls each cell against the camera's view
+   * and the shadow camera's. Still one draw call per pass, but only what's in view (or in the
+   * sun's shadow box, ~100 m across) is drawn, not the whole park. Small parts are kept in cells of
+   * their own by size, and `update` hides those cells once the parts in them would be under a
+   * couple of pixels (FINE_CULL).
+   */
+  build(material: THREE.Material, cast = true, receive = true, cell = 0): THREE.Mesh | null {
     if (!this.parts.length) return null;
-    const geo = mergeGeometries(this.parts, false)!;
+    const geo = cell > 0 ? null : mergeGeometries(this.parts, false)!;
+    const mesh = geo ? new THREE.Mesh(geo, material) : this.cells(material, cell);
     for (const p of this.parts) p.dispose();
     this.parts = [];
     this.verts = 0;
-    geo.computeBoundingSphere();
-    const mesh = new THREE.Mesh(geo, material);
+    geo?.computeBoundingSphere();
     mesh.castShadow = cast;
     mesh.receiveShadow = receive;
     mesh.position.copy(this.origin);
@@ -127,7 +137,79 @@ export class Batch {
     mesh.updateMatrix();
     return mesh;
   }
+
+  /** The parts merged per ground cell and size class, one BatchedMesh instance each (see `build`). */
+  private cells(material: THREE.Material, cell: number) {
+    const buckets = new Map<string, { parts: THREE.BufferGeometry[]; size: number }>();
+    const box = new THREE.Box3();
+    const ext = new THREE.Vector3();
+    let big = 0;
+    for (const p of this.parts) {
+      box.setFromBufferAttribute(p.attributes.position as THREE.BufferAttribute);
+      box.getSize(ext);
+      const size = FINE_CULL.findIndex(([s]) => Math.max(ext.x, ext.y, ext.z) < s);
+      const key =
+        ext.x > cell || ext.z > cell
+          ? `big${big++}`
+          : `${Math.floor((box.min.x + box.max.x) / 2 / cell)},${Math.floor((box.min.z + box.max.z) / 2 / cell)},${size}`;
+      const b = buckets.get(key);
+      if (b) b.parts.push(p);
+      else buckets.set(key, { parts: [p], size });
+    }
+    const list = [...buckets.values()];
+    const geos = list.map((b) => (b.parts.length === 1 ? b.parts[0] : mergeGeometries(b.parts, false)!));
+    let verts = 0;
+    let index = 0;
+    for (const g of geos) {
+      verts += g.attributes.position.count;
+      index += g.index!.count;
+    }
+    const mesh = new THREE.BatchedMesh(geos.length, verts, index, material);
+    const fine: number[] = [];
+    const sphere = new THREE.Sphere();
+    geos.forEach((g, i) => {
+      const gid = mesh.addGeometry(g);
+      const id = mesh.addInstance(gid);
+      const size = list[i].size;
+      if (size < 0) return;
+      // the cell's middle, and the distance past which it's hidden
+      mesh.getBoundingSphereAt(gid, sphere);
+      fine.push(id, sphere.center.x, sphere.center.y, sphere.center.z, (FINE_CULL[size][1] + sphere.radius) ** 2);
+    });
+    for (const g of geos) g.dispose();
+    mesh.computeBoundingSphere();
+    if (fine.length) this.fine.push({ mesh, cells: Float32Array.from(fine), shown: new Uint8Array(fine.length / 5).fill(1) });
+    return mesh;
+  }
+
+  /** Hides the small parts' cells that are too far off to see (call when the camera has moved; positions relative to the origin). */
+  cull(cx: number, cy: number, cz: number) {
+    for (const f of this.fine) {
+      const c = f.cells;
+      for (let i = 0, j = 0; i < c.length; i += 5, j++) {
+        const dx = c[i + 1] - cx;
+        const dy = c[i + 2] - cy;
+        const dz = c[i + 3] - cz;
+        const show = dx * dx + dy * dy + dz * dz < c[i + 4] ? 1 : 0;
+        if (show === f.shown[j]) continue;
+        f.shown[j] = show;
+        f.mesh.setVisibleAt(c[i], show === 1);
+      }
+    }
+  }
+
+  private fine: { mesh: THREE.BatchedMesh; cells: Float32Array; shown: Uint8Array }[] = [];
 }
+
+/**
+ * Size classes of small parts (largest dimension under the first number, m) and how far off
+ * their cells are still drawn (m): about where such a part shrinks under two pixels at 720p and
+ * a 50° view. Anything bigger is always drawn.
+ */
+const FINE_CULL: [number, number][] = [
+  [0.45, 230],
+  [1.1, 520],
+];
 
 const M2 = new THREE.Matrix4();
 const M3 = new THREE.Matrix4();
@@ -473,7 +555,88 @@ export function islandMaterials(renderer?: THREE.WebGLRenderer): IslandMaterials
     m.polygonOffsetFactor = -2;
     m.polygonOffsetUnits = -4;
   }
+  // light bounced in under the terminal's thatch (setInteriorFill)
+  for (const m of [MATS.paint, MATS.fabric, MATS.timber, MATS.deck, MATS.thatch, MATS.stone, MATS.metal, MATS.glass, MATS.water, MATS.ground]) addInteriorFill(m);
   return MATS;
+}
+
+// ------------------------------------------------------------------------------------------------
+// Interior fill: light bounced in under the big thatched roofs
+// ------------------------------------------------------------------------------------------------
+
+/** How many boxes `setInteriorFill` takes. */
+const FILL_BOXES = 4;
+
+const FILL = {
+  uFillBox: { value: Array.from({ length: FILL_BOXES }, () => new THREE.Vector4(0, 0, 0, 0)) },
+  uFillTop: { value: new Array<number>(FILL_BOXES).fill(0) },
+  uFillColor: { value: new THREE.Color(0, 0, 0) },
+};
+
+/**
+ * Where the sunlit floor, the open sides and the lamps fill a roofed hall with light (no real
+ * lights, which every shader in the world would pay for): world rectangles (x0, z0, x1, z1) and,
+ * per box, the height above which upward-facing surfaces are outside it (the roof's top). One set
+ * for the whole scene (the island terminal's). Surfaces inside get `color` as extra ambient
+ * light, fading in over 3 m from each box's edge so the outside of the walls stays as it was.
+ */
+export function setInteriorFill(boxes: { x0: number; z0: number; x1: number; z1: number; top: number }[]) {
+  FILL.uFillBox.value.forEach((v, i) => {
+    const b = boxes[i];
+    if (b) v.set(b.x0, b.z0, b.x1, b.z1);
+    else v.set(0, 0, 0, 0);
+    FILL.uFillTop.value[i] = b?.top ?? 0;
+  });
+}
+
+/** The fill's colour and strength (irradiance; ~2 by day under the thatch, less from the lamps at night). */
+export function setInteriorFillColor(color: THREE.ColorRepresentation, k: number) {
+  FILL.uFillColor.value.set(color).multiplyScalar(k);
+}
+
+/**
+ * Adds the interior fill to a lit material, after anything its own onBeforeCompile does (call it
+ * last; the program cache key keeps the material's own key and adds to it).
+ */
+export function addInteriorFill(material: THREE.Material) {
+  const prev = material.onBeforeCompile;
+  const key = material.customProgramCacheKey();
+  material.onBeforeCompile = (shader, renderer) => {
+    prev.call(material, shader, renderer);
+    Object.assign(shader.uniforms, FILL);
+    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vFillW;').replace(
+      '#include <worldpos_vertex>',
+      /* glsl */ `#include <worldpos_vertex>
+      vec4 fillW = vec4( transformed, 1.0 );
+      #ifdef USE_BATCHING
+        fillW = batchingMatrix * fillW;
+      #endif
+      #ifdef USE_INSTANCING
+        fillW = instanceMatrix * fillW;
+      #endif
+      vFillW = ( modelMatrix * fillW ).xyz;`,
+    );
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\nvarying vec3 vFillW;\nuniform vec4 uFillBox[${FILL_BOXES}];\nuniform float uFillTop[${FILL_BOXES}];\nuniform vec3 uFillColor;`)
+      .replace(
+        '#include <lights_fragment_maps>',
+        /* glsl */ `#include <lights_fragment_maps>
+        {
+          vec3 wn = inverseTransformDirection( normal, viewMatrix );
+          float m = 0.0;
+          for ( int i = 0; i < ${FILL_BOXES}; i ++ ) {
+            vec4 b = uFillBox[ i ];
+            vec2 e = min( vFillW.xz - b.xy, b.zw - vFillW.xz );
+            // inside, and not a roof's sunlit top (upward-facing, above the eaves)
+            float k = smoothstep( 0.0, 3.0, min( e.x, e.y ) ) * ( ( wn.y < 0.3 || vFillW.y < uFillTop[ i ] ) ? 1.0 : 0.0 );
+            m = max( m, k );
+          }
+          // a little more onto the floor (sky through the open sides) than up into the thatch
+          irradiance += uFillColor * m * ( 1.0 + 0.12 * wn.y );
+        }`,
+      );
+  };
+  material.customProgramCacheKey = () => `${key}|island-fill`;
 }
 
 /** How bright the lit surfaces are: dim interiors by day, glowing (bloom) at night. */
@@ -638,7 +801,9 @@ export class SignAtlas {
 
   /** The material every sign on the island shares. */
   material(intensity = 0.25) {
-    return new THREE.MeshStandardMaterial({ map: this.texture, emissive: '#ffffff', emissiveMap: this.emissive, emissiveIntensity: intensity, roughness: 0.6, metalness: 0 });
+    const m = new THREE.MeshStandardMaterial({ map: this.texture, emissive: '#ffffff', emissiveMap: this.emissive, emissiveIntensity: intensity, roughness: 0.6, metalness: 0 });
+    addInteriorFill(m);
+    return m;
   }
 }
 
@@ -907,30 +1072,45 @@ export class Batches {
    * Builds every non-empty batch into `group`; flat ground cover and glowing or see-through parts
    * cast no shadow. `lean` (the low tiers) folds the materials that only differ in finish into
    * one another to save draw calls: decking into timber, and paint, metal and water into the
-   * double-sided fabric (water turns opaque, metal loses its sheen).
+   * double-sided fabric (water turns opaque, metal loses its sheen). `cell` (metres, 0: off) builds
+   * each batch as per-cell BatchedMesh instances, culled against the view and the shadow box (see
+   * `Batch.build`); pass it only where `canMultiDraw` holds.
    */
-  build(group: THREE.Group, mats: IslandMaterials, signMat: THREE.Material, shadows: boolean, lean = false) {
+  build(group: THREE.Group, mats: IslandMaterials, signMat: THREE.Material, shadows: boolean, lean = false, cell = 0) {
     if (lean) {
       this.timber.absorb(this.deck);
       this.fabric.absorb(this.paint);
       this.fabric.absorb(this.metal);
       this.fabric.absorb(this.water, mats.water.color);
     }
-    const keys: MaterialKey[] = ['ground', 'stone', 'deck', 'paint', 'fabric', 'timber', 'thatch', 'metal', 'lit', 'glass', 'water'];
+    const keys = BATCH_KEYS;
     const noCast = new Set<MaterialKey>(['ground', 'stone', 'deck', 'glass', 'lit', 'water']);
     const out: THREE.Mesh[] = [];
     for (const k of keys) {
-      const mesh = this[k].build(mats[k], shadows && !noCast.has(k), shadows && k !== 'glass' && k !== 'lit' && k !== 'water');
+      const mesh = this[k].build(mats[k], shadows && !noCast.has(k), shadows && k !== 'glass' && k !== 'lit' && k !== 'water', cell);
       if (mesh) {
         mesh.name = k;
         out.push(mesh);
       }
     }
-    const signs = this.signs.build(signMat, false, shadows);
+    const signs = this.signs.build(signMat, false, shadows, cell);
     if (signs) out.push(signs);
     // see-through water and glass draw after everything opaque
     for (const m of out) if (m.material === mats.glass || m.material === mats.water) m.renderOrder = 3;
     group.add(...out);
     return out;
   }
+
+  private last = new THREE.Vector3(Infinity, 0, 0);
+
+  /** With `cell`: hides the small parts too far from the camera to see (cheap; only works when the camera has moved a few metres). */
+  update(camera: THREE.Camera) {
+    const o = this.origin;
+    const p = camera.position;
+    if (Math.hypot(p.x - o.x - this.last.x, p.y - o.y - this.last.y, p.z - o.z - this.last.z) < 6) return;
+    this.last.set(p.x - o.x, p.y - o.y, p.z - o.z);
+    for (const k of [...BATCH_KEYS, 'signs'] as const) this[k].cull(this.last.x, this.last.y, this.last.z);
+  }
 }
+
+const BATCH_KEYS: MaterialKey[] = ['ground', 'stone', 'deck', 'paint', 'fabric', 'timber', 'thatch', 'metal', 'lit', 'glass', 'water'];

@@ -344,6 +344,9 @@ export function islandPlan(term: IslandTerminal, park: PalmCay, obs: Obstacles):
     { x: ENTRANCE_X, z: 40673.5, a: tGrid, b: pGrid },
   ]);
   const sp = park.spots;
+  // what can be walked to from the Beach Plaza (the games' equipment walls off a pocket or two)
+  pGrid.connect(sp.plaza.x, sp.plaza.z);
+  const onFoot = (p: V2) => (pGrid.contains(p.x, p.z) && !tGrid.free(p.x, p.z) ? pGrid.linked(p.x, p.z) : site.free(p.x, p.z));
 
   const checkIn: Spot[] = [];
   for (let i = 0; i < CHECKIN_DESKS.n; i++) {
@@ -407,8 +410,13 @@ export function islandPlan(term: IslandTerminal, park: PalmCay, obs: Obstacles):
     for (let i = 0; i < 9; i++) {
       const yaw = mid - half + (2 * half * i) / 8;
       const f = forward(yaw);
-      const p = pGrid.nearestFree(c.x + f.x * r, c.z + f.z * r, 2);
-      if (p) watch.push({ ...p, yaw: yawTo(p, c) });
+      // (outward from the ring until there's ground joined to the rest of the park)
+      for (let rr = r; rr < r + 14; rr += 2) {
+        const p = pGrid.nearestLinked(c.x + f.x * rr, c.z + f.z * rr, 2);
+        if (!p) continue;
+        watch.push({ ...p, yaw: yawTo(p, c) });
+        break;
+      }
     }
 
   const shallows: Shallows[] = [];
@@ -417,7 +425,7 @@ export function islandPlan(term: IslandTerminal, park: PalmCay, obs: Obstacles):
       // down the beach to the water's edge
       let z = BEACH_WALK_Z;
       while (z < 41800 && islandShoreDist(x, z) > 0) z += 0.5;
-      const edge = pGrid.nearestFree(x, z - 23, 4);
+      const edge = pGrid.nearestLinked(x, z - 23, 4);
       if (!edge) continue;
       const wade: V3[] = [];
       for (const d of [4.5, 7, 9.5]) {
@@ -453,12 +461,12 @@ export function islandPlan(term: IslandTerminal, park: PalmCay, obs: Obstacles):
     lanes,
     lounge,
     gate1: { x: GATE1_X, z: Z_AIR + 0.9 },
-    benches,
-    bars,
-    beds,
-    castles,
-    promenade: sp.promenade.map((p) => ({ ...p })),
-    wander: sp.wander.filter((p) => pGrid.free(p.x, p.z)).map((p) => ({ ...p })),
+    benches: benches.filter((b) => onFoot(b.approach)),
+    bars: bars.filter((b) => onFoot(b.approach)),
+    beds: beds.filter((b) => onFoot(b.approach)),
+    castles: castles.filter(onFoot),
+    promenade: sp.promenade.filter(onFoot).map((p) => ({ ...p })),
+    wander: sp.wander.filter((p) => pGrid.linked(p.x, p.z)).map((p) => ({ ...p })),
     watch,
     shallows,
     tail,

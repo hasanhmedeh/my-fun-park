@@ -75,13 +75,12 @@ export class Ewd {
     const lever = d.controls?.throttle ?? null;
     const limit = LIMIT[thrustLimit(d)];
     const tla = lever === null ? null : leverN1(lever) * 100;
-    const totalThrust = Math.max(1, s.thrust[0] + s.thrust[1]);
+    const eng = engineReadouts(d);
     for (let i = 0; i < 2; i++) {
       const cx = ENG_X[i];
-      const n1 = s.n1[i] * 100;
-      const running = d.sys ? d.sys.engineRunning[i] : n1 > 15;
-      const starting = d.sys ? d.sys.engineStart[i] >= 0 : false;
-      const live = running || starting || n1 > 2;
+      const r = eng[i];
+      const n1 = r.n1;
+      const { starting, live } = r;
 
       // N1: white scale, red beyond 101 %, the amber limit mark, the levers' cyan circle, the green needle
       const ang = (v: number) => (N1_START + (clamp(v, 0, N1_MAX) / N1_MAX) * N1_SWEEP) * D2R;
@@ -146,7 +145,7 @@ export class Ewd {
       if (starting) text(g, 'START', cx, N1_Y - 44, C.white, 28);
 
       // EGT: a half dial, red line at the limit
-      const egt = egtFor(s.n1[i], d.weather.tempC);
+      const egt = r.egt;
       const ea = (v: number) => (180 + (clamp(v, 0, EGT_MAX) / EGT_MAX) * 180) * D2R;
       g.strokeStyle = C.white;
       g.lineWidth = 4;
@@ -160,9 +159,8 @@ export class Ewd {
       text(g, String(Math.round(egt / 5) * 5), cx, EGT_Y + 32, live ? C.green : C.grey, 40);
 
       // N2 and fuel flow
-      text(g, live ? n2For(s.n1[i]).toFixed(1) : 'XX', cx, 528, live ? C.green : C.amber, 40);
-      const ff = live ? (s.fuelFlow * 3600 * s.thrust[i]) / totalThrust : 0;
-      text(g, live ? String(Math.round(ff / 20) * 20) : 'XX', cx, 588, live ? C.green : C.amber, 40);
+      text(g, live ? r.n2.toFixed(1) : 'XX', cx, 528, live ? C.green : C.amber, 40);
+      text(g, live ? String(Math.round(r.ffKgH / 20) * 20) : 'XX', cx, 588, live ? C.green : C.amber, 40);
     }
     // the labels between the engines
     const mx = (ENG_X[0] + ENG_X[1]) / 2;
@@ -300,6 +298,53 @@ function thrustLimit(d: CockpitData): keyof typeof LIMIT {
   if (lever >= det.flx - DETENT_TOL) return 'FLX';
   if (d.s.onGround && phaseIndex(d.phase) <= phaseIndex('takeoff')) return 'TOGA';
   return 'CLB';
+}
+
+/** One engine's EWD readouts. */
+export interface EngineReadout {
+  /** N1 (%), N2 (%), EGT (°C) and fuel flow (kg/h, never negative). */
+  n1: number;
+  n2: number;
+  egt: number;
+  ffKgH: number;
+  running: boolean;
+  starting: boolean;
+  /** Drawn green (turning); otherwise the needles are grey and N2/FF read XX. */
+  live: boolean;
+}
+
+/**
+ * The two engines' readouts. The flight model gives only the total fuel flow, so it's shared
+ * between the engines by each one's own schedule (idle flow plus the share of the TOGA flow its
+ * thrust fraction calls for, the law the model burns by). The reversers' negative thrust never
+ * enters it, so the flow stays positive and physical in reverse.
+ */
+export function engineReadouts(d: CockpitData): [EngineReadout, EngineReadout] {
+  const { s } = d;
+  const total = Math.max(0, Number.isFinite(s.fuelFlow) ? s.fuelFlow : 0) * 3600;
+  const read = (i: number) => {
+    const n1 = clamp(Number.isFinite(s.n1[i]) ? s.n1[i] : 0, 0, 1.2);
+    const running = d.sys ? d.sys.engineRunning[i] : n1 > 0.15;
+    const starting = d.sys ? d.sys.engineStart[i] >= 0 : false;
+    const live = running || starting || n1 > 0.02;
+    const r: EngineReadout = { n1: n1 * 100, n2: n2For(n1), egt: egtFor(n1, d.weather.tempC), ffKgH: 0, running, starting, live };
+    return { r, w: running || starting ? flowShape(n1) : 0 };
+  };
+  const a = read(0);
+  const b = read(1);
+  const sum = a.w + b.w;
+  if (sum > 0) {
+    a.r.ffKgH = (total * a.w) / sum;
+    b.r.ffKgH = (total * b.w) / sum;
+  }
+  return [a.r, b.r];
+}
+
+/** The flight model's per-engine fuel schedule (relative) for an N1: idle flow plus the TOGA share by thrust fraction. */
+function flowShape(n1: number) {
+  const idle = A320.n1Idle;
+  const frac = n1 < idle ? A320.idleThrustFrac * (n1 / idle) ** 2 : A320.idleThrustFrac + (1 - A320.idleThrustFrac) * clamp((n1 - idle) / (A320.n1Toga - idle), 0, 1.05) ** A320.thrustExp;
+  return A320.fuelIdle + (A320.fuelToga - A320.fuelIdle) * clamp((frac - A320.idleThrustFrac) / (1 - A320.idleThrustFrac), 0, 1.1);
 }
 
 /** Where a surface angle sits between the indicator's stops (0 .. stops − 1, fractional while moving). */

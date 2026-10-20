@@ -4,6 +4,7 @@
 // pass makes the glow, and everything is one draw call per kind however many there are.
 
 import * as THREE from 'three';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { withFogSun } from '../fog';
 import { canvasTex, glowTexture, hdr } from '../textures';
 import { catenary } from './kit';
@@ -47,7 +48,12 @@ export class NightLights {
   private flames: THREE.Vector3[] = [];
   private halos: { p: THREE.Vector3; c: THREE.Color; size: number }[] = [];
   private pools: { x: number; y: number; z: number; r: number; c: THREE.Color }[] = [];
-  private bulbMat = new THREE.MeshBasicMaterial({ color: '#ffffff' });
+  /**
+   * Festoon bulbs: by day tinted glass beads (each bulb's own hue, deepened, with a sun glint), at
+   * night lit (their HDR colour as emission, for the bloom). Unlit white beads read as pearls.
+   */
+  private bulbMat = new THREE.MeshPhongMaterial({ color: '#ffffff', specular: '#ffffff', shininess: 140 });
+  private uNight = { value: 0 };
   private wireMat = new THREE.LineBasicMaterial({ color: '#2a2018' });
   private flameMat = new THREE.MeshBasicMaterial({ color: hdr('#ff9a3c', 5), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
   private haloMat = new THREE.PointsMaterial({ map: glowTexture('#ffb070'), size: 2.2, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, vertexColors: true });
@@ -97,6 +103,22 @@ export class NightLights {
         );
     };
     this.flameMat.customProgramCacheKey = () => 'island-flame';
+    const uNight = this.uNight;
+    this.bulbMat.onBeforeCompile = (shader) => {
+      shader.uniforms.uNight = uNight;
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform float uNight;')
+        .replace(
+          '#include <color_fragment>',
+          /* glsl */ `#include <color_fragment>
+          // the instance colour is the lit bulb's (HDR); its hue, deepened, is the glass's by day
+          vec3 lamp = diffuseColor.rgb;
+          vec3 tint = lamp / max(max(lamp.r, lamp.g), max(lamp.b, 1e-3));
+          diffuseColor.rgb = tint * tint * tint * 0.62 * (1.0 - uNight);`,
+        )
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += lamp * uNight + tint * tint * 0.06 * (1.0 - uNight);');
+    };
+    this.bulbMat.customProgramCacheKey = () => 'island-bulb';
   }
 
   addBulb(p: THREE.Vector3, color: THREE.ColorRepresentation, k = 5) {
@@ -135,7 +157,10 @@ export class NightLights {
   build() {
     const m = new THREE.Matrix4();
     if (this.bulbs.length) {
-      const im = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.075, 0), this.bulbMat, this.bulbs.length);
+      // smooth normals on the 20-sided bead, so the glass catches one round glint
+      const bead = mergeVertices(new THREE.IcosahedronGeometry(0.075, 0).deleteAttribute('normal').deleteAttribute('uv'));
+      bead.computeVertexNormals();
+      const im = new THREE.InstancedMesh(bead, this.bulbMat, this.bulbs.length);
       this.bulbs.forEach((b, i) => {
         im.setMatrixAt(i, m.makeTranslation(b.p.x, b.p.y, b.p.z));
         im.setColorAt(i, b.c);
@@ -197,7 +222,7 @@ export class NightLights {
 
   /** 0 by day (bulbs unlit, torches out) .. 1 at night. */
   setNight(k: number) {
-    this.bulbMat.color.setScalar(0.16 + 0.84 * k);
+    this.uNight.value = k;
     this.wireMat.color.setScalar(0.16 * (1 - k * 0.6));
     const on = k > 0.03;
     for (const o of [this.flameMesh, this.haloMesh, this.poolMesh]) if (o) o.visible = on;

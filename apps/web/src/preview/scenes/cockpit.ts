@@ -8,10 +8,15 @@
 //   ?scene=cockpit&case=final                 2 NM final at Palm Cay, AP on the ILS, a little left and high
 //   ?scene=cockpit&case=warning               gear up at 700 ft on the approach: master warning, ECAM, GPWS
 //   ?scene=cockpit&case=taxi                  taxiing out on A (ROSE NAV, the T.O memo)
+//   ?scene=cockpit&case=rollout               a rejected takeoff at 110 kt: idle, full reverse, autobrake (REV on the EWD)
 //   &view=outside   the chase camera with the compact strip instead of the flight deck
 //   &solo=pfd       one display unit (pfd, nd, ewd, isis) blown up in the middle, to inspect it
 //   &yaw=70         the cockpit camera turned by this many degrees (e.g. 70: the side window, 180: the rear wall)
 //   &env=1 &hour=23 night; &far=60000&near=2 (the scene sets these itself)
+//   &touch=1        the real HUD round the deck as a phone has it while piloting: the park's stylesheet,
+//                   #hud with the cockpit mount first, the flight's own HUD lines, Exit ride and the ℹ️,
+//                   and #touch with the stick, the E button and the flight's thrust lever and buttons
+//                   (body.is-piloting), to check the touch layout against the panel
 import * as THREE from 'three';
 import type { PreviewApi, PreviewScene } from '../main';
 import { A320, A320_POINTS } from '../../aviation/a320';
@@ -26,10 +31,12 @@ import { createA320, LIVERIES } from '../../world/airport/a320-model';
 import { FT, NM, SEA_Y, shoreDist, type Region } from '../../world/geo';
 import { Cockpit } from '../../world/flight/instruments/cockpit';
 import { cockpitFontReady } from '../../world/flight/instruments/display';
+import { FlightHud } from '../../world/flight/flight-hud';
+import { FlightTouch } from '../../world/flight/touch';
 import type { CockpitData } from '../../world/flight/instruments/types';
 import { geography } from './flight-view';
 
-type Case = 'takeoff' | 'climb' | 'cruise' | 'final' | 'warning' | 'taxi';
+type Case = 'takeoff' | 'climb' | 'cruise' | 'final' | 'warning' | 'taxi' | 'rollout';
 
 const D2R = Math.PI / 180;
 
@@ -142,6 +149,18 @@ const scene: PreviewScene = async (p: PreviewApi) => {
       }
       break;
     }
+    case 'rollout': {
+      const rw = AIRFIELDS.home.runways['27'];
+      fm.placeOnGround(rw.threshold.x - 60, rw.threshold.z, 270, { enginesRunning: true });
+      nav.phase = 'takeoff';
+      ap.setAlt(5000);
+      ap.pushHdg();
+      Object.assign(pilot, { throttle: A320.detents.toga, flapLever: 1, autobrake: 'max' });
+      for (let t = 0; s.ias < 110 && t < 60; t += 0.25) fly(0.25);
+      Object.assign(pilot, { throttle: 0, reverse: 1, brakeL: 0.8, brakeR: 0.8 });
+      fly(4.5);
+      break;
+    }
     case 'taxi': {
       fm.placeOnGround(-260, AIRFIELDS.home.geo.taxiwayZ, 90, { enginesRunning: true });
       nav.phase = 'taxi-out';
@@ -161,8 +180,11 @@ const scene: PreviewScene = async (p: PreviewApi) => {
 
   const outside = q.get('view') === 'outside';
   const mount = document.createElement('div');
-  mount.style.cssText = 'position:fixed;inset:0;pointer-events:none';
-  document.body.appendChild(mount);
+  const touch = q.get('touch') === '1' ? await touchHud(mount, kase === 'final' ? 'Follow the flight director down the glide path' : 'Thrust levers to TOGA') : null;
+  if (!touch) {
+    mount.style.cssText = 'position:fixed;inset:0;pointer-events:none';
+    document.body.appendChild(mount);
+  }
   const cockpit = new Cockpit(ctx, mount);
   cockpit.setView(outside ? 'outside' : 'cockpit');
   const solo = q.get('solo');
@@ -262,6 +284,33 @@ const scene: PreviewScene = async (p: PreviewApi) => {
       );
     }
     cockpit.update(dt, data);
+    touch?.update(pilot.throttle, { gear: pilot.gearDown, ap: ap.fcu.ap, athr: ap.fcu.athr, speedbrake: pilot.speedbrake > 0.05, warp: 1, flaps: pilot.flapLever });
   });
 };
+
+/**
+ * The Game's HUD as it stands while piloting on a phone, built from the same markup (index.html) and
+ * stylesheets (styles.css, flight.css), with the cockpit mount first in it as the flight puts it.
+ */
+async function touchHud(mount: HTMLDivElement, hint: string) {
+  await import('../../styles.css');
+  const hud = document.createElement('div');
+  hud.id = 'hud';
+  hud.className = 'hud';
+  hud.innerHTML = `
+    <div id="ride-exit" class="ride-exit"><button type="button" class="btn btn-small btn-cream">Exit ride <kbd>Esc</kbd></button></div>
+    <button type="button" id="info-toggle" class="hud-icon hud-info" aria-label="Info (I)">i</button>
+    <div class="touch" id="touch">
+      <div class="stick" id="stick"><span class="stick-knob" id="stick-knob"></span></div>
+      <button type="button" class="touch-action" id="touch-action" aria-label="Play">E</button>
+    </div>`;
+  hud.insertBefore(mount, hud.firstChild);
+  document.body.appendChild(hud);
+  document.body.classList.add('is-piloting');
+  const fh = new FlightHud(hud, true);
+  fh.show(true);
+  fh.hint({ text: hint }, true);
+  fh.camera('Cockpit');
+  return new FlightTouch(hud.querySelector<HTMLElement>('#touch')!, () => {});
+}
 export default scene;

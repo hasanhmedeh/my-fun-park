@@ -13,7 +13,7 @@ import { A320 } from '../../aviation/a320';
 import { runwayFrame, taxiRoute } from '../../aviation/airports';
 import { angleDiff, phaseIndex } from '../../aviation/nav';
 import type { FdmEvent } from '../../aviation/types';
-import { KT, vecHeading } from '../geo';
+import { KT, headingVec, vecHeading } from '../geo';
 import type { FlightSim } from './sim';
 import { TaxiPath } from './taxi';
 
@@ -255,6 +255,14 @@ export class Crew {
       this.wentAround = true;
       c.throttle = A320.detents.toga;
     }
+    // alpha floor on the approach (a gust, the raw angle of attack): TOGA LK would carry the aircraft
+    // onto the runway far too fast, so the crew goes around, as the SOP says for any protection
+    // triggering on final
+    if (phase === 'final' && !s.onGround && s.radioAltFt > 30 && c.throttle < A320.detents.toga && (s.alphaFloor || fcu.fma.thrust === 'TOGA LK')) c.throttle = A320.detents.toga;
+    // not stabilised by 700 ft (no glide slope, or the gear still up): go around, as the SOP says
+    if (phase === 'final' && !s.onGround && s.radioAltFt < 700 && s.radioAltFt > 100 && c.throttle < A320.detents.toga && !sim.nav.goingAround && this.engaged && !this.manual && (s.gear < 0.9 || (fcu.fma.vertical !== 'G/S' && fcu.fma.vertical !== 'G/S*'))) c.throttle = A320.detents.toga;
+    // the tower says go around (traffic still on the runway): the approach clearance is withdrawn
+    if (phase === 'final' && !s.onGround && s.radioAltFt > 30 && c.throttle < A320.detents.toga && !sim.nav.goingAround && !sim.atc.clearance.approach && !sim.atc.clearance.land) c.throttle = A320.detents.toga;
     // round again, whatever started it: the approach is flown afresh once ATC clears it
     if (sim.nav.goArounds > this.goArounds) {
       this.goArounds = sim.nav.goArounds;
@@ -330,6 +338,12 @@ export class Crew {
       ap.setAlt(1000);
       ap.setVs(-1500);
     }
+    // still above the beam when the altitude levels off (a tight join after a go-around): on down
+    // in steps, to 500 ft at the lowest, until the glide slope is captured from above
+    if (this.fromAbove && ils?.valid && fcu.ap && fcu.fma.armedVertical === 'G/S' && (fcu.fma.vertical === 'ALT' || fcu.fma.vertical === 'ALT*') && ils.gsFt > 60 && s.radioAltFt > 650) {
+      ap.setAlt(Math.max(500, Math.floor((s.altFt - 400) / 100) * 100));
+      ap.setVs(-1500);
+    }
     if (!this.opts.autopilot && this.engaged && phase === 'final' && fcu.ap) ap.toggleAp();
     this.land(dt);
   }
@@ -346,17 +360,28 @@ export class Crew {
       const ra = s.radioAltFt;
       if (ra > 50 && fcu.fdPitch !== null) c.pitch = clamp((fcu.fdPitch - s.pitch) * 0.06 - s.q * 0.03, -0.3, 0.3);
       else {
-        const vsT = -Math.max(130, Math.min(700, ra * 15));
-        // firmer on the stick in the last feet, where idle thrust takes the lift the flare had
-        c.pitch = clamp((vsT - s.vs) * (ra < 15 ? 0.0024 : 0.0012) + (ra < 30 ? 0.05 : 0), -0.6, 0.8);
+        // the flare: a sink rate that falls with the height (about 4 s to the runway), never more
+        // than it's sinking already (no pushing over at 50 ft); the flare law's nose-down bias
+        // below 30 ft is held off, and the pitch rate damps the pull. A gust that balloons the
+        // aircraft (sinking far less than wanted, or climbing) gets a firm push back down: floating
+        // in ground effect on a gusty day runs the touchdown past the zone.
+        const vsT = -clamp(ra * 13, 110, Math.max(110, -s.vs));
+        const bias = ra < 30 ? 0.12 + 0.1 * (1 - ra / 30) : 0;
+        const floating = s.vs > vsT + 120;
+        c.pitch = clamp((vsT - s.vs) * 0.0026 + bias - s.q * 0.04, floating ? -0.35 : -0.1, 0.9);
       }
-      c.roll = fcu.fdBank !== null && ra > 30 ? clamp((fcu.fdBank - s.bank) * 0.04, -0.4, 0.4) : clamp(-s.bank * 0.05 - fr.right * 0.004, -0.3, 0.3);
-      c.yaw = ra < 40 ? clamp(angleDiff(rw.heading, s.heading) / 15 - s.r * 0.08, -1, 1) : 0;
-      // the autothrust holds VAPP to the flare; then the levers come back to idle
-      if (ra < 10) {
+      // below 30 ft: hold the centreline by its drift (a wing down into the wind, at most 5°);
+      // the decrab from 60 ft, the rudder lining the nose up with the runway by the touchdown
+      const fw = headingVec(rw.heading);
+      const drift = s.vel.x * -fw.z + s.vel.z * fw.x;
+      const bankT = clamp(-(fr.right * 0.12 + drift * 0.9), -5, 5);
+      c.roll = fcu.fdBank !== null && ra > 30 ? clamp((fcu.fdBank - s.bank) * 0.04, -0.4, 0.4) : clamp((bankT - s.bank) * 0.06 - s.p * 0.02, -0.4, 0.4);
+      c.yaw = ra < 60 ? clamp(angleDiff(rw.heading, s.heading) / 8 - s.r * 0.1, -1, 1) : 0;
+      // the autothrust holds VAPP to the flare; then the levers come back to idle (RETARD, 20 ft)
+      if (ra < 20) {
         c.throttle = 0;
         if (fcu.athr) sim.ap.toggleAthr();
-      } else if (fcu.athr) c.throttle = A320.detents.cl;
+      } else if (fcu.athr && c.throttle < A320.detents.toga) c.throttle = A320.detents.cl;
     }
     if (!this.log.touchdown || !s.onGround) return;
     // the rollout: stick neutral, idle reverse, the autobrake to taxi speed; steer for the centreline

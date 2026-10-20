@@ -544,7 +544,9 @@ export class Atc {
       return;
     }
     const reason = st.reason ?? 'traffic on the runway';
-    if (!this.clearance.lineUp && /depart/i.test(reason)) {
+    // line up behind a departure that's already rolling; one still lined up (perhaps at the full
+    // length, behind the intersection the player enters at) goes first, with the player holding short
+    if (!this.clearance.lineUp && /depart/i.test(reason) && st.clearInS <= 45) {
       this.reply(
         ...this.clear(`${this.cs}, line up and wait runway ${rw}, ${reason}.`, `${this.csSay}, line up and wait runway ${runwayWords(rw)}, ${reason}.`, `Line up and wait runway ${rw}`, `Line up and wait runway ${runwayWords(rw)}`, () => {
           this.clearance.lineUp = true;

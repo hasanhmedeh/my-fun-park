@@ -90,7 +90,6 @@ export class FlightControls {
     for (const k of CAPTURED_KEYS) this.input.capture.add(k);
     const on = (code: string, fn: (e: KeyboardEvent) => void) => this.unsub.push(this.input.onKey(code, (e) => this.enabled && this.sim && fn(e)));
     const p = () => this.sim!.pilot;
-    const ap = () => this.sim!.ap;
     on('KeyY', () => this.lever(A320.detents.toga, 'TOGA'));
     on('KeyU', () => this.lever(A320.detents.cl, 'CL'));
     on('KeyJ', () => this.lever(A320.detents.idle, 'IDLE'));
@@ -132,7 +131,6 @@ export class FlightControls {
     on('Backslash', () => this.fcu({ kind: 'push', knob: this.knob ?? 'hdg' }));
     on('Quote', () => this.fcu({ kind: 'pull', knob: this.knob ?? 'hdg' }));
     on('KeyT', () => this.onWarp?.());
-    void ap;
   }
 
   /** Lets go of the keys (the round's over). */

@@ -232,9 +232,8 @@ export function bar(k: Build, x: number, z: number, yaw: number, o: BarOptions):
     }
   }
   if (o.kind === 'ice') {
+    // an open display freezer (a glass lid would be the park's only glass: a draw call of its own)
     k.b.paint.box(1.6, 0.9, 0.7, '#e9f4f6', at(m, 0, 0.57, d / 2 - 0.6));
-    // the display's glass lid (left off on the low tiers, where the park would draw it alone in a call of its own)
-    if (k.tier !== 'low' && k.tier !== 'lowest') k.b.glass.box(1.5, 0.02, 0.6, '#ffffff', at(m, 0, 1.03, d / 2 - 0.6));
     const tubs = ['#f6d6e0', '#fff1c9', '#7a4a2c', '#bfe8c8', '#f7b0a0'];
     for (let i = 0; i < 5; i++) k.b.paint.box(0.26, 0.04, 0.4, tubs[i], at(m, -0.6 + i * 0.3, 1.0, d / 2 - 0.6));
   }

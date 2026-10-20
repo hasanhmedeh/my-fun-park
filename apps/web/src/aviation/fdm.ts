@@ -810,13 +810,15 @@ export class FlightModel {
       this.quat.multiply(this.dq).normalize();
     }
 
-    // specific force along the body's up and right axes (what the passengers feel)
+    // specific force along the body's up and right axes (what the passengers feel). R maps body to
+    // world (world = R · body, row-major), so the body's right (1, 0, 0) and up (0, 1, 0) axes in the
+    // world are R's first and second columns, and a world vector's body components are Rᵀ · f.
     const fsx = F.x / m;
     const fsy = F.y / m + G;
     const fsz = F.z / m;
     this.rotation();
-    s.nz = (R[3] * fsx + R[4] * fsy + R[5] * fsz) / G;
-    s.ny = (R[0] * fsx + R[1] * fsy + R[2] * fsz) / G;
+    s.nz = (R[1] * fsx + R[4] * fsy + R[7] * fsz) / G;
+    s.ny = (R[0] * fsx + R[3] * fsy + R[6] * fsz) / G;
 
     this.holdStill(T);
     this.derive(h, false);

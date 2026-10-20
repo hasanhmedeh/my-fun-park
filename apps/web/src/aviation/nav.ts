@@ -219,6 +219,18 @@ export class Navigator implements NavSource {
     return this.legs[this.activeIndex] ?? null;
   }
 
+  /**
+   * Ground speed mini (kt to add to the managed approach speed): the headwind now (true airspeed
+   * less ground speed) above the tower's, so a gust that raises the airspeed raises the target with
+   * it and the autothrust keeps the energy for when the gust dies away (at most 15 kt; never less
+   * than the speed itself, and only in the air).
+   */
+  groundSpeedMini(s: AircraftState) {
+    if (s.onGround || s.gs < 60) return 0;
+    const now = s.tas - s.gs;
+    return Math.round(clamp(now - Math.max(0, this.arrivalHeadwind()), 0, 15));
+  }
+
   /** The approach speed for the arrival (VLS in CONF FULL for the mass, plus the wind correction). */
   vapp(s: AircraftState) {
     const vls = s.config >= 5 ? s.speeds.vls : vlsFull(s.mass);
@@ -305,10 +317,8 @@ export class Navigator implements NavSource {
     if (p >= phaseIndex('approach')) {
       // APPR phase: green dot clean, S in CONF 1, F in CONF 1+F / 2 / 3, VAPP in FULL
       const c = s.config;
-      if (c >= 5) return this.vapp(s);
-      if (c >= 2) return Math.round(s.speeds.f);
-      if (c === 1) return Math.round(s.speeds.s);
-      return Math.round(s.speeds.greenDot);
+      const base = c >= 5 ? this.vapp(s) : c >= 2 ? Math.round(s.speeds.f) : c === 1 ? Math.round(s.speeds.s) : Math.round(s.speeds.greenDot);
+      return base + this.groundSpeedMini(s);
     }
     // climb, cruise, descent: 250 kt below FL100, slower for a constraint ahead, never above VMAX − 5
     let v: number = s.altFt < 10000 ? A320.speedLimitLow : Math.min(300, A320.vmo - 10);
@@ -347,6 +357,10 @@ export class Navigator implements NavSource {
       const v = Math.max(s.gs, 140) * KT;
       const radius = (v * v) / (9.81 * Math.tan(ANTICIPATION_BANK * D2R));
       anticipate = clamp(radius * Math.tan((Math.min(turn, 150) * D2R) / 2), 60, 4 * NM);
+      // a turn back on itself (direct to the initial approach fix after a go-around, then round to
+      // the intermediate fix) is flown over the fix: anticipated as a fly-by it would be cut miles
+      // short, joining the final leg a mile from the runway far above the glide slope
+      if (turn > 100) anticipate = Math.min(anticipate, 0.3 * NM);
     }
     // the threshold is passed, not anticipated; a fix is also sequenced if it has been flown past
     if (along <= anticipate || (!next && along <= 0)) {

@@ -134,13 +134,13 @@ class ResultsDialog {
     const rows = keys
       .map((k) => {
         const v = r.stats[k];
-        const pb = r.completed && isPersonalBest(k, v, best);
+        const pb = r.completed && isPersonalBest(k, v, best, r.ride);
         return `<div class="results-stat${pb ? ' is-best' : ''}"><dt>${escapeHtml(statLabel(k))}</dt><dd>${escapeHtml(formatStat(k, v))}${
           pb ? '<span class="results-best">🏆 New personal best</span>' : ''
         }</dd></div>`;
       })
       .join('');
-    const pbs = r.completed ? keys.filter((k) => isPersonalBest(k, r.stats[k], best)).length : 0;
+    const pbs = r.completed ? keys.filter((k) => isPersonalBest(k, r.stats[k], best, r.ride)).length : 0;
     const headline = r.ending ? escapeHtml(r.ending.headline) : !rows ? 'Thanks for riding! 🎪' : !r.completed ? 'You hopped off early' : pbs ? 'New personal best! 🏆' : 'Round complete! 🎉';
     const lead = r.ending
       ? escapeHtml(r.ending.lead)

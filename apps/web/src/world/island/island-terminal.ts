@@ -21,8 +21,8 @@ import { FlightBoards, type FlightRow } from '../airport/boards';
 import { mulberry } from '../random';
 import { BODY_FONT, DISPLAY_FONT } from '../textures';
 import { Airstairs, airstairsGroup } from './airstairs';
-import { Palms, Shrubs, type PalmSpot, type ShrubSpot } from './flora';
-import { Batch, Batches, SignAtlas, at, hipRoof, islandMaterials, litLevel, place, signPlane, strip, type SignStyle, type UvRect, type V2, type WalkRect } from './kit';
+import { Palms, Shrubs, canMultiDraw, type PalmSpot, type ShrubSpot } from './flora';
+import { Batch, Batches, SignAtlas, at, hipRoof, islandMaterials, litLevel, place, setInteriorFill, setInteriorFillColor, signPlane, strip, type SignStyle, type UvRect, type V2, type WalkRect } from './kit';
 import { NightLights } from './lights';
 import { lantern, torch, type Build } from './props';
 
@@ -30,6 +30,8 @@ const AP = AIRPORTS.island;
 const T = AP.terminal;
 /** The terminal's meshes are stored relative to its middle (precision 40 km out). */
 const ORIGIN = { x: 0, y: 0, z: (T.z0 + T.z1) / 2 };
+/** The static batches' culling cells (m), where the GPU can multi-draw (kit.ts, Batch.build). */
+const BATCH_CELL = 40;
 
 /** The airside glass wall, the line between the airside and landside halls, the landside screens. */
 const Z_AIR = T.z0;
@@ -54,6 +56,17 @@ const WING = { eave: 6.5, rise: 16, inner: 38, outer: T.x1 + 3, z0: T.z0 - 3, z1
 const HALL = { half: 41, eave: 9, rise: 18 };
 /** The exit canopy over the arrivals kerb (where the visitor steps out after a flight). */
 const CANOPY = { x0: -18, x1: 18, z0: Z_LAND, z1: 40702, eave: 5.4 };
+/**
+ * The light under the roofs (kit.ts's interior fill): by day the sun bounced off the sand-coloured
+ * floor and in through the open sides, warm; at night the lamps' glow. The fill boxes reach FILL_PAD
+ * past the walls (it fades in over 3 m from a box's edge).
+ */
+const FILL_DAY = new THREE.Color('#ffe2bc');
+const FILL_NIGHT = new THREE.Color('#ffbf80');
+const FILL_DAY_K = 1.8;
+const FILL_NIGHT_K = 0.55;
+const FILL_PAD = 2.5;
+const FILL_COLOUR = new THREE.Color();
 
 /** The underside of the thatch above (x, z): the highest of the three roofs there (hipRoof's planes). */
 function roofY(x: number, z: number) {
@@ -130,6 +143,8 @@ export class IslandTerminal {
   private signMat: THREE.MeshStandardMaterial;
   private boards: FlightBoards;
   private lights: NightLights;
+  /** The static batches (their small parts are hidden by distance, see kit.ts). */
+  private batches: Batches;
   private palms: Palms;
   private shrubs: Shrubs;
   /** The spinning fans (high and medium tiers; the low ones merge still fans into the static paint). */
@@ -160,13 +175,14 @@ export class IslandTerminal {
 
     this.signMat = atlas.material(0.08);
     if (lean) staticFans(k.b.paint, fanSpots);
-    k.b.build(this.group, this.mats, this.signMat, q.shadows, lean);
+    k.b.build(this.group, this.mats, this.signMat, q.shadows, lean, canMultiDraw(ctx.renderer) ? BATCH_CELL : 0);
+    this.batches = k.b;
     const screenMesh = screens.build(this.boards.material, false, false);
     if (screenMesh) this.group.add(screenMesh);
     this.lights.build();
     this.group.add(this.lights.group);
     this.palms = new Palms(palms, { origin: ORIGIN, tier: q.tier, shadows: q.shadows, renderer: ctx.renderer, seed: 61 });
-    this.shrubs = new Shrubs(shrubs, { origin: ORIGIN, tier: q.tier, shadows: false, seed: 62 });
+    this.shrubs = new Shrubs(shrubs, { origin: ORIGIN, tier: q.tier, shadows: false, seed: 62, renderer: ctx.renderer });
     if (!lean) {
       this.fans = new Fans(fanSpots, ORIGIN);
       this.group.add(this.fans.mesh);
@@ -179,6 +195,12 @@ export class IslandTerminal {
       arrivalsPath: gate2.arrivals,
       seats,
     };
+    // the halls under the thatch, and the exit canopy: bounced light fills them (kit.ts), reaching a
+    // little past the walls so it is full strength right up to them
+    setInteriorFill([
+      { x0: T.x0 - FILL_PAD, z0: T.z0 - FILL_PAD, x1: T.x1 + FILL_PAD, z1: T.z1 + FILL_PAD, top: WING.eave - 0.3 },
+      { x0: CANOPY.x0 - FILL_PAD, z0: Z_LAND - 3, x1: CANOPY.x1 + FILL_PAD, z1: CANOPY.z1 + FILL_PAD, top: CANOPY.eave - 0.3 },
+    ]);
     this.setNight(0);
   }
 
@@ -196,12 +218,15 @@ export class IslandTerminal {
     this.signMat.emissiveIntensity = 0.08 + k * 0.6;
     this.boards.setNight(k);
     this.lights.setNight(k);
+    FILL_COLOUR.lerpColors(FILL_DAY, FILL_NIGHT, k);
+    setInteriorFillColor(FILL_COLOUR, THREE.MathUtils.lerp(FILL_DAY_K, FILL_NIGHT_K, k));
   }
 
   update(dt: number, t: number) {
     for (const id in this.stairs) this.stairs[id].update(dt);
     const cam = this.ctx.camera.position;
     if (Math.abs(cam.z - ORIGIN.z) > 6000) return;
+    this.batches.update(this.ctx.camera);
     this.palms.update(this.ctx.camera);
     this.shrubs.update(this.ctx.camera);
     this.lights.update(t);

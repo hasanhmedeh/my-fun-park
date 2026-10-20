@@ -650,6 +650,8 @@
   .ck-glare {
     margin-top: -8px;
     border-radius: 46% 46% 0 0 / 10px 10px 0 0;
+    /* as wide as the masters on the right, so the FCU stays centred over the PFD and ND */
+    padding-left: 78px;
   }
   .ck-panel {
     padding: 6px 0 0;
@@ -681,8 +683,13 @@
     font-size: 8px;
     gap: 2px;
   }
+  /* the flight's FLAPS / GEAR buttons cover the glareshield's left end on phones: the masters
+     follow the FCU on its right instead, clear of the A/THR column */
   .ck-masters {
-    left: max(10px, env(safe-area-inset-left));
+    position: static;
+    order: 1;
+    margin-left: 6px;
+    transform: none;
     gap: 4px;
   }
   .ck-master {
@@ -707,7 +714,8 @@
     --ck-split: 52%;
     --ck-glare-h: 36px;
     --ck-gap: 6px;
-    --ck-du: min(calc((48vh - var(--ck-glare-h) - 28px) / 2), 60vw);
+    /* the PFD and ND stacked in the middle, narrow enough to leave a thumb's column each side */
+    --ck-du: min(calc((48vh - var(--ck-glare-h) - 28px) / 2), calc(100vw - 224px));
   }
   .ck-glare {
     margin-top: -8px;
@@ -764,6 +772,75 @@
   .ck-popb {
     min-width: 40px;
     height: 40px;
+  }
+
+  /* The flight's touch controls (touch.ts, flight.css) while the flight deck shows: in flight.css
+     they stand on the lower windscreen, over the runway on final. Here they move down into the
+     panel's two side columns, beside the PFD and ND: the stick and FLAPS/GEAR/brakes on the left,
+     the thrust lever, the E button and AP/A/THR/CAM/warp on the right. The outside cameras keep
+     flight.css's layout. */
+  .is-piloting .hud:has(> .ck-host .ck-root[data-view='cockpit']) {
+    --ck-side: calc((100vw - min(calc((48vh - 64px) / 2), calc(100vw - 224px))) / 2 - 14px);
+    --ck-gb: max(8px, env(safe-area-inset-bottom));
+  }
+  .is-piloting .hud:has(> .ck-host .ck-root[data-view='cockpit']) .stick {
+    --stick: min(100px, var(--ck-side));
+    left: max(6px, env(safe-area-inset-left));
+    bottom: var(--ck-gb);
+  }
+  .is-piloting .hud:has(> .ck-host .ck-root[data-view='cockpit']) .stick-knob {
+    width: 44px;
+    height: 44px;
+    margin: -22px 0 0 -22px;
+  }
+  .is-piloting .hud:has(> .ck-host .ck-root[data-view='cockpit']) .fl-thrust {
+    width: 50px;
+    height: 136px;
+    right: max(8px, env(safe-area-inset-right));
+    bottom: var(--ck-gb);
+  }
+  .is-piloting .hud:has(> .ck-host .ck-root[data-view='cockpit']) .fl-thrust-track {
+    inset: 12px 0;
+  }
+  .is-piloting .hud:has(> .ck-host .ck-root[data-view='cockpit']) .touch-action {
+    width: 50px;
+    height: 50px;
+    font-size: 1.15rem;
+    right: max(8px, env(safe-area-inset-right));
+    bottom: calc(var(--ck-gb) + 146px);
+  }
+  .is-piloting .hud:has(> .ck-host .ck-root[data-view='cockpit']) .fl-tbtns {
+    gap: 4px;
+    grid-template-columns: repeat(2, calc((var(--ck-side) - 4px) / 2));
+  }
+  .is-piloting .hud:has(> .ck-host .ck-root[data-view='cockpit']) .fl-tbtns button {
+    width: auto;
+    min-width: 0;
+    height: 32px;
+    padding: 0 2px;
+    border-radius: 8px;
+    font-size: 0.56rem;
+    letter-spacing: -0.02em;
+  }
+  .is-piloting .hud:has(> .ck-host .ck-root[data-view='cockpit']) .fl-tbtns-a {
+    left: max(6px, env(safe-area-inset-left));
+    bottom: calc(var(--ck-gb) + min(100px, var(--ck-side)) + 10px);
+  }
+  .is-piloting .hud:has(> .ck-host .ck-root[data-view='cockpit']) .fl-tbtns-b {
+    right: max(6px, env(safe-area-inset-right));
+    bottom: calc(var(--ck-gb) + 206px);
+  }
+  /* the windscreen is clear now: Exit in its top-left corner (the strip's place, which only the
+     outside cameras show), the radio's line just above the glareshield */
+  .is-piloting .hud:has(> .ck-host .ck-root[data-view='cockpit']) .ride-exit {
+    top: max(8px, env(safe-area-inset-top));
+    bottom: auto;
+    left: max(8px, env(safe-area-inset-left));
+    right: auto;
+    transform: none;
+  }
+  .is-piloting .hud:has(> .ck-host .ck-root[data-view='cockpit']) .fl-radio {
+    bottom: calc(48% + 22px);
   }
   .ck-strip {
     --ck-s: 120px;

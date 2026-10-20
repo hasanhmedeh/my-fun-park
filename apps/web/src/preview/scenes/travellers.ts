@@ -24,6 +24,10 @@ import { Travellers, type Boarding } from '../../world/crowd/travellers';
 import type { Region } from '../../world/geo';
 import { homeStage, standIn } from './terminal';
 import { stage } from './island';
+import { JetSki } from '../../world/attractions/island/jetski';
+import { Slides } from '../../world/attractions/island/slides';
+import { Cannons } from '../../world/attractions/island/cannons';
+import { Volley } from '../../world/attractions/island/volley';
 
 const preview: PreviewScene = async (p) => {
   const { ctx, params } = p;
@@ -37,6 +41,8 @@ const preview: PreviewScene = async (p) => {
   const island = new IslandTerminal(ctx);
   const palmCay = new PalmCay(ctx);
   ctx.scene.add(home.group, island.group, palmCay.group);
+  // the island's games, as the game builds them (their colliders are what the walk grid routes round)
+  const games = { jetski: new JetSki(ctx), slides: new Slides(ctx), cannons: new Cannons(ctx), volley: new Volley(ctx) };
   const extras: { update(dt: number, t: number): void }[] = [];
   if (place === 'home') {
     homeStage(p);
@@ -56,6 +62,7 @@ const preview: PreviewScene = async (p) => {
     stage(p, (k) => {
       island.setNight(k);
       palmCay.setNight(k);
+      for (const g of Object.values(games)) g.setNight(k);
     });
     island.stairs.S2?.dock(true);
   }
@@ -117,7 +124,7 @@ const preview: PreviewScene = async (p) => {
         // trace=<seconds>: what everyone's up to every so often through the day so far
         if (trace && i % Math.round(trace * 30) === 0) {
           const f = flight as Boarding | null;
-          console.warn(`[trace] t=${t.toFixed(0)}${f ? ` flight ${(f.progress * 100).toFixed(0)}%` : ""} ${JSON.stringify(people.debug(params.has("where")))}`);
+          console.warn(`[trace] t=${t.toFixed(0)}${f ? ` flight ${(f.progress * 100).toFixed(0)}% ${people.debugRun()}` : ""} ${f ? "" : JSON.stringify(people.debug(params.has("where")))}`);
         }
       }
       // follow=<what they're doing>: the camera a few paces (fd, default 4) ahead of and beside the first one doing it
@@ -141,6 +148,7 @@ const preview: PreviewScene = async (p) => {
     else {
       island.update(dt, t);
       palmCay.update(dt, t, ctx.camera);
+      for (const g of Object.values(games)) g.update(dt, t);
     }
   });
   p.view(place === 'home' ? { x: 150, y: 1.7, z: 436 } : { x: 0, y: 3, z: 41395 }, place === 'home' ? { x: 60, y: 1.7, z: 500 } : { x: 0, y: 0, z: 41440 });

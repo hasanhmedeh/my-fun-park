@@ -7,7 +7,9 @@
 // destination with the local time and temperature, and "disarm doors" on the stand.
 //
 // The passengers applaud a butter landing, murmur after a hard one, and gasp at a big jolt or a
-// steep bank. Announcements wait for a quiet moment on the radio rather than talking over ATC.
+// steep bank. Everything here goes out on the speech's cabin channel (Speech.announce, shown by
+// onCabin, never in the radio log); announcements still wait for a quiet moment on the radio, so
+// the PA is heard rather than talked over, and one the radio did talk over is made again, once.
 
 import { AIRFIELDS } from './airports';
 import { phaseIndex, type Navigator } from './nav';
@@ -50,6 +52,8 @@ export class Cabin {
   private chimeWait = 0;
   private held: Utterance | null = null;
   private sent: Utterance | null = null;
+  /** The lines already made again after the radio talked over them (each is repeated once at most). */
+  private readonly repeated = new Set<Utterance>();
   private t = 0;
   private wasAirborne = false;
   private wasOnGround = true;
@@ -187,7 +191,7 @@ export class Cabin {
 
   /** A line of text only (no voice): what the cabin does. */
   private react(text: string) {
-    this.speech.say({ speaker: 'cabin', from: CABIN, text, say: '', priority: 0 });
+    this.speech.announce({ speaker: 'cabin', from: CABIN, text, say: '', priority: 0 });
   }
 
   // ---------------------------------------------------------------------------------------------- announcements
@@ -224,7 +228,10 @@ export class Cabin {
    */
   private feed(dt: number) {
     if (this.sent && this.speech.lastCut === this.sent) {
-      this.queue.unshift({ u: this.sent });
+      if (!this.repeated.has(this.sent)) {
+        this.repeated.add(this.sent);
+        this.queue.unshift({ u: this.sent });
+      }
       this.speech.lastCut = null;
       this.sent = null;
     }
@@ -233,7 +240,7 @@ export class Cabin {
       if (this.chimeWait <= 0) this.send(this.held);
       return;
     }
-    if (!this.queue.length || this.speech.quietFor < 1.2) return;
+    if (!this.queue.length || this.speech.quietFor < 1.2 || !this.speech.cabinIdle) return;
     const a = this.queue.shift()!;
     if (a.chime) {
       this.sfx.cabinChime(a.chime);
@@ -245,6 +252,6 @@ export class Cabin {
   private send(u: Utterance) {
     this.held = null;
     this.sent = u;
-    this.speech.say(u);
+    this.speech.announce(u);
   }
 }

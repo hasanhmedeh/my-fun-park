@@ -25,16 +25,29 @@ const LANDING_BANDS: { below: number; points: number; label: string }[] = [
   { below: Infinity, points: 40, label: 'Very hard landing' },
 ];
 
+/**
+ * The load factor the cabin feels, smoothed over this long (s): the seat and the body take out the
+ * turbulence's quick buzz (the flight model's specific force at each substep), which an airline's
+ * flight-data monitoring filters out as well; a pull, a push or a sustained turn still counts in full.
+ */
+const NZ_SMOOTH_S = 0.4;
+
 /** Speed tolerance before the 250 kt rule counts (an autothrust holding 250 wanders a knot or two), and how long. */
 const SPEED_LIMIT_TOL = 5;
 const SPEED_LIMIT_HOLD_S = 3;
 /**
- * The schedule's padding over the plan's block time (s). flightPlan() counts the airborne part at
- * an average 118 m/s plus four minutes on the ground; a real flight also spends its time on the
- * radio, waiting for traffic, flying the slower approach and taxiing in, which an airline's
- * schedule pads for. With it a tidy flight arrives on time and a dawdling one is late.
+ * The schedule's padding over the plan's block time (s). flightPlan() already counts the pushback,
+ * the taxi both ways, the takeoff run, the air time and the landing roll; the airline pads that by
+ * a couple of minutes for a wait at the holding point or a slow taxi. A tidy flight arrives on
+ * time and a dawdling one (or one that goes around) is late.
  */
-export const SCHEDULE_PAD_S = 480;
+export const SCHEDULE_PAD_S = 120;
+
+/**
+ * The most stars a flight can earn with each landing band (the same order as LANDING_BANDS): a
+ * five-star flight can't have a heavy landing on its list, whatever the points say.
+ */
+const LANDING_STAR_CAP = [5, 5, 4, 3, 2] as const;
 
 const FAIL_TEXT: Record<FailReason, string> = {
   impact: 'the aircraft struck the ground',
@@ -116,6 +129,8 @@ export class FlightScorer {
   private readonly gearEx = new Excursion(3);
   private readonly stallEx = new Excursion(5);
   private lastG = -Infinity;
+  /** The smoothed load factor (see NZ_SMOOTH_S). */
+  private nzF = 1;
   private lastSpeed = -Infinity;
   private speedOver = 0;
   private readonly lastAlert = new Map<string, number>();
@@ -165,14 +180,16 @@ export class FlightScorer {
       }
     }
 
+    this.nzF += (s.nz - this.nzF) * Math.min(1, dt / NZ_SMOOTH_S);
     if (air && this.sinceTouchdown > 1.5) {
-      this.maxG = Math.max(this.maxG, s.nz);
-      this.minG = Math.min(this.minG, s.nz);
+      const nz = this.nzF;
+      this.maxG = Math.max(this.maxG, nz);
+      this.minG = Math.min(this.minG, nz);
       this.maxBank = Math.max(this.maxBank, Math.abs(s.bank));
-      this.worstJolt = Math.max(this.worstJolt, Math.abs(s.nz - 1));
+      this.worstJolt = Math.max(this.worstJolt, Math.abs(nz - 1));
 
       // passengers feel load factor, side force, steep banks and big pitch attitudes
-      const ge = Math.max(0, Math.abs(s.nz - 1) - 0.08);
+      const ge = Math.max(0, Math.abs(nz - 1) - 0.08);
       const be = Math.max(0, Math.abs(s.bank) - 30);
       const pe = Math.max(0, s.pitch - 20) + Math.max(0, -s.pitch - 8);
       this.discomfort += (ge * ge * 12 + be * 0.04 + pe * 0.05) * dt;
@@ -187,9 +204,9 @@ export class FlightScorer {
       if (bank < 30) this.bankItem = null;
 
       // load factor: more than 0.3 g off 1 g costs 5 points, at most once every 20 s
-      if (Math.abs(s.nz - 1) > 0.3 && this.t - this.lastG >= 20) {
+      if (Math.abs(nz - 1) > 0.3 && this.t - this.lastG >= 20) {
         this.lastG = this.t;
-        this.penalise(`Uncomfortable load factor (${s.nz.toFixed(2)} g)`, 5, this.t);
+        this.penalise(`Uncomfortable load factor (${nz.toFixed(2)} g)`, 5, this.t);
       }
 
       // the 250 kt speed limit below 10,000 ft, at most once every 30 s
@@ -204,7 +221,8 @@ export class FlightScorer {
     this.discomfort += ye * ye * 40 * dt;
 
     // VMO / MMO
-    const overVmo = s.overspeed || s.ias > A320.vmo || s.mach > A320.mmo;
+    // (the model's overspeed flag also counts VFE and VLE, which have their own items below)
+    const overVmo = s.ias > A320.vmo || s.mach > A320.mmo;
     if (this.vmoEx.check(overVmo, s.ias < A320.vmo - 5 && s.mach < A320.mmo - 0.01, dt)) this.penalise(`Overspeed beyond VMO/MMO (${Math.round(s.ias)} kt)`, 15, this.t);
 
     // flaps and gear beyond their limiting speeds (VFE, VLE, VLO while moving)
@@ -315,7 +333,24 @@ export class FlightScorer {
   stars(): 1 | 2 | 3 | 4 | 5 {
     const sc = this.score();
     if (this.failure) return 1;
-    return sc >= 90 ? 5 : sc >= 75 ? 4 : sc >= 55 ? 3 : sc >= 35 ? 2 : 1;
+    const byScore = sc >= 90 ? 5 : sc >= 75 ? 4 : sc >= 55 ? 3 : sc >= 35 ? 2 : 1;
+    return Math.min(byScore, this.starCap()) as 1 | 2 | 3 | 4 | 5;
+  }
+
+  /**
+   * The most stars the itemised list allows: the landing's band (heavy 4, hard 3, very hard 2), a
+   * bounce 4, and a strike (tail, pod or wingtip) 3, so the stars never contradict the debrief.
+   */
+  private starCap(): number {
+    let cap = 5;
+    const l = this.landing;
+    if (l) {
+      const band = LANDING_BANDS.findIndex((b) => l.fpm < b.below);
+      cap = Math.min(cap, LANDING_STAR_CAP[band < 0 ? LANDING_STAR_CAP.length - 1 : band]);
+      if (l.bounced) cap = Math.min(cap, 4);
+    }
+    if (this.items.some((i) => /^(Tailstrike|Engine pod strike|Wingtip strike)/.test(i.label))) cap = Math.min(cap, 3);
+    return cap;
   }
 
   /** The round's stats (SPEC §3's flight keys). The landing's keys are only there if it landed. */
@@ -372,9 +407,9 @@ export class FlightScorer {
 
   // ---------------------------------------------------------------------------------------------- internals
 
+  /** The title's word for the flight, from its stars (so the two always agree). */
   private verdict() {
-    const s = this.score();
-    return s >= 90 ? 'Superb flight' : s >= 75 ? 'Good flight' : s >= 55 ? 'Safe flight' : s >= 35 ? 'Rough flight' : 'Eventful flight';
+    return ['Eventful flight', 'Rough flight', 'Safe flight', 'Good flight', 'Superb flight'][this.stars() - 1];
   }
 
   private touchdown(e: Extract<FdmEvent, { kind: 'touchdown' }>, s: AircraftState) {

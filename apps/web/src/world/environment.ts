@@ -16,6 +16,8 @@ import { nearTrail, WALL as TRAIL_WALL } from './attractions/trail-track';
 import { Terrain, onLand } from './terrain';
 import { Sea } from './sea';
 import { Clouds } from './clouds';
+import { stationHall } from './airport/terminal-plan';
+import { SKYLINK } from './geo';
 
 export { mulberry };
 
@@ -300,8 +302,11 @@ export class Environment {
 
     // grass grows on the park's lawn and on the lawn along the wheel road (thinning out where it fades)
     const R = PARK.r + 1;
+    // (not up through the floor of the SkyLink's park station, which stands on the lawn)
+    const hall = stationHall(SKYLINK.park);
+    const inHall = (x: number, z: number) => x > hall.x0 - 1 && x < hall.x1 + 1 && z > hall.z0 - 1 && z < hall.z1 + 1;
     const growth = (x: number, z: number) => {
-      if (parkDistance(x, z) < R) return ground.isSand(x, z) || onMuseum(x, z, 0.6) ? 0 : 1;
+      if (parkDistance(x, z) < R) return ground.isSand(x, z) || onMuseum(x, z, 0.6) || inHall(x, z) ? 0 : 1;
       if (Math.abs(x - LAYOUT.ferris.x) > L.half || z < L.z0 || z > PARK.z || onPath(x, z, 1.2)) return 0;
       const edge = Math.min(L.half - Math.abs(x - LAYOUT.ferris.x), z - L.z0);
       return THREE.MathUtils.smoothstep(edge, L.fade * 0.25, L.fade);
@@ -841,7 +846,7 @@ export class Environment {
     // the sky's horizon melts into the same haze the sea and the land fade into
     this.skyUniforms.uHorizonFog.value = aloft * (1 - space);
     this.skyUniforms.uFogCol.value.copy(fog.color);
-    this.clouds.light(sunW > 0.001 ? sun : moon, this.sun.color, this.sun.intensity, this.hemi.color, this.hemi.groundColor);
+    this.clouds.light(sunW > 0.001 ? sun : moon, this.sun.color, this.sun.intensity, this.hemi.color, this.hemi.groundColor, sunW <= 0.001);
     this.terrain.setNight(this.night);
 
     // the park's own lights: dimmer by day, full glow at night

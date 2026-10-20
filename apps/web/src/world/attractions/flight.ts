@@ -12,6 +12,7 @@
 import * as THREE from 'three';
 import { A320_POINTS } from '../../aviation/a320';
 import { AIRFIELDS } from '../../aviation/airports';
+import { Speech } from '../../aviation/speech';
 import { phaseIndex } from '../../aviation/nav';
 import { SCHEDULE_PAD_S } from '../../aviation/scoring';
 import type { AircraftState, GroundQuery, PlaneModel, PlaneVisual, ScoreItem, TimeOfDay } from '../../aviation/types';
@@ -35,7 +36,7 @@ import { FlightHud } from '../flight/flight-hud';
 import { IlsGuide } from '../flight/ils-guide';
 import { Cockpit } from '../flight/instruments/cockpit';
 import type { CockpitData } from '../flight/instruments/types';
-import { FlightSim, type Stage } from '../flight/sim';
+import { FlightSim, type Hint, type Stage } from '../flight/sim';
 import { FlightTouch } from '../flight/touch';
 
 export interface FlightDeps {
@@ -74,6 +75,8 @@ const DEPLANING_MAX_S = 12;
 const DOOR_S = 2.5;
 /** Engines off on the stand, then this long before the bridge or the stairs come to the door. */
 const DOCK_DELAY_S = 1.5;
+/** The hint once the report is up (the sim's own would go on about the stand or the aftermath). */
+const REPORT_HINT: Hint = { text: 'Flight report · Continue', keys: 'E' };
 const STORE = { ils: 'funfair.flight.ils', voices: 'funfair.flight.voices', keys: 'funfair.flight.keys', flown: 'funfair.flight.flown' };
 
 function load(key: string): string | null {
@@ -124,6 +127,13 @@ export class Flight implements Attraction {
   private readonly ils: IlsGuide;
   private readonly slides: THREE.Group;
   private sim: FlightSim | null = null;
+  /**
+   * One radio for every flight: a Speech per flight would add a speechSynthesis voiceschanged
+   * listener each round that is never taken off. FlightSim clears it at the start.
+   */
+  private readonly speech: Speech;
+  /** The last round ended without arriving (Esc before landing): its stats score nothing. */
+  private abandoned = false;
   /** Where the hero waits between flights. */
   private parkedAt: Region = 'home';
   private tod: TimeOfDay = 'day';
@@ -160,6 +170,8 @@ export class Flight implements Attraction {
   private readonly pose = { x: 0, z: 0, heading: 0 };
   private readonly markerPool: FlightMarker[] = [];
   private readonly markerList: FlightMarker[] = [];
+  private readonly sfxParams: Parameters<Ctx['sfx']['aircraft']>[0] = { n1: [0, 0], ias: 0, onGround: true, groundSpeed: 0, reverser: 0, spoilers: 0, gear: 1, inside: true, flapsMoving: false, gearMoving: false };
+  private readonly touchLit: Parameters<FlightTouch['update']>[1] = { gear: true, ap: false, athr: false, speedbrake: false, warp: 1, flaps: 0 };
   private readonly q = new THREE.Quaternion();
   private readonly up = new THREE.Vector3(0, 1, 0);
   private utcSec = -1;
@@ -167,6 +179,7 @@ export class Flight implements Attraction {
   constructor(ctx: Ctx, deps: FlightDeps) {
     this.ctx = ctx;
     this.deps = deps;
+    this.speech = new Speech(ctx.sfx);
     this.hero = createA320({ livery: LIVERIES.funfair, detail: 'hero', shadows: ctx.quality.shadows }, { spotLight: !ctx.mobile, lowMemory: ctx.mobile || ctx.quality.tier === 'lowest' || ctx.quality.tier === 'low' });
     this.hero.group.name = 'flight-hero';
     ctx.scene.add(this.hero.group);
@@ -273,10 +286,11 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
     const from = this.booking?.from ?? this.parkedAt;
     const info = bookFlight(from, this.booking?.timeOfDay ?? this.tod);
     const voices = load(STORE.voices) === '1';
-    const sim = new FlightSim({ info, ground: d.ground, sfx: this.ctx.sfx, traffic: d.traffic, speak: voices });
+    const sim = new FlightSim({ info, ground: d.ground, sfx: this.ctx.sfx, traffic: d.traffic, speak: voices, speech: this.speech });
     this.sim = sim;
     this.active = true;
     this.completed = false;
+    this.abandoned = false;
     this.arrival = null;
     this.reportShown = false;
     this.completeFired = false;
@@ -429,8 +443,11 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
     this.active = false;
     const d = this.deps;
     const sim = this.sim!;
-    const done = sim.finished && !sim.failed;
+    // landed and off the runway counts as arrived, Esc on the taxi-in or at the stand included: the
+    // visitor gets off at the destination and the aircraft stays there
+    const done = sim.arrived;
     this.completed = done;
+    this.abandoned = !done && !sim.failed;
     if (!sim.finished) sim.abandon();
     sim.speech.cancel();
     sim.speech.onLine = null;
@@ -488,31 +505,51 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
     this.onFinish?.();
   }
 
-  /** This flight's numbers (see account/stats.ts); valid mid-round. */
+  /**
+   * This flight's numbers (see account/stats.ts); valid mid-round. A flight left before arriving
+   * scores nothing (as a failed one): only what was flown counts, not the points not yet lost.
+   */
   roundStats(): Record<string, number> {
-    return this.sim ? this.sim.scorer.stats() : {};
+    if (!this.sim) return {};
+    const st = this.sim.scorer.stats();
+    if (this.abandoned) {
+      st.score = 0;
+      st.stars = 1;
+      for (const k of ['landingFpm', 'landingG', 'centrelineM', 'touchdownM']) delete st[k];
+    }
+    return st;
+  }
+
+  /** Landed and off the runway (Game's Esc then leaves as completed, at the destination). */
+  get arrived(): boolean {
+    return this.active && !!this.sim && this.sim.arrived;
+  }
+
+  /** The flight while it's flown; between flights the getters read the parked hero. */
+  private get live(): FlightSim | null {
+    return this.active ? this.sim : null;
   }
 
   // ---------------------------------------------------------------------------------------------- for Game
 
   /** The ground point under the aircraft (env.follow). */
   get focus(): THREE.Vector3 {
-    const p = this.sim ? this.sim.state.pos : this.idlePos;
+    const p = this.live ? this.live.state.pos : this.idlePos;
     return this.focusV.set(p.x, 0, p.z);
   }
 
   get position(): THREE.Vector3 {
-    return this.posV.copy(this.sim ? this.sim.state.pos : this.idlePos);
+    return this.posV.copy(this.live ? this.live.state.pos : this.idlePos);
   }
 
   /** The park's yaw (radians, 0 north, forward = (−sin, −cos)): −heading. */
   get yaw(): number {
-    return -(this.sim ? this.sim.state.heading : this.idleHeading) * D2R;
+    return -(this.live ? this.live.state.heading : this.idleHeading) * D2R;
   }
 
   /** Metres above the ground (the haze and the minimap's scale). */
   get altitude(): number {
-    return this.sim ? Math.max(0, this.sim.state.radioAltFt * FT) : 0;
+    return this.live ? Math.max(0, this.live.state.radioAltFt * FT) : 0;
   }
 
   /** The aircraft's state for Traffic.update's player (null between flights). */
@@ -522,7 +559,7 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
 
   /** Which region the aircraft is over now (the visitor's region while flying). */
   get region(): Region {
-    const p = this.sim ? this.sim.state.pos : this.idlePos;
+    const p = this.live ? this.live.state.pos : this.idlePos;
     return regionAt(p.x, p.z);
   }
 
@@ -535,7 +572,7 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
   get markers(): FlightMarker[] {
     const out = this.markerList;
     out.length = 0;
-    const sim = this.sim;
+    const sim = this.live;
     if (!sim) return out;
     let n = 0;
     const take = () => this.markerPool[n] ?? (this.markerPool[n] = { x: 0, z: 0, kind: 'fix', label: '' });
@@ -905,18 +942,18 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
     const flapsMoving = Math.abs(s.flapsDeg - this.lastFlaps) > 0.001;
     this.lastFlaps = s.flapsDeg;
     if (sim.stage === 'failed' || sim.stage === 'done') return;
-    this.ctx.sfx.aircraft({
-      n1: s.n1,
-      ias: s.ias,
-      onGround: s.onGround,
-      groundSpeed: s.gs,
-      reverser: s.reverser,
-      spoilers: Math.max(sys.spoilerL, sys.spoilerR),
-      gear: s.gear,
-      inside: this.cams.inside,
-      flapsMoving,
-      gearMoving: s.gear > 0.01 && s.gear < 0.99,
-    });
+    const a = this.sfxParams;
+    a.n1 = s.n1;
+    a.ias = s.ias;
+    a.onGround = s.onGround;
+    a.groundSpeed = s.gs;
+    a.reverser = s.reverser;
+    a.spoilers = Math.max(sys.spoilerL, sys.spoilerR);
+    a.gear = s.gear;
+    a.inside = this.cams.inside;
+    a.flapsMoving = flapsMoving;
+    a.gearMoving = s.gear > 0.01 && s.gear < 0.99;
+    this.ctx.sfx.aircraft(a);
   }
 
   private updateHud(sim: FlightSim, dt: number) {
@@ -925,7 +962,7 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
     this.hintClock -= dt;
     if (this.hintClock <= 0) {
       this.hintClock = 0.25;
-      hud.hint(this.reportShown ? null : sim.hint(), this.ctx.mobile);
+      hud.hint(this.reportShown ? REPORT_HINT : sim.hint(), this.ctx.mobile);
       if (sim.stage === 'flight' && !sim.state.onGround && phaseIndex(sim.nav.phase) < phaseIndex('final')) {
         const pr = sim.progress();
         const mins = Math.max(1, Math.round(pr.etaS / 60));
@@ -937,7 +974,14 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
     hud.taxiGuide(taxiing ? sim.guide : null, sim.state.gs);
     if (this.touch) {
       const f = sim.ap.fcu;
-      this.touch.update(sim.pilot.throttle, { gear: sim.pilot.gearDown, ap: f.ap, athr: f.athr, speedbrake: sim.pilot.speedbrake > 0, warp: sim.warp, flaps: sim.pilot.flapLever });
+      const lit = this.touchLit;
+      lit.gear = sim.pilot.gearDown;
+      lit.ap = f.ap;
+      lit.athr = f.athr;
+      lit.speedbrake = sim.pilot.speedbrake > 0;
+      lit.warp = sim.warp;
+      lit.flaps = sim.pilot.flapLever;
+      this.touch.update(sim.pilot.throttle, lit);
     }
   }
 

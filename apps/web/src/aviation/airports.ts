@@ -441,9 +441,32 @@ export function flightPlan(from: Region, depRunway: RunwayIdent, arrRunway: Runw
     pz = f.z;
   }
   dist += Math.hypot(arr.threshold.x - px, arr.threshold.z - pz);
-  // ~118 m/s on average in the air, plus pushback, taxi out and the landing roll
-  const blockTimeS = Math.round(dist / 118 + 240);
+  const blockTimeS = blockTime(from, to, dep, arr, dist);
   return { from, to, depRunway, arrRunway, cruiseFt: CRUISE_FT, fixes, blockTimeS };
+}
+
+/** Average taxi speeds the plan assumes (m/s): out, with the turns, the stops at the crossings and the slow line-up (about 12 kt); in, on the faster lanes back (about 17 kt). */
+const PLAN_TAXI_OUT_MS = 6;
+const PLAN_TAXI_IN_MS = 9;
+
+/**
+ * Gate to gate (s), the way an airline plans it: the pushback and engine start, the taxi out along
+ * the route ATC gives (the stand's taxilane to the runway entry it hands out), lining up and the
+ * takeoff run, the airborne part at an average 96 m/s (the 250 kt climb and cruise, the slower
+ * approach), the landing roll to the first exit, and the taxi in to the stand.
+ */
+function blockTime(from: Region, to: Region, dep: RunwayEnd, arr: RunwayEnd, airM: number) {
+  const depAp = AIRFIELDS[from];
+  const arrAp = AIRFIELDS[to];
+  const entry = dep.entries[0];
+  const stand = depAp.stands.find((s) => s.id === depAp.playerStand);
+  const outM = (stand && entry ? taxiRoute(depAp, stand.lane, entry.hold)?.lengthM : 0) || 1800;
+  const exit = arr.exits[0];
+  const inM = (exit ? taxiRoute(arrAp, exit.node, arrAp.playerStand, true)?.lengthM : 0) || 700;
+  const taxiOutS = 80 + outM / PLAN_TAXI_OUT_MS + 30;
+  const flyingS = 35 + airM / 96 + 45;
+  const taxiInS = inM / PLAN_TAXI_IN_MS + 10;
+  return Math.round(taxiOutS + flyingS + taxiInS);
 }
 
 // ------------------------------------------------------------------------------------------------

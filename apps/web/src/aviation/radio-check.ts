@@ -178,6 +178,8 @@ interface FlightOpts {
 interface FlightLog {
   clearances: { kind: string; t: number }[];
   lines: { u: Utterance; t: number }[];
+  /** The cabin channel's lines (the PA and the passengers), apart from the radio's. */
+  cabin: { u: Utterance; t: number }[];
   phases: { phase: FlightPhase; t: number }[];
   fixes: { name: string; t: number; distM: number }[];
   violations: string[];
@@ -214,6 +216,7 @@ function fly(o: FlightOpts): FlightLog {
   const log: FlightLog = {
     clearances: [],
     lines: [],
+    cabin: [],
     phases: [],
     fixes: [],
     violations: [],
@@ -269,6 +272,7 @@ function fly(o: FlightOpts): FlightLog {
     scorer.alert(kind);
   };
   speech.onLine = (u) => log.lines.push({ u, t });
+  speech.onCabin = (u) => log.cabin.push({ u, t });
 
   // the aircraft, on its stand
   const stand = ap.stands.find((x) => x.id === ap.playerStand)!;
@@ -690,6 +694,11 @@ export function runRadioChecks(): Row[] {
     const bands: [number, number][] = [[100, 100], [180, 95], [300, 90], [500, 80], [700, 60]];
     const got = bands.map(([fpm]) => land(fpm).score());
     add('Score: landing rate bands 0/−5/−10/−20/−40', got.every((g, i) => g === bands[i][1]), bands.map(([fpm], i) => `${fpm} fpm → ${got[i]}`).join(', '));
+    // the stars agree with the list: a heavy landing scores 90 but can't be a five-star flight
+    const capped = bands.map(([fpm]) => land(fpm));
+    const capStars = capped.map((c) => c.stars()).join('');
+    const titles = capped.map((c) => c.debrief().title);
+    add('Stars: heavy landing ≤ 4★, hard ≤ 3★, very hard ≤ 2★', capStars === '55432' && /^★★★★☆ Good flight/.test(titles[2]), `${bands.map(([fpm]) => fpm).join(' ')} fpm → ${capStars}; 300 fpm: "${titles[2]}"`);
     const long = land(100, 1000).score();
     const off = land(100, 450, 10).score();
     const crab = land(100, 450, 0, 7).score();
@@ -725,8 +734,15 @@ export function runRadioChecks(): Row[] {
     }
     {
       const { sc, s } = mk();
+      // a turbulence spike (two frames at 1.6 g) is smoothed out; a sustained 1.45 g is not
+      s.nz = 1.6;
+      sc.update(1 / 30, s, f);
+      sc.update(1 / 30, s, f);
+      s.nz = 1;
+      sc.update(1, s, f);
+      const spike = sc.score();
       s.nz = 1.45;
-      sc.update(0.1, s, f);
+      sc.update(0.5, s, f);
       sc.update(5, s, f);
       const a = sc.score();
       sc.update(16, s, f);
@@ -735,7 +751,7 @@ export function runRadioChecks(): Row[] {
       for (let i = 0; i < 50; i++) sc.update(0.1, s, f);
       const b = sc.score();
       for (let i = 0; i < 50; i++) sc.update(0.1, s, f);
-      add('Score: load factor −5 / 20 s, 250 kt below FL100 −5 / 30 s', a === 95 && b === 85 && sc.score() === 85, `1.45 g → ${a} (once in 5 s), again 21 s later + 270 kt → ${b}, still 270 kt 5 s later → ${sc.score()}`);
+      add('Score: load factor −5 / 20 s (smoothed), 250 kt below FL100 −5 / 30 s', spike === 100 && a === 95 && b === 85 && sc.score() === 85, `1.6 g spike → ${spike}, 1.45 g → ${a} (once in 5 s), again 21 s later + 270 kt → ${b}, still 270 kt 5 s later → ${sc.score()}`);
     }
     {
       const { sc, s } = mk();
@@ -786,15 +802,26 @@ export function runRadioChecks(): Row[] {
   {
     const sp = new Speech(new Sfx());
     sp.enabled = false;
-    for (let i = 0; i < 6; i++) sp.say({ speaker: 'cabin', from: 'Purser', text: `Line ${i}` });
+    const radio: string[] = [];
+    const cabinLines: string[] = [];
+    sp.onLine = (u) => radio.push(u.speaker);
+    sp.onCabin = (u) => cabinLines.push(u.speaker);
+    for (let i = 0; i < 6; i++) sp.say({ speaker: 'fo', from: 'Funfair 101', text: `Line ${i}` });
+    sp.announce({ speaker: 'pa', from: 'Purser', text: 'Ladies and gentlemen, welcome aboard.' });
     sp.update(0.1);
     const q = sp.queued;
+    const pa = sp.announcing?.speaker;
     sp.say({ speaker: 'atc', from: 'Funfair Tower', text: 'Funfair 101, hold position.' });
+    sp.update(0.1);
     sp.update(0.1);
     const atcNow = sp.speaking?.speaker;
     sp.say({ speaker: 'gpws', from: 'GPWS', text: 'PULL UP' });
     sp.update(0.1);
-    add('Speech: queue ≤ 3, ATC interrupts cabin, GPWS interrupts ATC', q <= 3 && atcNow === 'atc' && sp.speaking?.speaker === 'gpws' && sp.log.length >= 6, `queued ${q}, then ${atcNow}, then ${sp.speaking?.speaker}; ${sp.log.length} lines logged`);
+    add(
+      'Speech: queue ≤ 3, GPWS interrupts ATC; the cabin on its own channel',
+      q <= 3 && pa === 'pa' && atcNow === 'atc' && sp.speaking?.speaker === 'gpws' && sp.log.length >= 6 && cabinLines.join() === 'pa' && !radio.includes('pa') && sp.cabinLog.length === 1,
+      `queued ${q} (PA ${pa} alongside), then ${atcNow}, then ${sp.speaking?.speaker}; ${sp.log.length} radio lines logged, cabin [${cabinLines.join(', ')}]`,
+    );
     const words = [digits(9), freqWords('118.30'), freqWords('121.80'), altitudeWords(5000), altitudeWords(3500), flightLevelWords(120), headingWords(270), windWords(250, 12, 22), taxiwayWords('E2')];
     const want = ['niner', 'one one eight decimal three', 'one two one decimal eight', 'five thousand', 'three thousand five hundred', 'flight level one two zero', 'two seven zero', 'wind two five zero degrees, one two knots, gusting two two', 'Echo two'];
     const bad = words.map((w, i) => (w === want[i] ? '' : `${w} ≠ ${want[i]}`)).filter(Boolean);
@@ -885,8 +912,10 @@ export function runRadioChecks(): Row[] {
     const missingCalls = calls.filter((c) => !fl.lines.some((l) => l.u.text === c));
     add(`${label}: flight-deck callouts`, missingCalls.length === 0, missingCalls.length ? `missing ${missingCalls.join(', ')}` : calls.join(', '));
     const cab = [/arm doors/, /safety demonstration/, /life jacket/, /this is your captain speaking/, /seats for takeoff/, /started our descent/, /seats for landing/, /welcome to (Palm Cay|Funfair International)/i, /disarm doors/];
-    const missingCab = cab.filter((r) => !r.test(said));
-    add(`${label}: cabin announcements`, missingCab.length === 0, missingCab.length ? `missing ${missingCab.join(', ')}` : `${fl.lines.filter((l) => l.u.speaker === 'pa' || l.u.speaker === 'captain').length} PA lines`);
+    const pa = fl.cabin.map((l) => l.u.text).join('\n');
+    const missingCab = cab.filter((r) => !r.test(pa));
+    const leaked = fl.lines.filter((l) => l.u.speaker === 'pa' || l.u.speaker === 'cabin' || /Ladies and gentlemen|Cabin crew,/.test(l.u.text)).length;
+    add(`${label}: cabin announcements, on the cabin channel only`, missingCab.length === 0 && leaked === 0, missingCab.length ? `missing ${missingCab.join(', ')}` : `${fl.cabin.filter((l) => l.u.speaker === 'pa' || l.u.speaker === 'captain').length} PA lines, ${leaked} in the radio log`);
     const phr = [/information \w+, time \d{4}\. Runway 27 in use/, /request clearance to/, /pushback and start-up approved, face (east|west)/, /taxi to holding point A\d, runway 27, via/, /contact Tower 118\.\d+/, /cleared for takeoff/, /contact Sea Radar/, /Climb and maintain 5,000 ft/, /descend 3,000 ft/, /cleared ILS approach runway 27/, /cleared to land/, /vacate via E2/, /Taxi to stand \d via/];
     const missingPhr = phr.filter((r) => !r.test(said));
     add(`${label}: ATC phraseology`, missingPhr.length === 0, missingPhr.length ? `missing ${missingPhr.join(', ')}` : `${fl.lines.filter((l) => l.u.speaker === 'atc').length} ATC lines, ATIS "${fl.atc.atis.text.slice(0, 70)}…"`);

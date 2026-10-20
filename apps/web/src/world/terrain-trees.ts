@@ -83,13 +83,31 @@ function unindexed(g: THREE.BufferGeometry) {
   return g.index ? g.toNonIndexed() : g;
 }
 
+/**
+ * Squashes a lump and roughens it, x and z scaled by base + spread × a random amount. The amount
+ * is a hash of the vertex's own position, so the copies of a corner the faces share (the
+ * geometry isn't indexed) all move together and no cracks open between the faces.
+ */
+function jitter(g: THREE.BufferGeometry, seed: number, base: number, spread: number, squash: number) {
+  const p = g.attributes.position;
+  const h = (x: number, y: number, z: number, k: number) => {
+    const v = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719 + seed * 91.7 + k) * 43758.5453;
+    return v - Math.floor(v);
+  };
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i);
+    const y = p.getY(i);
+    const z = p.getZ(i);
+    p.setXYZ(i, x * (base + h(x, y, z, 0) * spread), y * squash, z * (base + h(x, y, z, 5.3) * spread));
+  }
+}
+
 /** A broadleaf ~11 m tall: a lumpy crown of two blobs on a short trunk (about 50 triangles). */
 function broadleafGeo() {
   const rnd = mulberry(31);
   const lump = (r: number, x: number, y: number, z: number) => {
     const g = new THREE.IcosahedronGeometry(r, 0);
-    const p = g.attributes.position;
-    for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) * (0.9 + rnd() * 0.2), p.getY(i) * 0.82, p.getZ(i) * (0.9 + rnd() * 0.2));
+    jitter(g, rnd(), 0.9, 0.2, 0.82);
     return g.translate(x, y, z);
   };
   const crown = mergeGeometries([lump(3.3, 0, 6.6, 0), lump(2.4, 1.1, 8.4, -0.5)].map(plain))!;
@@ -112,8 +130,7 @@ function jungleGeo() {
   const rnd = mulberry(57);
   const lump = (r: number, x: number, y: number, z: number) => {
     const g = new THREE.IcosahedronGeometry(r, 0);
-    const p = g.attributes.position;
-    for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) * (1.05 + rnd() * 0.25), p.getY(i) * 0.55, p.getZ(i) * (1.05 + rnd() * 0.25));
+    jitter(g, rnd(), 1.05, 0.25, 0.55);
     return g.translate(x, y, z);
   };
   const crown = mergeGeometries([lump(4.6, 0, 14, 0), lump(3.2, -2.6, 12.6, 1.6), lump(3, 2.4, 13, -1.8)].map(plain))!;
@@ -313,17 +330,49 @@ function plantCell(cx: number, cz: number): Cell {
   return cell;
 }
 
+/** The cell offsets round a cell out to R (+ one cell), nearest first, as flat (di, dj) pairs; cached per radius in cells. */
+const rings = new Map<number, Int16Array>();
+function ringOffsets(R: number) {
+  const m = Math.ceil(R / CELL);
+  let offs = rings.get(m);
+  if (offs) return offs;
+  const list: [number, number, number][] = [];
+  for (let i = -m - 1; i <= m + 1; i++)
+    for (let j = -m - 1; j <= m + 1; j++) {
+      const d = Math.hypot(i, j);
+      if (d < m + 1) list.push([i, j, d]);
+    }
+  list.sort((a, b) => a[2] - b[2]);
+  offs = new Int16Array(list.length * 2);
+  list.forEach(([i, j], k) => {
+    offs[k * 2] = i;
+    offs[k * 2 + 1] = j;
+  });
+  rings.set(m, offs);
+  return offs;
+}
+
 export class Vegetation {
   readonly group = new THREE.Group();
   private meshes: THREE.InstancedMesh[] = [];
   private cells = new Map<number, Cell>();
-  private queue: { cx: number; cz: number }[] = [];
+  /** Cells still to plant round the plan's centre, nearest first, as flat (cx, cz) pairs; `queueAt` is the next one. */
+  private queue: number[] = [];
+  private queueAt = 0;
   private planCx = NaN;
   private planCz = NaN;
   private planR = 0;
   private dirty = false;
-  private counts = new Array<number>(KINDS * 2).fill(0);
   private sinceAssemble = 0;
+  /** The cells of the refill in progress, nearest first. */
+  private list: Cell[] = [];
+  private ringCount = new Int32Array(0);
+  /** The refill in progress: the next cell, the thinning, and the instances written so far (per level, per mesh). */
+  private job = { active: false, at: 0, share: 1, used: [0, 0], counts: new Array<number>(KINDS * 2).fill(0) };
+  /** Per mesh, the buffers the next refill is written into (swapped with the live ones when done). */
+  private spare: { m: Float32Array; c: Float32Array }[] = [];
+  /** After a warm-up: the spot it was for, kept until the camera gets there (a few frames at most). */
+  private hold: { x: number; z: number; frames: number } | null = null;
   private tier: (typeof TIERS)['high'];
 
   constructor(_ctx: Ctx, q: Quality) {
@@ -346,12 +395,17 @@ export class Vegetation {
       const im = new THREE.InstancedMesh(g, solid, cap);
       im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
       im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      im.instanceColor.setUsage(THREE.DynamicDrawUsage);
       im.count = 0;
       im.receiveShadow = q.shadows;
       // far away, and many: no shadow pass (it would draw every instance again)
       im.castShadow = false;
       im.matrixAutoUpdate = false;
+      // the trees stand all round the camera, so the mesh is always in view: no bounding sphere to
+      // recompute over every instance each time the buffers are refilled
+      im.frustumCulled = false;
       im.renderOrder = 1;
+      this.spare.push({ m: new Float32Array(cap * 16), c: new Float32Array(cap * 3) });
       this.meshes.push(im);
       this.group.add(im);
     });
@@ -364,23 +418,67 @@ export class Vegetation {
   /** Plants the cells round the camera (a little each frame) and keeps the instanced meshes filled from them. */
   update(camera: THREE.Camera, seeing: number) {
     const p = camera.position;
+    if (this.hold) {
+      // warmed for a spot the camera hasn't been moved to yet: keep those trees, don't re-plan here
+      const h = this.hold;
+      if (Math.hypot(p.x - h.x, p.z - h.z) < CELL * 2 || --h.frames <= 0) this.hold = null;
+      else return;
+    }
     const R = Math.min(this.tier.radius, seeing);
     const cx = Math.floor(p.x / CELL);
     const cz = Math.floor(p.z / CELL);
-    if (cx !== this.planCx || cz !== this.planCz || Math.abs(R - this.planR) > CELL) this.plan(cx, cz, R);
-    // plant queued cells for a moment each frame: flying, where the forests matter, up to ~1.5 ms;
-    // walking in the park (the far plane short, the woods deep in the haze) under half a millisecond
+    // into a new cell: the plan alone this frame (a refill under way goes on with the cells it has)
+    if (cx !== this.planCx || cz !== this.planCz || Math.abs(R - this.planR) > CELL) {
+      this.plan(cx, cz, R);
+      return;
+    }
     const walking = ((camera as THREE.PerspectiveCamera).far ?? 2400) < 5000;
+    // the work is spread so no frame does much of it: a frame either sorts the cells for a refill,
+    // or copies a slice of one, or plants a few cells
+    if (this.job.active) {
+      this.assembleStep(0.35);
+      return;
+    }
+    // refill the instance buffers once planting is done, or a few times a second while it goes on
+    this.sinceAssemble++;
+    if (this.dirty && (this.queueAt >= this.queue.length || this.sinceAssemble >= (walking ? 30 : 8))) {
+      this.assembleStart(p, R);
+      return;
+    }
+    // plant queued cells for a moment each frame: flying, where the forests matter, up to ~0.7 ms;
+    // walking in the park (the far plane short, the woods deep in the haze) under half a millisecond
+    this.plant(walking ? 0.4 : 0.7);
+  }
+
+  /**
+   * At once, for a camera about to be at `pos` (after a teleport or a region change): plans the
+   * cells round it, plants the nearest within `budgetMs` and fills the meshes, so the trees are
+   * there on the first frame; the far fringe follows over the next frames as usual. Returns the
+   * time taken (ms).
+   */
+  warm(pos: THREE.Vector3, seeing: number, budgetMs = 45) {
     const t0 = performance.now();
-    while (this.queue.length && performance.now() - t0 < (walking ? 0.4 : 1.5)) {
-      const c = this.queue.shift()!;
-      const k = this.key(c.cx, c.cz);
-      if (!this.cells.has(k)) this.cells.set(k, plantCell(c.cx, c.cz));
+    const R = Math.min(this.tier.radius, seeing);
+    this.plan(Math.floor(pos.x / CELL), Math.floor(pos.z / CELL), R);
+    // keep ~3 ms of the budget for filling the meshes
+    this.plant(Math.max(1, budgetMs - 3));
+    this.assembleStart(pos, R);
+    this.assembleStep(Infinity);
+    this.hold = { x: pos.x, z: pos.z, frames: 10 };
+    return performance.now() - t0;
+  }
+
+  /** Plants queued cells, nearest first, for up to `ms` milliseconds (at least one). */
+  private plant(ms: number) {
+    const q = this.queue;
+    const t0 = performance.now();
+    while (this.queueAt < q.length && performance.now() - t0 < ms) {
+      const cx = q[this.queueAt++];
+      const cz = q[this.queueAt++];
+      const k = this.key(cx, cz);
+      if (!this.cells.has(k)) this.cells.set(k, plantCell(cx, cz));
       this.dirty = true;
     }
-    // refilling the instance buffers costs too: once planting is done, or a few times a second while it goes on
-    this.sinceAssemble++;
-    if (this.dirty && (this.queue.length === 0 || this.sinceAssemble >= (walking ? 30 : 8))) this.assemble(p, R);
   }
 
   /** Works out which cells are wanted round (cx, cz), queues the missing ones nearest first, and forgets far ones. */
@@ -388,71 +486,125 @@ export class Vegetation {
     this.planCx = cx;
     this.planCz = cz;
     this.planR = R;
-    const n = Math.ceil(R / CELL) + 1;
-    const want: { cx: number; cz: number; d: number }[] = [];
+    const offs = ringOffsets(R);
+    const q = this.queue;
+    q.length = 0;
+    this.queueAt = 0;
+    for (let i = 0; i < offs.length; i += 2) {
+      const a = cx + offs[i];
+      const b = cz + offs[i + 1];
+      if (!this.cells.has(this.key(a, b))) q.push(a, b);
+    }
     const ox = (cx + 0.5) * CELL;
     const oz = (cz + 0.5) * CELL;
-    for (let i = -n; i <= n; i++)
-      for (let j = -n; j <= n; j++) {
-        const d = Math.hypot(i * CELL, j * CELL);
-        if (d < R + CELL) want.push({ cx: cx + i, cz: cz + j, d });
-      }
-    want.sort((a, b) => a.d - b.d);
-    this.queue = want.filter((w) => !this.cells.has(this.key(w.cx, w.cz)));
-    for (const [k, c] of this.cells) if (Math.hypot((c.cx + 0.5) * CELL - ox, (c.cz + 0.5) * CELL - oz) > R * 1.4 + CELL * 2) this.cells.delete(k);
+    const forget = R * 1.4 + CELL * 2;
+    for (const [k, c] of this.cells) if (Math.hypot((c.cx + 0.5) * CELL - ox, (c.cz + 0.5) * CELL - oz) > forget) this.cells.delete(k);
     this.dirty = true;
   }
 
-  /** Copies the planted cells into the instanced meshes: nearest first, thinning out towards the edge. */
-  private assemble(p: THREE.Vector3, R: number) {
+  /**
+   * Starts refilling the instanced meshes from the planted cells round `p`: nearest first,
+   * thinning out towards the edge. The copying is spread over the next frames (`assembleStep`)
+   * into spare buffers, which are swapped in whole when it's done, so no frame draws half a refill.
+   */
+  private assembleStart(p: THREE.Vector3, R: number) {
     this.dirty = false;
     this.sinceAssemble = 0;
-    const list = [...this.cells.values()];
-    for (const c of list) c.dist = Math.hypot((c.cx + 0.5) * CELL - p.x, (c.cz + 0.5) * CELL - p.z);
-    list.sort((a, b) => a.dist - b.dist);
+    // only the cells in range are sorted (the cache keeps a wider ring)
+    const reach = R + CELL * 0.7;
+    // nearest first, by a counting sort into 32 m rings (a comparison sort of ~2500 cells cost
+    // ~0.5 ms; the order within a ring doesn't matter)
+    const RING = 32;
+    const nb = Math.ceil(reach / RING) + 1;
+    const start = this.ringCount.length >= nb + 1 ? this.ringCount : (this.ringCount = new Int32Array(nb + 1));
+    start.fill(0);
+    let n = 0;
+    for (const c of this.cells.values()) {
+      c.dist = Math.hypot((c.cx + 0.5) * CELL - p.x, (c.cz + 0.5) * CELL - p.z);
+      if (c.dist <= reach) {
+        start[Math.floor(c.dist / RING) + 1]++;
+        n++;
+      }
+    }
+    for (let b = 1; b <= nb; b++) start[b] += start[b - 1];
+    const list = this.list;
+    list.length = n;
+    for (const c of this.cells.values()) if (c.dist <= reach) list[start[Math.floor(c.dist / RING)]++] = c;
     // seen from high up, the trees below are as far away as those out to the side
     const lift = Math.max(0, p.y - groundY(p.x, p.z));
     // full trees and far ones each draw from their own budget, nearest cells first, so the forest
     // you are over is always whole and only the far fringe goes when a budget runs out
     const t = this.tier;
-    const budget = [t.nearBudget, t.farBudget];
     // first what every cell would like, then one thinning per level so the lot fits its budget
     // (thinned evenly, not cut off at a cell's edge)
     const want = [0, 0];
     for (const c of list) {
-      if (c.dist > R + CELL * 0.7) break;
       const d = Math.hypot(c.dist, lift);
       c.thin = THREE.MathUtils.clamp(1.35 - d / R, 0.3, 1);
       c.lod = d < t.near ? 0 : 1;
       want[c.lod] += (c.n[0] + c.n[1] + c.n[2] + c.n[3]) * c.thin;
     }
     // the same share for both, so the forest's density doesn't jump where the full trees end
-    const share = Math.min(1, budget[0] / Math.max(1, want[0]), budget[1] / Math.max(1, want[1]));
-    const used = [0, 0];
-    this.counts.fill(0);
-    for (const c of list) {
-      if (c.dist > R + CELL * 0.7) break;
+    const j = this.job;
+    j.share = Math.min(1, t.nearBudget / Math.max(1, want[0]), t.farBudget / Math.max(1, want[1]));
+    j.at = 0;
+    j.used[0] = j.used[1] = 0;
+    j.counts.fill(0);
+    j.active = true;
+  }
+
+  /** Copies the next cells of the refill for up to `ms` milliseconds; swaps the buffers in at the end. */
+  private assembleStep(ms: number) {
+    const j = this.job;
+    const list = this.list;
+    const budget = [this.tier.nearBudget, this.tier.farBudget];
+    const t0 = performance.now();
+    while (j.at < list.length) {
+      const c = list[j.at++];
       const lod = c.lod;
-      const thin = c.thin * share;
+      const thin = c.thin * j.share;
       for (let k = 0; k < KINDS; k++) {
-        const take = Math.min(Math.floor(c.n[k] * thin + 0.5), budget[lod] - used[lod]);
+        const take = Math.min(Math.floor(c.n[k] * thin + 0.5), budget[lod] - j.used[lod]);
         if (take <= 0) continue;
         const i = lod * KINDS + k;
-        const im = this.meshes[i];
-        (im.instanceMatrix.array as Float32Array).set(c.mats[k].subarray(0, take * 16), this.counts[i] * 16);
-        (im.instanceColor!.array as Float32Array).set(c.cols[k].subarray(0, take * 3), this.counts[i] * 3);
-        this.counts[i] += take;
-        used[lod] += take;
+        // copied by hand: a subarray view per cell and kind (thousands a refill) costs more than the copy
+        const M = this.spare[i].m;
+        const C = this.spare[i].c;
+        const sm = c.mats[k];
+        const sc = c.cols[k];
+        const om = j.counts[i] * 16;
+        const oc = j.counts[i] * 3;
+        for (let e = 0, n = take * 16; e < n; e++) M[om + e] = sm[e];
+        for (let e = 0, n = take * 3; e < n; e++) C[oc + e] = sc[e];
+        j.counts[i] += take;
+        j.used[lod] += take;
       }
+      if ((j.at & 15) === 0 && performance.now() - t0 > ms) return;
     }
+    j.active = false;
     for (let i = 0; i < this.meshes.length; i++) {
       const im = this.meshes[i];
-      const count = this.counts[i];
+      const count = j.counts[i];
+      // the spare buffers become the live ones (same size), the live ones the spares
+      const m = im.instanceMatrix;
+      const c = im.instanceColor!;
+      const s = this.spare[i];
+      const lm = m.array as Float32Array;
+      const lc = c.array as Float32Array;
+      m.array = s.m;
+      c.array = s.c;
+      s.m = lm;
+      s.c = lc;
       im.count = count;
       im.visible = count > 0;
-      im.instanceMatrix.needsUpdate = true;
-      im.instanceColor!.needsUpdate = true;
-      if (count) im.computeBoundingSphere();
+      if (!count) continue;
+      // upload only the part in use, not the whole budget's buffer
+      m.clearUpdateRanges();
+      m.addUpdateRange(0, count * 16);
+      m.needsUpdate = true;
+      c.clearUpdateRanges();
+      c.addUpdateRange(0, count * 3);
+      c.needsUpdate = true;
     }
   }
 }

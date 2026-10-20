@@ -865,19 +865,27 @@ function weather(add: Add) {
   let maxW = 0;
   let minV = 1e9;
   let maxV = 0;
+  let maxG = 0;
+  let gusty = 0;
+  let gapOk = true;
   let fmtOk = true;
   for (let i = 0; i < 300; i++) {
     const tod = (['dawn', 'day', 'dusk', 'night'] as const)[i % 4];
     const w = makeWeather(i, tod);
     minW = Math.min(minW, w.windKt);
     maxW = Math.max(maxW, w.windKt);
+    maxG = Math.max(maxG, w.gustKt);
+    if (w.gustKt) {
+      gusty++;
+      if (w.gustKt < w.windKt + 8) gapOk = false;
+    }
     if (tod !== 'dawn') minV = Math.min(minV, w.visibilityM);
     maxV = Math.max(maxV, w.visibilityM);
     const m = metar(w, 'XPCY', 13, 19);
     if (!/^XPCY 191300Z (\d{5}(G\d{2})?KT|VRB\d{2}KT|00000KT) (CAVOK|\d{4}( BR)?( (FEW|SCT|BKN|OVC)\d{3})+|\d{4}( BR)? NSC) \d{2}\/\d{2} Q\d{4} NOSIG$/.test(m)) fmtOk = false;
   }
-  ok &&= minW >= 4 && maxW <= 22 && minV >= 8000 && maxV <= 40000;
-  add('Weather: deterministic, winds 4–22 kt, vis 8–40 km', ok, `wind ${minW}–${maxW} kt, vis ${f0(minV / 1000)}–${f0(maxV / 1000)} km`, '4–22 kt, 8–40 km');
+  ok &&= minW >= 4 && maxW <= 18 && maxG <= 25 && gapOk && gusty > 10 && minV >= 8000 && maxV <= 40000;
+  add('Weather: deterministic, winds 4–18 kt, gusts ≤ 25 kt, vis 8–40 km', ok, `wind ${minW}–${maxW} kt, gusts to ${maxG} kt (${gusty} of 300 days), vis ${f0(minV / 1000)}–${f0(maxV / 1000)} km`, '4–18 kt, G ≤ 25, 8–40 km');
   add('METAR format', fmtOk, metar(makeWeather(7, 'day'), 'XPCY', 13, 19), 'ICAO METAR');
   const wc = windComponents(isaWeather({ windFrom: 360, windKt: 15 }), 270);
   const wh = windComponents(isaWeather({ windFrom: 270, windKt: 10 }), 270);

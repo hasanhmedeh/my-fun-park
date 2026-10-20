@@ -60,8 +60,23 @@ const PROP_RANGE = 70;
 /** Route searches allowed per frame (a long one over the beach park can take a millisecond or two). */
 const ROUTES_PER_FRAME = 2;
 /** Queue spacing, and the gap kept to the person ahead on a bridge or the stairs. */
-const QUEUE_GAP = 0.78;
-const WALK_GAP = 1.05;
+const QUEUE_GAP = 0.62;
+const WALK_GAP = 1.0;
+/** How many stand in the visitor's flight's queue at the desk before boarding is called. */
+const PRE_QUEUE: Record<Region, number> = { home: 8, island: 4 };
+/**
+ * The boarding's rhythm: a pass scanned every this many seconds (the gate's agent is quick; 18
+ * passengers take about 40 s from the call to the last aboard), and a deplaning's passengers
+ * step out of the door this often (the airstairs go one at a time, more carefully).
+ */
+const SCAN_EVERY = 0.66;
+/** The least the head of the queue stands at the desk for the scan. */
+const SCAN_PAUSE = 0.2;
+const OUT_EVERY: Record<Region, number> = { home: 0.5, island: 1.15 };
+/** Through the gate and along the bridge or across the apron: a brisk walk (m/s), whatever their pace. */
+const BRISK = { min: 1.9, max: 2.05 };
+/** Walking up (or down) a bridge's escalator, on top of its own speed. */
+const ESCALATOR = { speed: 0.75, walk: 0.75 };
 /**
  * How far (m) a beachgoer's choice of what to do next leans towards the visitor: the park is 400 m
  * of sand and only a couple of dozen are about, so they gather where they will be seen.
@@ -121,6 +136,15 @@ class Line {
     this.slope = len > 1e-6 ? (b.y - a.y) / len : 0;
   }
 
+  /** How far along the walk its first steep part (an escalator, stairs) starts. */
+  steepFrom() {
+    for (let i = 1; i < this.pts.length; i++) {
+      const len = this.cum[i] - this.cum[i - 1];
+      if (len > 1e-6 && Math.abs(this.pts[i].y - this.pts[i - 1].y) / len > 0.3) return this.cum[i - 1];
+    }
+    return 0;
+  }
+
   /** How far along the walk first comes down to the ground after leaving it (the foot of the bridge or the stairs). */
   groundAfterClimb() {
     let up = false;
@@ -150,6 +174,8 @@ class Walker {
   replan = false;
   /** Fresh routes allowed before a stuck walker just gives up on the waypoint and heads for the next. */
   replans = 0;
+  /** A brisker walk than their own (called to board: off to the back of the queue). */
+  hurry = 1;
   /** Position set directly by the script (seats, lines, stairs, the sea): no steering or pushing. */
   scripted = false;
   /** Out of the world: not drawn, not simulated (aboard, gone home, waiting to come back). */
@@ -172,6 +198,8 @@ class Walker {
   holding = false;
   caseAt: { x: number; y: number; z: number; yaw: number; flat: boolean } | null = null;
   caseState: CaseState = { pull: 0 };
+  /** How far the case's telescopic handle is out (pushed home on a belt or the scale). */
+  handle = 1;
   bag: PropItem | null = null;
   bagDown: { x: number; y: number; z: number; yaw: number } | null = null;
   hat: PropItem | null = null;
@@ -308,6 +336,7 @@ class Run implements Boarding {
   lastAppear = -10;
   count = 0;
   finished = false;
+  dumped = false;
   greeter: Walker | null = null;
   attendant: Walker | null = null;
   /** Escalators (home) carry people standing; stairs (the island) are walked, slowly. */
@@ -324,9 +353,10 @@ class Run implements Boarding {
   ) {
     this.line = new Line(pts);
     this.scanS = scanS;
-    // clear of the aircraft: a few paces past the foot of the bridge's escalator or the airstairs
-    this.clearS = Math.min(this.line.length, Math.max(this.line.groundAfterClimb() + 4, 12));
     this.escalators = region === 'home';
+    // clear of the aircraft: off the bridge, onto its escalator down into the terminal; or a pace or
+    // two past the foot of the airstairs
+    this.clearS = Math.min(this.line.length, Math.max(this.escalators ? this.line.steepFrom() : this.line.groundAfterClimb() + 1.5, 12));
   }
 
   get progress() {
@@ -358,6 +388,9 @@ export class Travellers {
   private routesLeft = ROUTES_PER_FRAME;
   private visitor: THREE.Vector3Like | null = null;
   private run: Run | null = null;
+  /** The visitor's flight's queue before boarding is called (front first), and the line it stands along (its tail to the desk). */
+  private readonly preQ: Record<Region, Walker[]> = { home: [], island: [] };
+  private readonly preLine: Record<Region, Line>;
   private night = -1;
   /** The crew's walk out to gate 3: when they next set off. */
   private crewDue = 20;
@@ -377,6 +410,8 @@ export class Travellers {
     this.obs = new Obstacles(ctx.world);
     this.home = homePlan(opts.home, this.obs);
     this.isle = islandPlan(opts.island, opts.palmCay, this.obs);
+    const queueLine = (tail: V2[]) => new Line([...tail.slice(1).reverse(), tail[0]].map((q) => ({ x: q.x, y: 0, z: q.z })));
+    this.preLine = { home: queueLine(this.home.tail), island: queueLine(this.isle.tail) };
     const exit = this.home.lanes[0].path;
     this.airsideZ = exit[exit.length - 1].z - 0.5;
 
@@ -492,6 +527,15 @@ export class Travellers {
     return where ? each : out;
   }
 
+  /** Dev: the visitor's flight's line (who's where along it), or ''. */
+  debugRun() {
+    const r = this.run;
+    if (!r) return '';
+    const who = r.members.map((w) => (w.onLine ? w.lineS.toFixed(0) : w.away ? 'A' : `~${w.doing}@${w.x.toFixed(0)},${w.z.toFixed(0)}${w.scripted ? 's' : ''}`)).join(' ');
+    if (!r.dumped && (r.dumped = true)) console.warn(r.line.pts.map((p, i) => `${i}:(${p.x.toFixed(1)},${p.y.toFixed(1)},${p.z.toFixed(1)}) s${r.line.cum[i].toFixed(1)}`).join(" "));
+    return `${r.kind} L${r.line.length.toFixed(0)} scan${r.scanS.toFixed(0)} n${r.members.length} q${r.queue.length} rel${r.released} join${r.joining} in${r.count} [${who}]`;
+  }
+
   /** Dev: where the first person doing something (`doing` contains `what`) is, and which way they face; or null. */
   whereIs(what: string) {
     for (const w of this.awake ? this.byRegion[this.awake] : []) if (!w.away && w.doing.includes(what)) return { x: w.x, y: w.y, z: w.z, heading: w.heading };
@@ -519,15 +563,28 @@ export class Travellers {
       // and walk it as move() would, pushed out of the colliders: does anything stop them?
       p.x = a.x;
       p.z = a.z;
-      for (const q of out) {
-        let steps = 0;
-        for (let d = Math.hypot(q.x - p.x, q.z - p.z); d > 0.3; d = Math.hypot(q.x - p.x, q.z - p.z)) {
-          const k = Math.min(0.1, d) / d;
+      for (let qi = 0; qi < out.length; qi++) {
+        const q = out[qi];
+        const next = qi < out.length - 1 ? out[qi + 1] : null;
+        // stuck: no headway (half a metre nearer) in 120 steps of 5 cm
+        let best = Infinity;
+        let since = 0;
+        // (corners are reached as move() reaches them: close, or early where the way on is clear)
+        for (let d = Math.hypot(q.x - p.x, q.z - p.z); d > (next ? 0.12 : 0.3); d = Math.hypot(q.x - p.x, q.z - p.z)) {
+          if (next && d < 0.9 && this.obs.clear(p.x, p.z, next.x, next.z, 0.3)) break;
+          const k = Math.min(0.05, d) / d;
           p.x += (q.x - p.x) * k;
           p.z += (q.z - p.z) * k;
           this.obs.push(p, 0.28);
-          if (++steps > 4000) {
-            fails.push(`${at} stuck at (${p.x.toFixed(1)}, ${p.z.toFixed(1)}) heading for (${q.x.toFixed(1)}, ${q.z.toFixed(1)})`);
+          if (d < best - 0.5) {
+            best = d;
+            since = 0;
+          } else if (++since > 120) {
+            const near = this.obs.list
+              .filter((o) => Math.hypot(o.x - p.x, o.z - p.z) < (o.kind === 'circle' ? o.r : Math.hypot(o.hx, o.hz)) + 1.5)
+              .map((o) => (o.kind === 'circle' ? `circle(${o.x.toFixed(1)},${o.z.toFixed(1)} r${o.r.toFixed(2)})` : `box(${o.x.toFixed(1)},${o.z.toFixed(1)} ${o.hx.toFixed(2)}x${o.hz.toFixed(2)} yaw${Math.atan2(o.s, o.c).toFixed(2)})`))
+              .join(' ');
+            fails.push(`${at} stuck at (${p.x.toFixed(1)}, ${p.z.toFixed(1)}) heading for (${q.x.toFixed(1)}, ${q.z.toFixed(1)}); near ${near}; route ${out.map((r) => `(${r.x.toFixed(1)}, ${r.z.toFixed(1)})`).join(' ')}`);
             return;
           }
         }
@@ -572,6 +629,13 @@ export class Travellers {
     for (const s of every(I.shallows, 8)) route('plaza → shallows', is, I.plaza, s.edge);
     for (const s of every(I.watch, 10)) route('plaza → watching', is, I.plaza, s);
     for (const s of every(I.wander, 8)) route('plaza → wander', is, I.plaza, s);
+    // and across the park: from one game to the next, from a bed to the sea, along the promenade
+    const ws = every(I.watch, 8);
+    ws.forEach((s, i) => route('game → game', is, s, ws[(i + 3) % ws.length]));
+    const bs = every(I.beds, 8);
+    bs.forEach((b, i) => route('bed → shallows', is, b.approach, I.shallows[(i * 5) % I.shallows.length].edge));
+    const ps = every(I.promenade, 6);
+    ps.forEach((p, i) => route('promenade → watching', is, p, ws[i % ws.length]));
     // and any asked for (dev: a walk seen to go wrong), with the corners found
     for (const [a, b] of probes) {
       const site = a.z > 20000 ? is : hs;
@@ -606,17 +670,23 @@ export class Travellers {
     const run = new Run('board', region, pts, scanS, region === 'home' ? this.home.gates[3].desk : null, this);
     this.run = run;
     const head = path[0];
-    // seated at the gate first (nearest the desk first), then whoever can be put there unseen
+    // those already queueing at the desk go first, in their order; then those seated at the gate
+    // (nearest the desk first), then whoever can be put there unseen
+    const queued = this.preQ[region].splice(0, n);
+    this.preQ[region].length = 0;
     const seats = region === 'home' ? this.home.gateSeats[3] : this.isle.lounge;
-    const pool = this.byRegion[region].filter((w) => w.role === 'traveller' || w.role === 'departing');
-    const atGate = pool.filter((w) => !w.away && w.claim && seats.includes(w.claim as Seat));
+    // (on Palm Cay, beachgoers going home too, put at the gate out of sight)
+    const pool = this.byRegion[region].filter((w) => w.role === 'traveller' || w.role === 'departing' || (w.role === 'stroller' && (w.away || !w.visible)));
+    // (those sat at the lounge's far end wait for the stragglers' call, in time for the next flight)
+    const atGate = pool.filter((w) => !queued.includes(w) && !w.away && w.claim && seats.includes(w.claim as Seat) && Math.hypot(w.x - head.x, w.z - head.z) < 14);
     atGate.sort((a, b) => Math.hypot(a.x - head.x, a.z - head.z) - Math.hypot(b.x - head.x, b.z - head.z));
-    const chosen = atGate.slice(0, n);
+    const chosen = [...queued, ...atGate.slice(0, n - queued.length)];
     const others = pool.filter((w) => !chosen.includes(w) && (w.away || !w.visible) && !w.line);
     for (const w of others) {
       if (chosen.length >= n) break;
       const s = this.freeSeat(seats, head, true);
-      if (!s) break;
+      // (not from the far end of the lounge: they would hold the boarding up)
+      if (!s || Math.hypot(s.x - head.x, s.z - head.z) > 14) break;
       this.reset(w);
       this.claimSpot(w, s);
       this.sitNow(w, s);
@@ -629,7 +699,16 @@ export class Travellers {
       w.onLine = false;
       w.lineV = 0;
       run.members.push(w);
-      w.task = this.boarder(w, run);
+      if (i < queued.length) {
+        // already standing in the queue: straight onto the line where they stand
+        w.lineS = Math.max(0, run.scanS - i * QUEUE_GAP);
+        w.onLine = true;
+        w.doing = 'queueing';
+        w.rig.setBase('stand');
+        run.queue.push(w);
+        this.alongLine(w, run);
+        w.task = this.onTheLine(w, run);
+      } else w.task = this.boarder(w, run);
     });
     // a cabin crew member greets them at the door; on the island a ramp agent minds the stairs
     run.greeter = this.doorCrew(region, run);
@@ -748,7 +827,9 @@ export class Travellers {
 
   /** Clear whatever they were doing (the spot they held, their pose, the line). */
   private reset(w: Walker) {
+    w.hurry = 1;
     this.release(w);
+    this.leavePreQueue(w);
     w.line = null;
     w.onLine = false;
     w.scripted = false;
@@ -768,6 +849,7 @@ export class Travellers {
 
   private vanish(w: Walker) {
     this.release(w);
+    this.leavePreQueue(w);
     w.away = true;
     w.visible = false;
     w.rig.root.visible = false;
@@ -1177,6 +1259,11 @@ export class Travellers {
           let q = this.rnd() * gw.reduce((a, b) => a + b, 0);
           g = others.find((_, i) => (q -= gw[i]) <= 0) ?? 1;
         }
+        if (g === 3 && this.preQueueOpen('home') && this.rnd() < 0.6) {
+          this.reset(w);
+          yield* this.preQueue(w, true);
+          return;
+        }
         const s = this.pick(H.gateSeats[g], f, 40);
         if (!s) break;
         this.claimSpot(w, s);
@@ -1290,8 +1377,8 @@ export class Travellers {
     }
     // gate 3 (the visitor's flight) gets the most, but not everyone: the other gates have flights too
     let at3 = 0;
-    for (const o of this.byRegion.home) if (o.doing === 'waiting for FA101') at3++;
-    const g = this.rnd() < 0.6 && at3 < this.byRegion.home.length * 0.3 ? 3 : this.otherGate();
+    for (const o of this.byRegion.home) if (o.doing === 'waiting for FA101' || o.doing === 'queueing early') at3++;
+    const g = this.rnd() < 0.6 && at3 < this.byRegion.home.length * 0.4 ? 3 : this.otherGate();
     const s = this.pick(H.gateSeats[g], g === 3 ? { x: -30, z: 528 } : null, 30);
     if (!s) {
       yield* this.leaveByGate(w, g);
@@ -1306,8 +1393,15 @@ export class Travellers {
   private *atGate(w: Walker, g: number): Task {
     w.doing = g === 3 ? 'waiting for FA101' : `waiting at gate ${g}`;
     if (g === 3) {
-      // (board() takes them from here; now and then someone gets up to stretch their legs)
-      yield* this.wait(90 + this.rnd() * 180);
+      // (board() takes them from here, or from the queue at the desk they go and stand in early;
+      // now and then someone gets up to stretch their legs)
+      for (let t = 90 + this.rnd() * 180; t > 0; t -= this.dt) {
+        if (this.preQueueOpen('home') && this.rnd() < this.dt / 25) {
+          yield* this.preQueue(w, false);
+          return;
+        }
+        yield;
+      }
       yield* this.standUp(w);
       yield* this.toGate(w);
       return;
@@ -1553,10 +1647,11 @@ export class Travellers {
     // the back of the queue: a pace behind everyone waiting to be scanned, and everyone on their way to it
     const back = () => run.scanS - (run.queue.length - run.released + run.joining) * QUEUE_GAP;
     // the nearer the desk, the sooner they stir; while the queue reaches back to its end the rest stay sat
-    yield* this.wait(Math.min(8, w.lineOrder * 0.35) + this.rnd() * 1.5);
+    yield* this.wait(Math.min(3, w.lineOrder * 0.15) + this.rnd() * 0.8);
     while (!run.finished && back() < 0) yield;
     if (run.finished) return;
     run.joining++;
+    w.hurry = 1.4;
     const place = back();
     if (w.claim && 'approach' in w.claim) yield* this.standUp(w);
     this.release(w);
@@ -1564,6 +1659,7 @@ export class Travellers {
     w.doing = 'queueing';
     yield* this.walkTo(w, this.tmp.x, this.tmp.z, 0.35);
     run.joining--;
+    w.hurry = 1;
     if (run.finished) return;
     // into the queue behind whoever is last in it now (runLines moves them from here)
     const last = run.queue[run.queue.length - 1];
@@ -1572,7 +1668,78 @@ export class Travellers {
     run.queue.push(w);
     w.onLine = true;
     this.alongLine(w, run);
+    yield* this.onTheLine(w, run);
+  }
+
+  /** On the line: runLines moves them, till they're aboard. */
+  private *onTheLine(w: Walker, run: Run): Task {
     while (w.line === run) yield;
+  }
+
+  // ---- the visitor's flight: the queue before it's called
+
+  private leavePreQueue(w: Walker) {
+    const q = this.preQ[w.region];
+    const i = q.indexOf(w);
+    if (i >= 0) q.splice(i, 1);
+  }
+
+  /** Room in the queue at the visitor's flight's desk (and no boarding under way)? */
+  private preQueueOpen(region: Region) {
+    return !this.run && this.preQ[region].length < PRE_QUEUE[region];
+  }
+
+  /**
+   * Up to the desk early, to stand in line before boarding's called: shuffling up as those ahead
+   * give up and sit down again, which they do after a while (board() takes them from here).
+   */
+  private *preQueue(w: Walker, instant: boolean): Task {
+    const q = this.preQ[w.region];
+    const line = this.preLine[w.region];
+    if (w.claim && 'approach' in w.claim && !instant) yield* this.standUp(w);
+    this.release(w);
+    q.push(w);
+    w.doing = 'queueing early';
+    let slot = -1;
+    let patience = 120 + this.rnd() * 150;
+    let fidget = 3 + this.rnd() * 5;
+    const to: V3 = { x: 0, y: 0, z: 0 };
+    while (q.includes(w)) {
+      const i = q.indexOf(w);
+      if (i !== slot) {
+        slot = i;
+        line.at(line.length - i * QUEUE_GAP, to);
+        const yaw = Number.isNaN(line.heading) ? w.heading : line.heading;
+        if (instant) {
+          this.placeAt(w, to.x, 0, to.z, yaw);
+          instant = false;
+        } else {
+          if (Math.hypot(to.x - w.x, to.z - w.z) > 1.2) yield* this.walkTo(w, to.x, to.z, 0.4);
+          if (!q.includes(w)) break;
+          yield* this.glide(w, { x: to.x, y: 0, z: to.z }, 0.7);
+        }
+        w.scripted = true;
+        w.faceHeading = yaw;
+        continue;
+      }
+      if ((fidget -= this.dt) <= 0) {
+        fidget = 4 + this.rnd() * 8;
+        const c = this.rnd();
+        if (c < 0.3) w.rig.play('Interact', 0.8);
+        else if (c < 0.5) w.rig.setBase(w.rig.pose === 'talk' ? 'stand' : 'talk');
+      }
+      if ((patience -= this.dt) <= 0) {
+        // tired of standing: back to a seat for a bit
+        this.leavePreQueue(w);
+        w.rig.setBase('stand');
+        w.scripted = false;
+        if (w.region === 'home') yield* this.toGate(w);
+        else yield* this.islandLounge(w);
+        return;
+      }
+      yield;
+    }
+    w.rig.setBase('stand');
   }
 
   private *deplaner(w: Walker, run: Run): Task {
@@ -1632,43 +1799,57 @@ export class Travellers {
       const aheadS = aheadOn ? ahead.lineS : Infinity;
       if (run.kind === 'deplane' && !w.onLine) {
         // out of the door when the one before is clear of it
-        if (aheadOn && (!ahead.onLine || aheadS < WALK_GAP + 0.4)) continue;
-        if (this.t - run.lastAppear < 0.75) continue;
+        if (aheadOn && (!ahead.onLine || aheadS < WALK_GAP + 0.15)) continue;
+        if (this.t - run.lastAppear < OUT_EVERY[run.region]) continue;
         run.lastAppear = this.t;
         this.appear(w);
         w.onLine = true;
         w.lineS = 0;
-        w.lineV = 0;
+        // (out of the door already walking)
+        w.lineV = 1.4;
         this.alongLine(w, run);
         w.heading = w.faceHeading ?? w.heading;
         continue;
       }
       if (!w.onLine) continue;
       // how far they may go: behind the one ahead, and (boarding) not past the desk till scanned
-      let cap = Math.min(L, aheadS - (w.lineS < run.scanS ? QUEUE_GAP : WALK_GAP));
-      if (run.kind === 'board' && i >= run.released) cap = Math.min(cap, run.scanS);
+      const behind = aheadS - (w.lineS < run.scanS ? QUEUE_GAP : WALK_GAP);
+      let cap = Math.min(L, behind);
+      // (following someone who is walking: keep up with them, not slow as if coming to a stop)
+      let leadV = aheadOn && cap === behind ? ahead.lineV : 0;
+      if (run.kind === 'board' && i >= run.released && run.scanS < cap) {
+        cap = run.scanS;
+        leadV = 0;
+      }
       run.line.at(w.lineS, this.tmp);
       const steep = Math.abs(run.line.slope);
       // escalators carry people standing; stairs are climbed (or come down) at a careful pace
       const riding = run.escalators && steep > 0.3;
-      const want = riding ? 0.75 : w.pace / (1 + 1.5 * steep);
+      // in the queue at their own pace; through the gate (or off the aircraft) briskly, walking up
+      // or down the escalator as it moves, and slower on the airstairs
+      const brisk = run.kind === 'deplane' ? w.lineS < run.clearS + 6 : w.lineS >= run.scanS;
+      // (and out of sight, where nobody can tell, quicker still: the bridge is long)
+      const pace = (brisk ? THREE.MathUtils.clamp(w.pace * 1.4, BRISK.min, BRISK.max) : w.pace) * (w.visible ? 1 : 1.8);
+      const want = riding ? ESCALATOR.speed + (brisk ? ESCALATOR.walk : 0) : pace / (1 + 2 * steep);
       const gap = cap - w.lineS;
-      const target = gap > 0.02 ? Math.min(want, 0.25 + gap * 1.6) : 0;
-      w.lineV += (target - w.lineV) * Math.min(1, dt * 5);
+      const target = gap > 0.02 ? Math.min(want, leadV + 0.35 + gap * 2.4) : Math.min(want, leadV);
+      w.lineV += (target - w.lineV) * Math.min(1, dt * 7);
       w.lineS = Math.max(w.lineS, Math.min(cap, w.lineS + w.lineV * dt));
       this.alongLine(w, run);
       // the legs: still when standing on an escalator, walking otherwise
-      w.speed = riding ? 0 : w.lineV;
+      w.speed = riding ? Math.max(0, w.lineV - ESCALATOR.speed) : w.lineV;
       // the desk: a pause, the boarding pass scanned, then through
-      if (run.kind === 'board' && i === run.released && w.lineS >= run.scanS - 0.05) {
+      if (run.kind === 'board' && i === run.released && w.lineS >= run.scanS - 0.3) {
         if (run.headAt < 0) {
           run.headAt = this.t;
           if (run.desk) w.face = run.desk;
           w.rig.play('Interact', 1.3);
         }
-        const interval = THREE.MathUtils.clamp(16 / run.members.length, 0.55, 1.1);
-        if (this.t - run.headAt > interval && this.t - run.lastRelease > interval) {
+        const interval = SCAN_EVERY;
+        if (this.t - run.headAt > SCAN_PAUSE && this.t - run.lastRelease > interval) {
           run.released++;
+          // (stepping off briskly, so the next in line can step up)
+          w.lineV = Math.max(w.lineV, 1.0);
           run.lastRelease = this.t;
           run.headAt = -1;
           w.face = null;
@@ -1747,6 +1928,11 @@ export class Travellers {
 
   private *islandDeparture(w: Walker, seed: boolean): Task {
     const I = this.isle;
+    if (seed && this.preQueueOpen('island') && this.rnd() < 0.4) {
+      this.reset(w);
+      yield* this.preQueue(w, true);
+      return;
+    }
     if (seed && this.rnd() < 0.75) {
       const s = this.pick(I.lounge, { x: -40, z: 40618 }, 40);
       if (s) {
@@ -1791,7 +1977,13 @@ export class Travellers {
 
   private *islandLounge(w: Walker): Task {
     w.doing = 'waiting for FA102';
-    yield* this.wait(120 + this.rnd() * 300);
+    for (let t = 120 + this.rnd() * 300; t > 0; t -= this.dt) {
+      if (this.preQueueOpen('island') && this.rnd() < this.dt / 30) {
+        yield* this.preQueue(w, false);
+        return;
+      }
+      yield;
+    }
     yield* this.standUp(w);
     yield* this.islandGate1(w);
   }
@@ -2050,12 +2242,12 @@ export class Travellers {
           // a corner is taken a little early, but only where the way on to the next is clear
           // (cutting it blind would walk them into the corner of whatever the route goes round)
           const next = last ? null : w.route[w.ri + 1];
-          if (d < (last ? w.arriveR : 0.25) || (next && d < 0.9 && this.obs.clear(w.x, w.z, next.x, next.z, 0.25))) {
+          if (d < (last ? w.arriveR : 0.12) || (next && d < 0.9 && this.obs.clear(w.x, w.z, next.x, next.z, 0.3))) {
             w.ri++;
             w.resetProgress();
           } else {
             w.progress(d, dt);
-            want = w.pace;
+            want = w.pace * w.hurry;
             if (last) want = Math.min(want, 0.3 + d * 1.2);
             vx = dx / d;
             vz = dz / d;
@@ -2134,15 +2326,18 @@ export class Travellers {
     const upright = w.pose === UPRIGHT && w.poseK >= 1;
     const sitting = w.rig.pose === 'sit';
     if (w.case) {
+      // the handle: pushed home when the case is laid on a belt, pulled up again when it's taken
+      const handleTo = !w.holding && w.caseAt?.flat ? 0 : 1;
+      w.handle += THREE.MathUtils.clamp(handleTo - w.handle, -this.dt * 2.5, this.dt * 2.5);
       if (w.holding && upright && !sitting) {
         // pulled along when walking (not when carried by an escalator), stood beside them otherwise
         const want = w.speed > 0.25 ? 1 : 0;
         w.caseState.pull += (want - w.caseState.pull) * Math.min(1, this.dt * 4);
-        this.luggage.set(w.case, pulledCase(w.rig, w.heading, w.floor, w.caseState, w.case.scale, w.posed, m));
+        this.luggage.set(w.case, pulledCase(w.rig, w.heading, w.floor, w.caseState, w.case.scale, w.posed, m), w.handle);
       } else if (w.caseAt) {
         const c = w.caseAt;
         // a case laid on its back rests on its shell (its origin is at the back, by the wheels)
-        this.luggage.set(w.case, standingCase(c.x, c.y + (c.flat ? CASE.d * w.case.scale : 0), c.z, c.yaw, c.flat, w.case.scale, m));
+        this.luggage.set(w.case, standingCase(c.x, c.y + (c.flat ? CASE.d * w.case.scale : 0), c.z, c.yaw, c.flat, w.case.scale, m), w.handle);
       } else this.luggage.hide(w.case);
     }
     if (w.bag) {

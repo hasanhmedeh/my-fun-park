@@ -53,6 +53,8 @@ export class WalkGrid {
   readonly nz: number;
   /** 1 where nobody can stand: outside the walk areas, or inside something solid. */
   private blocked: Uint8Array;
+  /** After `connect`: 1 for the cells reachable on foot from its seed (null until then). */
+  private reach: Uint8Array | null = null;
 
   constructor(
     readonly bounds: Rect,
@@ -78,11 +80,19 @@ export class WalkGrid {
       if (o.x + reach < bounds.x0 || o.x - reach > bounds.x1 || o.z + reach < bounds.z0 || o.z - reach > bounds.z1) continue;
       const [i0, i1] = this.span(o.x - reach - cell, o.x + reach + cell, this.bounds.x0, this.nx);
       const [k0, k1] = this.span(o.z - reach - cell, o.z + reach + cell, this.bounds.z0, this.nz);
+      // something thinner than a cell (a rail, a rope post) could fall between the cells' centres:
+      // those are tried at four more points across each cell too
+      const thin = (o.kind === 'circle' ? o.r : Math.min(o.hx, o.hz)) + margin < cell * 0.5;
+      const q = cell * 0.25;
       for (let k = k0; k <= k1; k++)
         for (let i = i0; i <= i1; i++) {
           const x = bounds.x0 + (i + 0.5) * cell;
           const z = bounds.z0 + (k + 0.5) * cell;
-          if (Obstacles.depth(o, x, z, margin, out) > 0) this.blocked[k * this.nx + i] = 1;
+          if (
+            Obstacles.depth(o, x, z, margin, out) > 0 ||
+            (thin && (Obstacles.depth(o, x - q, z - q, margin, out) > 0 || Obstacles.depth(o, x + q, z - q, margin, out) > 0 || Obstacles.depth(o, x - q, z + q, margin, out) > 0 || Obstacles.depth(o, x + q, z + q, margin, out) > 0))
+          )
+            this.blocked[k * this.nx + i] = 1;
         }
     }
     ensureWork(this.nx * this.nz);
@@ -117,9 +127,53 @@ export class WalkGrid {
     for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) this.blocked[k * this.nx + i] = on ? 1 : 0;
   }
 
+  /**
+   * Flood the free cells reachable on foot from (x, z) (as the search steps: no cutting corners),
+   * so spots walled off in a pocket of their own can be told apart (`linked`, `nearestLinked`).
+   */
+  connect(x: number, z: number) {
+    const s0 = this.nearestFree(x, z, 4);
+    const reach = new Uint8Array(this.nx * this.nz);
+    this.reach = reach;
+    if (!s0) return;
+    const nx = this.nx;
+    const stack = new Int32Array(this.nx * this.nz);
+    let n = 0;
+    const s = this.index(s0.x, s0.z);
+    reach[s] = 1;
+    stack[n++] = s;
+    while (n > 0) {
+      const c = stack[--n];
+      const ix = c % nx;
+      const iz = (c - ix) / nx;
+      for (let d = 0; d < 8; d++) {
+        const jx = ix + DX[d];
+        const jz = iz + DZ[d];
+        if (jx < 0 || jz < 0 || jx >= nx || jz >= this.nz) continue;
+        const m = jz * nx + jx;
+        if (this.blocked[m] || reach[m]) continue;
+        if (d >= 4 && (this.blocked[iz * nx + jx] || this.blocked[jz * nx + ix])) continue;
+        reach[m] = 1;
+        stack[n++] = m;
+      }
+    }
+  }
+
+  /** Free and reachable from `connect`'s seed (just free, before it's called). */
+  linked(x: number, z: number) {
+    const c = this.index(x, z);
+    return c >= 0 && !this.blocked[c] && (!this.reach || this.reach[c] === 1);
+  }
+
+  /** The nearest linked cell's centre within `maxR` metres, or null. */
+  nearestLinked(x: number, z: number, maxR = 4): V2 | null {
+    return this.nearestFree(x, z, maxR, this.reach);
+  }
+
   /** The nearest free cell's centre within `maxR` metres (rings outward), or null. */
-  nearestFree(x: number, z: number, maxR = 4): V2 | null {
-    if (this.free(x, z)) return { x, z };
+  nearestFree(x: number, z: number, maxR = 4, within: Uint8Array | null = null): V2 | null {
+    const c0 = this.index(x, z);
+    if (c0 >= 0 && !this.blocked[c0] && (!within || within[c0])) return { x, z };
     const c = this.cell;
     const ci = Math.floor((x - this.bounds.x0) / c);
     const ck = Math.floor((z - this.bounds.z0) / c);
@@ -130,7 +184,7 @@ export class WalkGrid {
       for (let k = ck - r; k <= ck + r; k++)
         for (let i = ci - r; i <= ci + r; i++) {
           if (Math.max(Math.abs(i - ci), Math.abs(k - ck)) !== r) continue;
-          if (i < 0 || k < 0 || i >= this.nx || k >= this.nz || this.blocked[k * this.nx + i]) continue;
+          if (i < 0 || k < 0 || i >= this.nx || k >= this.nz || this.blocked[k * this.nx + i] || (within && !within[k * this.nx + i])) continue;
           const px = this.bounds.x0 + (i + 0.5) * c;
           const pz = this.bounds.z0 + (k + 0.5) * c;
           const d = (px - x) ** 2 + (pz - z) ** 2;
@@ -159,8 +213,10 @@ export class WalkGrid {
    */
   route(ax: number, az: number, bx: number, bz: number, out: V2[], limit = 400000): boolean {
     const a = this.nearestFree(ax, az, 3);
-    const b = this.nearestFree(bx, bz, 4);
-    if (!a || !b) return false;
+    if (!a) return false;
+    // (from the main walk, to the nearest cell joined to it: not into a pocket walled off by itself)
+    const b = this.reach && this.reach[this.index(a.x, a.z)] ? this.nearestLinked(bx, bz, 4) : this.nearestFree(bx, bz, 4);
+    if (!b) return false;
     const s = this.index(a.x, a.z);
     const t = this.index(b.x, b.z);
     if (s === t) {
