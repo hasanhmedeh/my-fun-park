@@ -686,7 +686,7 @@ export class Travellers {
       if (chosen.length >= n) break;
       const s = this.freeSeat(seats, head, true);
       // (not from the far end of the lounge: they would hold the boarding up)
-      if (!s || Math.hypot(s.x - head.x, s.z - head.z) > 14) break;
+      if (!s || Math.hypot(s.x - head.x, s.z - head.z) > (region === 'home' ? 14 : 30)) break;
       this.reset(w);
       this.claimSpot(w, s);
       this.sitNow(w, s);
