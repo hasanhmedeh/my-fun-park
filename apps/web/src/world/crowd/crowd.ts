@@ -3,7 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { staticBox, std, type Ctx } from '../context';
 import type { Coaster } from '../attractions/coaster';
 import type { Striker } from '../attractions/striker';
-import { DISTRICTS, LAYOUT, PARK, PLAZAS, PROMENADE } from '../layout';
+import { FAIR_DISTRICTS, LAYOUT, PARK, PLAZAS, PROMENADE } from '../layout';
 import { mulberry } from '../random';
 import { nearTrack } from '../rides';
 import { NavGraph } from './nav';
@@ -380,8 +380,8 @@ export class Crowd {
         spots.push({ x, z, heading: Math.atan2(nx, nz) });
       }
     }
-    // a pair at each district's plaza, facing it
-    for (const { plaza: [px, pz] } of Object.values(DISTRICTS))
+    // a pair at each of the fair's district plazas, facing it (the airport and Palm Cay have people of their own)
+    for (const { plaza: [px, pz] } of FAIR_DISTRICTS)
       for (const a of [(3 * Math.PI) / 4, -Math.PI / 4]) {
         const x = px + Math.cos(a) * 10.6;
         const z = pz + Math.sin(a) * 10.6;

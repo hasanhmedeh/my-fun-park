@@ -4,7 +4,7 @@ import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { std, staticCylinder, type Ctx } from './context';
 import { Grass } from './grass';
-import { DISTRICTS, FENCE_GAP, flipLocal, GROUND, inValley, LAYOUT, MIDWAY, onFootprint, onMuseum, onPath, PARK, parkDistance, PATHS, PLAZAS, VALLEY, WHEEL_LAWN, WHEEL_ROAD, type DistrictId } from './layout';
+import { DISTRICTS, FAIR_DISTRICTS, FENCE_GAP, flipLocal, GROUND, inValley, LAYOUT, MIDWAY, onFootprint, onMuseum, onPath, PARK, parkDistance, PATHS, PLAZAS, VALLEY, WHEEL_LAWN, WHEEL_ROAD, type DistrictId } from './layout';
 import type { Quality } from './quality';
 import { mulberry } from './random';
 import { detailNormalTexture, glowTexture, groundTexture, hdr, PALETTE, lawnPatchTexture, poolTexture, stripeTexture } from './textures';
@@ -222,7 +222,8 @@ export class Environment {
     // ---------- Ground ----------
     // the park's lawn with its paths and plazas, each district's colour set into its plaza
     const WORLD = GROUND.size;
-    const inlays = Object.values(DISTRICTS).map(({ plaza: [x, z], color }) => ({ x, z, r: 6.2, color }));
+    // (only the fair's own districts: the airport and Palm Cay have paving of their own)
+    const inlays = FAIR_DISTRICTS.map(({ plaza: [x, z], color }) => ({ x, z, r: 6.2, color }));
     const ground = groundTexture(ctx.mobile || q.tier === 'lowest' ? 2048 : 4096, GROUND, PATHS, PLAZAS, inlays);
     const detail = detailNormalTexture(512);
     detail.repeat.set(90 * (WORLD / 260), 90 * (WORLD / 260));
@@ -540,7 +541,7 @@ export class Environment {
       const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
       add(PARK.x + Math.cos(a) * 16, PARK.z + Math.sin(a) * 16);
     }
-    for (const { plaza: [x, z] } of Object.values(DISTRICTS))
+    for (const { plaza: [x, z] } of FAIR_DISTRICTS)
       for (const a of [Math.PI / 4, (5 * Math.PI) / 4]) add(x + Math.cos(a) * 9.4, z + Math.sin(a) * 9.4);
     // …and on along the road out to the giant wheel
     for (let z = PARK.z - PARK.r - 6; z > WHEEL_ROAD.end + 4; z -= 12) spots.push([LAYOUT.ferris.x - 5.2, z], [LAYOUT.ferris.x + 5.2, z]);

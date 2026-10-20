@@ -1,0 +1,273 @@
+/* Beach Volley's HUD (world/attractions/island/volley.ts): the round's numbers along the top, the
+   timing meter above the action button, a hint, toasts for each rally, the camera and the keys.
+   Everything here is self-contained (the colours fall back when the park's variables are absent). */
+
+.vb-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: var(--cream, #fff5e3);
+  font-family: var(--body, 'DM Sans', system-ui, sans-serif);
+  z-index: 3;
+}
+.vb-hud[hidden] {
+  display: none;
+}
+
+.vb-top {
+  position: absolute;
+  top: max(14px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: 18px;
+  background: rgba(29, 18, 56, 0.74);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow, 0 18px 40px -12px rgba(18, 8, 40, 0.55));
+}
+.vb-top div {
+  min-width: 58px;
+  padding: 2px 8px;
+  text-align: center;
+}
+.vb-top span {
+  display: block;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+.vb-top b {
+  font: 400 1.55rem/1.05 var(--display, 'Lilita One', 'Arial Rounded MT Bold', system-ui, sans-serif);
+  font-variant-numeric: tabular-nums;
+}
+.vb-top .vb-score b {
+  color: var(--mustard, #ffc23d);
+}
+.vb-top .vb-hot b {
+  color: var(--candy, #ff4d6d);
+}
+
+.vb-hint {
+  position: absolute;
+  top: calc(max(14px, env(safe-area-inset-top)) + 64px);
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 5px 14px;
+  border-radius: 99px;
+  background: rgba(29, 18, 56, 0.55);
+  font-size: 0.88rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.vb-hint:empty {
+  display: none;
+}
+.vb-hint kbd {
+  display: inline-block;
+  min-width: 1.4em;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: var(--cream, #fff5e3);
+  color: var(--ink, #1d1238);
+  font: 700 0.8rem/1.45 var(--body, system-ui, sans-serif);
+  text-align: center;
+}
+
+.vb-meter {
+  position: absolute;
+  left: 50%;
+  bottom: max(110px, calc(env(safe-area-inset-bottom) + 96px));
+  width: min(440px, 84vw);
+  transform: translateX(-50%);
+  padding: 8px 14px 10px;
+  border-radius: 16px;
+  background: rgba(29, 18, 56, 0.74);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow, 0 18px 40px -12px rgba(18, 8, 40, 0.55));
+}
+.vb-meter[hidden] {
+  display: none;
+}
+.vb-meter p {
+  margin: 0 0 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.vb-meter p b {
+  font: 400 1.15rem/1 var(--display, 'Lilita One', 'Arial Rounded MT Bold', system-ui, sans-serif);
+  letter-spacing: 0.04em;
+  color: var(--mustard, #ffc23d);
+}
+.vb-bar {
+  position: relative;
+  height: 20px;
+  border-radius: 99px;
+  background: rgba(255, 245, 227, 0.14);
+  overflow: hidden;
+}
+.vb-bar i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+.vb-bar .vb-ok {
+  background: rgba(46, 196, 182, 0.42);
+}
+.vb-bar .vb-good {
+  background: rgba(255, 194, 61, 0.7);
+}
+.vb-bar .vb-perfect {
+  background: var(--candy, #ff4d6d);
+  box-shadow: 0 0 12px rgba(255, 77, 109, 0.8);
+}
+.vb-bar em {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 5px;
+  margin-left: -2.5px;
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(29, 18, 56, 0.85);
+}
+.vb-meter.is-done em {
+  background: var(--mustard, #ffc23d);
+}
+
+.vb-grade {
+  position: absolute;
+  left: 50%;
+  bottom: calc(max(110px, calc(env(safe-area-inset-bottom) + 96px)) + 78px);
+  margin: 0;
+  transform: translateX(-50%);
+  font: 400 2rem/1 var(--display, 'Lilita One', 'Arial Rounded MT Bold', system-ui, sans-serif);
+  text-shadow: 0 3px 0 rgba(29, 18, 56, 0.8), 0 6px 18px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+  animation: vb-pop 0.5s ease-out;
+}
+.vb-grade[hidden] {
+  display: none;
+}
+.vb-grade.is-perfect {
+  color: var(--candy, #ff4d6d);
+}
+.vb-grade.is-good {
+  color: var(--mustard, #ffc23d);
+}
+.vb-grade.is-ok {
+  color: var(--teal, #2ec4b6);
+}
+.vb-grade.is-miss {
+  color: #c9c3d6;
+}
+
+.vb-toast {
+  position: absolute;
+  left: 50%;
+  top: calc(max(14px, env(safe-area-inset-top)) + 104px);
+  margin: 0;
+  padding: 8px 20px 10px;
+  transform: translateX(-50%);
+  border-radius: 18px;
+  background: var(--mustard, #ffc23d);
+  color: var(--ink, #1d1238);
+  font: 400 1.5rem/1.1 var(--display, 'Lilita One', 'Arial Rounded MT Bold', system-ui, sans-serif);
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: var(--shadow, 0 18px 40px -12px rgba(18, 8, 40, 0.55));
+  animation: vb-pop 0.45s ease-out;
+}
+.vb-toast small {
+  display: block;
+  margin-top: 2px;
+  font: 700 0.85rem/1.2 var(--body, system-ui, sans-serif);
+  opacity: 0.8;
+}
+.vb-toast.is-lost {
+  background: rgba(29, 18, 56, 0.86);
+  color: var(--cream, #fff5e3);
+}
+.vb-toast[hidden] {
+  display: none;
+}
+
+.vb-keys,
+.vb-cam {
+  position: absolute;
+  left: 16px;
+  margin: 0;
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: rgba(29, 18, 56, 0.55);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+.vb-cam {
+  bottom: max(16px, env(safe-area-inset-bottom));
+}
+.vb-keys {
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 30px);
+  opacity: 0.85;
+}
+.vb-keys kbd {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: rgba(255, 245, 227, 0.2);
+  font: inherit;
+}
+
+@keyframes vb-pop {
+  0% {
+    transform: translateX(-50%) scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: translateX(-50%) scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+@media (max-width: 640px) {
+  .vb-top {
+    gap: 0;
+    padding: 4px 4px;
+  }
+  .vb-top div {
+    min-width: 46px;
+    padding: 2px 4px;
+  }
+  .vb-top b {
+    font-size: 1.2rem;
+  }
+  .vb-hint {
+    font-size: 0.76rem;
+    top: calc(max(14px, env(safe-area-inset-top)) + 52px);
+    white-space: normal;
+    width: max-content;
+    max-width: 86vw;
+    text-align: center;
+  }
+  .vb-toast {
+    font-size: 1.3rem;
+    white-space: normal;
+    max-width: 86vw;
+  }
+  .vb-keys {
+    display: none;
+  }
+}

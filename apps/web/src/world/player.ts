@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import type { Ctx } from './context';
 import type { Input } from './input';
-import { clampToGrounds, LAYOUT } from './layout';
+import { clampToGrounds, LAYOUT, respawnFor } from './layout';
 import type { PersonRig } from './crowd/people';
 import { perks } from './perks';
 
@@ -40,6 +40,8 @@ export class Player {
   private lastImpact = 0;
   private vel = new THREE.Vector2();
   private lean = new THREE.Group();
+  /** True while a ride carries the visitor (see carry): no walking, no gravity, no keeping to the ground. */
+  private carried = false;
 
   constructor(
     private ctx: Ctx,
@@ -74,13 +76,51 @@ export class Player {
     this.rig.setGlow(k);
   }
 
-  reset(x: number, z: number, heading: number) {
-    this.body.position.set(x, BODY_R + 0.05, z);
+  /** Puts the visitor on their feet at (x, z) facing `heading`, on a floor `floorY` above the ground (a terminal's). */
+  reset(x: number, z: number, heading: number, floorY = 0) {
+    this.release();
+    this.body.position.set(x, floorY + BODY_R + 0.05, z);
     this.body.velocity.setZero();
     this.vel.set(0, 0);
     this.heading = heading;
     this.speed = 0;
     this.sync();
+  }
+
+  /**
+   * A ride carries the visitor (the SkyLink's train, a scripted walk up a jet bridge): each frame
+   * it says where their feet are and which way they face, and `speed` drives the walk cycle (0:
+   * standing). Until `release()` (or a `reset`) nothing keeps them to the ground, gravity leaves
+   * them be and their own input doesn't move them.
+   */
+  carry(x: number, feetY: number, z: number, heading: number, speed = 0) {
+    if (!this.carried) {
+      this.carried = true;
+      this.body.type = CANNON.Body.KINEMATIC;
+      this.body.collisionResponse = false;
+      this.move = null;
+    }
+    this.body.position.set(x, feetY + BODY_R, z);
+    this.body.velocity.setZero();
+    this.vel.set(0, 0);
+    this.heading = heading;
+    this.speed = speed;
+    this.sync();
+  }
+
+  /** The ride's over: the visitor walks (and falls) on their own again, from wherever it left them. */
+  release() {
+    if (!this.carried) return;
+    this.carried = false;
+    this.body.type = CANNON.Body.DYNAMIC;
+    this.body.collisionResponse = true;
+    this.body.velocity.setZero();
+    this.body.wakeUp();
+  }
+
+  /** True while a ride carries the visitor (see carry). */
+  get isCarried() {
+    return this.carried;
   }
 
   get position() {
@@ -126,6 +166,11 @@ export class Player {
 
   update(dt: number, input: Input) {
     const b = this.body;
+    if (this.carried) {
+      // the ride sets the pose: the visitor only animates (walking along with it, or standing)
+      this.animate(dt);
+      return;
+    }
     // camera-relative movement: W = away from the camera, D = to its right
     let mx = 0;
     let mz = 0;
@@ -175,14 +220,19 @@ export class Player {
     b.velocity.z = this.vel.y;
     this.speed = this.vel.length();
 
-    // keep inside the fair (or on the road out to the giant wheel)
+    // keep to the walkable ground of the landmass the visitor is on (the fair and the roads out of
+    // it, the airport, Palm Cay), never across the sea
     const clamped = clampToGrounds(b.position.x, b.position.z);
     if (clamped) {
       b.position.x = clamped[0];
       b.position.z = clamped[1];
       this.vel.multiplyScalar(0.3);
     }
-    if (b.position.y < -5) this.reset(LAYOUT.spawn.x, LAYOUT.spawn.z, 0);
+    // a fall through the world puts them back on their feet in the same region
+    if (b.position.y < -5) {
+      const r = respawnFor(b.position.x, b.position.z);
+      this.reset(r.x, r.z, r.heading);
+    }
 
     this.animate(dt);
     this.ctx.sfx.setEngine(0, false);

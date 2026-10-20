@@ -9,6 +9,12 @@ export class Input {
   private stick = { x: 0, y: 0, active: false };
   private handlers: Record<string, (() => void)[]> = {};
   private _paused = false;
+  private keyHandlers = new Map<string, ((e: KeyboardEvent) => void)[]>();
+  /**
+   * Extra key codes whose browser default is cancelled (PageUp, '/', the quote key...). The flight fills this on
+   * entry and clears it on exit, so page scrolling and quick-find behave as usual everywhere else.
+   */
+  readonly capture = new Set<string>();
 
   constructor(private touchEls: { stick: HTMLElement; knob: HTMLElement; action: HTMLElement; lift: HTMLElement }) {
     window.addEventListener('keydown', this.onKeyDown);
@@ -46,6 +52,26 @@ export class Input {
     (this.handlers[evt] ??= []).push(fn);
   }
 
+  /** Whether a physical key (KeyboardEvent.code) is held right now; always false while paused. */
+  held(code: string): boolean {
+    return this.keys.has(code);
+  }
+
+  /**
+   * Calls fn on the first press of a physical key (never on auto-repeat), behind the same filters as the named
+   * events: nothing while paused, typing into a form field or using a dialog. Returns a function that unsubscribes.
+   */
+  onKey(code: string, fn: (e: KeyboardEvent) => void): () => void {
+    let list = this.keyHandlers.get(code);
+    if (!list) this.keyHandlers.set(code, (list = []));
+    const own = list;
+    own.push(fn);
+    return () => {
+      const i = own.indexOf(fn);
+      if (i >= 0) own.splice(i, 1);
+    };
+  }
+
   private emit(evt: string) {
     this.handlers[evt]?.forEach((f) => f());
   }
@@ -56,7 +82,7 @@ export class Input {
     // typing into a form field, or using the time panel, a dialog (sign up) or the booth's shop, isn't playing the game
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.closest?.('.time-panel, #clock, dialog, .shop'))) return;
     const driving = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyZ', 'KeyQ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'];
-    if (driving.includes(e.code)) e.preventDefault();
+    if (driving.includes(e.code) || this.capture.has(e.code)) e.preventDefault();
     if (e.repeat) {
       this.keys.add(e.code);
       return;
@@ -80,6 +106,7 @@ export class Input {
       this.emit('escape');
     }
     if (e.code === 'KeyI') this.emit('info');
+    this.keyHandlers.get(e.code)?.forEach((f) => f(e));
   };
 
   private setupStick() {

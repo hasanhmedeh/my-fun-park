@@ -1,8 +1,7 @@
 import { isPlot, PLOT_IDS, plotNumber, type PlotId } from '../account/api';
-import { DISTRICTS, FLIP_YAW, LAYOUT, MUSEUM, museumPoint, PARK, parkBounds, PATHS, PLAZAS, plotPoint, VALLEY, ZONES, type DistrictId, type ZoneId } from './layout';
-import { FALCON_TRACK, STACK_TRACK } from './rides';
-import { CIRCUIT, CIRCUIT_BOUNDS, circuitPoint, ROAD_HALF, START_S, WALL } from './attractions/speedway-track';
-import { START_S as TRAIL_START, TRAIL, TRAIL_BOUNDS, TRAIL_HALF, trailPoint, WALL as TRAIL_WALL } from './attractions/trail-track';
+import { DISTRICTS, VALLEY, ZONES, type DistrictId, type ZoneId } from './layout';
+import { AIRPORT_MARKS, fairBounds, paintAircraft, paintFix, paintTrain, paintVisitor, pushMapShapes, setValleyTrack, type MapShape } from './map-paint';
+import { drawTiles, mapTiles } from './map-tiles';
 import { PALETTE } from './textures';
 
 type Place = { icon: string; label: string; blurb: string };
@@ -26,6 +25,16 @@ const PLACES: Record<ZoneId, Place> = {
   ideas: { icon: '💡', label: 'Idea Box', blurb: 'Tell us what you’d love to see in the fair' },
   museum: { icon: '🏛️', label: 'Career Museum', blurb: 'Hasan Hmedeh’s work from 2019 to today, in framed pictures' },
   workshop: { icon: '🛠️', label: 'Coaster Workshop', blurb: 'Build your own coaster, and send it in to run here in the valley' },
+  skylink: { icon: '🚝', label: 'SkyLink', blurb: 'The free people mover: two minutes over the Rally Trail to the airport' },
+  flight: { icon: '✈️', label: 'Funfair Air · Gate 3', blurb: 'Book flight FA101 and fly the A320neo yourself to Palm Cay, 40 km south' },
+  airport: { icon: '🛫', label: 'Funfair International', blurb: 'The airport on the coast: check-in, shops and the gates' },
+  skylinkBack: { icon: '🚝', label: 'SkyLink to the fair', blurb: 'The people mover back to the fair’s main gate' },
+  flightBack: { icon: '✈️', label: 'Funfair Air · Palm Cay', blurb: 'Book flight FA102 and fly yourself home to the fair' },
+  palmcay: { icon: '🌴', label: 'Palm Cay arrivals', blurb: 'The island’s arrivals plaza, at the top of the Palm Promenade' },
+  jetski: { icon: '🚤', label: 'Jet-Ski Race', blurb: 'Three laps of the lagoon against four rivals, with jumps' },
+  slides: { icon: '🌊', label: 'Splash Tower', blurb: 'Three water slides from a 28 m tower: Kamikaze, Typhoon and the Lazy Loop' },
+  cannons: { icon: '🏴‍☠️', label: 'Pirate Cannons', blurb: 'Man the fort’s cannons and sink the pirate ships' },
+  volley: { icon: '🏐', label: 'Beach Volley', blurb: 'Serve, spike and knock the coconuts off their stand' },
   // each plot is named after the coaster running on it (see setPlotPlace)
   ...(Object.fromEntries(PLOT_IDS.map((id) => [id, { icon: '🎢', label: `Plot ${plotNumber(id)}`, blurb: 'Waiting for a coaster' }])) as Record<PlotId, Place>),
 };
@@ -39,340 +48,93 @@ const runningPlots = new Set<PlotId>();
 /** True for every place the maps show (a plot only while a coaster runs there). */
 export const onMap = (id: ZoneId) => !isPlot(id) || runningPlots.has(id);
 
-/** The released coasters' tracks, seen from above (world x, z), by plot. */
-const valleyTracks = new Map<PlotId, { pts: [number, number][]; color: string }>();
+/** Creators' Valley's ground, where a plot's coaster is painted. */
+const valleyBox = () => {
+  const [v] = VALLEY.lawns;
+  return { x0: v.x0, x1: v.x1, z0: v.z0, z1: v.z1 };
+};
 
 /** A coaster opened on a plot (or the plot emptied): its place on the maps and its track from above. */
 export function setPlotPlace(id: PlotId, coaster: { name: string; creator: string; track: [number, number][]; color: string } | null) {
   const p = MAP_PLACES.find((m) => m.id === id)!;
   p.label = coaster?.name ?? `Plot ${plotNumber(id)}`;
   p.blurb = coaster ? `A coaster by @${coaster.creator}, built in the Coaster Workshop` : 'Waiting for a coaster';
-  if (coaster) {
-    runningPlots.add(id);
-    valleyTracks.set(id, { pts: coaster.track, color: coaster.color });
-  } else {
-    runningPlots.delete(id);
-    valleyTracks.delete(id);
-  }
+  if (coaster) runningPlots.add(id);
+  else runningPlots.delete(id);
+  setValleyTrack(id, coaster ? { pts: coaster.track, color: coaster.color } : null);
+  mapTiles.invalidate(valleyBox());
 }
 if (import.meta.env.DEV && new Set(MAP_PLACES.map((p) => p.id)).size !== Object.keys(PLACES).length)
   console.warn('Every zone belongs in exactly one district (DISTRICTS in layout.ts), or the map leaves it out.');
 
-/** Pixels per metre in the pre-rendered map sheet. */
-const SHEET_SCALE = 3;
-/** Metres visible from the centre to the edge of the minimap. */
-const VIEW = 55;
-
-/** The area worth mapping: the park itself plus both coaster tracks, the kart circuit, the Rally Trail and Creators' Valley. */
-export function fairBounds() {
-  const c = CIRCUIT_BOUNDS;
-  const t = TRAIL_BOUNDS;
-  const p = parkBounds();
-  const [v] = VALLEY.lawns;
-  let x0 = Math.min(p.x0, c.x0, t.x0, v.x0), x1 = Math.max(p.x1, c.x1, t.x1), z0 = Math.min(p.z0, c.z0, t.z0, v.z0), z1 = Math.max(p.z1, c.z1, t.z1, v.z1);
-  for (const d of [STACK_TRACK, FALCON_TRACK])
-    for (const p of d.pos) {
-      x0 = Math.min(x0, p.x);
-      x1 = Math.max(x1, p.x);
-      z0 = Math.min(z0, p.z);
-      z1 = Math.max(z1, p.z);
-    }
-  return { x0, z0, x1, z1 };
-}
-
 /**
- * Paints the fair from above: lawn, paths, plazas, coaster tracks and the big rides.
- * `X` / `Z` map world metres to canvas pixels and `s` is pixels per metre.
- * The caller fills the desert background first.
+ * Adds buildings to both maps (the airside's hangars and tower, the cargo sheds…), from the
+ * module that builds them; the tiles under them are painted again.
  */
-export function paintFair(g: CanvasRenderingContext2D, X: (x: number) => number, Z: (z: number) => number, s: number) {
-  // Creators' Valley's lawn out past the west fence, and its eight plots (the road is one of the paths)
-  g.fillStyle = '#5c9a4e';
-  for (const v of VALLEY.lawns) g.fillRect(X(v.x0), Z(v.z0), (v.x1 - v.x0) * s, (v.z1 - v.z0) * s);
-  for (let n = 1; n <= PLOT_IDS.length; n++) {
-    const a = plotPoint(n, -VALLEY.size / 2, -VALLEY.size / 2);
-    const b = plotPoint(n, VALLEY.size / 2, VALLEY.size / 2);
-    g.fillStyle = 'rgba(29, 18, 56, 0.12)';
-    g.fillRect(X(Math.min(a.x, b.x)), Z(Math.min(a.z, b.z)), VALLEY.size * s, VALLEY.size * s);
-    g.strokeStyle = 'rgba(224, 90, 168, 0.7)';
-    g.lineWidth = Math.max(1, 0.8 * s);
-    g.setLineDash([3 * s, 2 * s]);
-    g.strokeRect(X(Math.min(a.x, b.x)), Z(Math.min(a.z, b.z)), VALLEY.size * s, VALLEY.size * s);
-    g.setLineDash([]);
-  }
-
-  // the fair's lawn
-  g.fillStyle = '#5c9a4e';
-  g.beginPath();
-  g.arc(X(PARK.x), Z(PARK.z), PARK.r * s, 0, Math.PI * 2);
-  g.fill();
-  g.strokeStyle = 'rgba(29, 18, 56, 0.55)';
-  g.lineWidth = 1.2 * s;
-  g.stroke();
-
-  // footpaths + plazas
-  g.strokeStyle = g.fillStyle = '#efdcb6';
-  g.lineCap = g.lineJoin = 'round';
-  for (const p of PATHS) {
-    g.lineWidth = p.width * s;
-    g.beginPath();
-    p.points.forEach(([x, z], i) => (i ? g.lineTo(X(x), Z(z)) : g.moveTo(X(x), Z(z))));
-    g.stroke();
-  }
-  for (const [x, z, r] of PLAZAS) {
-    g.beginPath();
-    g.arc(X(x), Z(z), r * s, 0, Math.PI * 2);
-    g.fill();
-  }
-  // each district's colour, round its plaza (as it's set into the paving)
-  for (const { plaza: [x, z], color } of Object.values(DISTRICTS)) {
-    g.strokeStyle = color;
-    g.lineWidth = Math.max(1, 1.1 * s);
-    g.beginPath();
-    g.arc(X(x), Z(z), 6.2 * s, 0, Math.PI * 2);
-    g.stroke();
-  }
-
-  // the kart circuit outside the south-west fence: its lawn, the asphalt and the start line
-  const lap = (d: number) => {
-    g.beginPath();
-    for (let i = 0; i <= CIRCUIT.n; i++) {
-      const p = circuitPoint(i * CIRCUIT.ds, d);
-      if (i) g.lineTo(X(p.x), Z(p.z));
-      else g.moveTo(X(p.x), Z(p.z));
-    }
-    g.closePath();
-  };
-  g.fillStyle = g.strokeStyle = '#5c9a4e';
-  g.lineWidth = (WALL + 3) * 2 * s;
-  lap(0);
-  g.fill();
-  g.stroke();
-  for (const [stroke, width] of [
-    ['rgba(29, 18, 56, 0.6)', ROAD_HALF * 2 + 2],
-    ['#4a4752', ROAD_HALF * 2],
-  ] as const) {
-    g.strokeStyle = stroke;
-    g.lineWidth = Math.max(width * s, 2);
-    lap(0);
-    g.stroke();
-  }
-  const a = circuitPoint(START_S, ROAD_HALF);
-  const b = circuitPoint(START_S, -ROAD_HALF);
-  g.strokeStyle = '#fff';
-  g.lineWidth = Math.max(1.6 * s, 1.5);
-  g.beginPath();
-  g.moveTo(X(a.x), Z(a.z));
-  g.lineTo(X(b.x), Z(b.z));
-  g.stroke();
-
-  // the Rally Trail outside the south fence: its meadow, the dirt and the start line
-  const loop = (d: number) => {
-    g.beginPath();
-    for (let i = 0; i <= TRAIL.n; i++) {
-      const p = trailPoint(i * TRAIL.ds, d);
-      if (i) g.lineTo(X(p.x), Z(p.z));
-      else g.moveTo(X(p.x), Z(p.z));
-    }
-    g.closePath();
-  };
-  g.fillStyle = g.strokeStyle = '#5c9a4e';
-  g.lineWidth = (TRAIL_WALL + 2) * 2 * s;
-  loop(0);
-  g.fill();
-  g.stroke();
-  for (const [stroke, width] of [
-    ['rgba(29, 18, 56, 0.55)', TRAIL_HALF * 2 + 2],
-    ['#a07c52', TRAIL_HALF * 2],
-  ] as const) {
-    g.strokeStyle = stroke;
-    g.lineWidth = Math.max(width * s, 2);
-    loop(0);
-    g.stroke();
-  }
-  const ta = trailPoint(TRAIL_START, TRAIL_HALF);
-  const tb = trailPoint(TRAIL_START, -TRAIL_HALF);
-  g.strokeStyle = '#fff';
-  g.lineWidth = Math.max(1.6 * s, 1.5);
-  g.beginPath();
-  g.moveTo(X(ta.x), Z(ta.z));
-  g.lineTo(X(tb.x), Z(tb.z));
-  g.stroke();
-
-  // coaster tracks (dark casing under a coloured line so they read on any ground)
-  for (const [d, color] of [
-    [FALCON_TRACK, PALETTE.teal],
-    [STACK_TRACK, PALETTE.candy],
-  ] as const) {
-    for (const [stroke, width] of [
-      ['rgba(29, 18, 56, 0.6)', 2.6],
-      [color, 1.4],
-    ] as const) {
-      g.strokeStyle = stroke;
-      g.lineWidth = Math.max(width * s, width);
-      g.beginPath();
-      d.pos.forEach((p, i) => (i ? g.lineTo(X(p.x), Z(p.z)) : g.moveTo(X(p.x), Z(p.z))));
-      g.closePath();
-      g.stroke();
-    }
-  }
-  // …and the coasters members built, on their plots in the valley
-  for (const { pts, color } of valleyTracks.values())
-    for (const [stroke, width] of [
-      ['rgba(29, 18, 56, 0.6)', 2.2],
-      [color, 1.1],
-    ] as const) {
-      g.strokeStyle = stroke;
-      g.lineWidth = Math.max(width * s, width);
-      g.beginPath();
-      pts.forEach(([x, z], i) => (i ? g.lineTo(X(x), Z(z)) : g.moveTo(X(x), Z(z))));
-      g.closePath();
-      g.stroke();
-    }
-
-  // the giant wheel seen from above: the rim edge-on, the hub, and its two A-frames
-  const wz = LAYOUT.ferris.z;
-  g.strokeStyle = '#3a3f48';
-  g.lineWidth = 1.6 * s;
-  for (const side of [-1, 1])
-    for (const sx of [-1, 1]) {
-      g.beginPath();
-      g.moveTo(X(LAYOUT.ferris.x + sx * 56), Z(wz + side * 40));
-      g.lineTo(X(LAYOUT.ferris.x), Z(wz + side * 22));
-      g.stroke();
-    }
-  g.strokeStyle = '#e9edf2';
-  g.lineWidth = 3 * s;
-  g.beginPath();
-  g.moveTo(X(LAYOUT.ferris.x - 124), Z(wz));
-  g.lineTo(X(LAYOUT.ferris.x + 124), Z(wz));
-  g.stroke();
-
-  // the Career Museum from above: its glass roof (with the ridge down the middle) and the porch
-  const m = MUSEUM;
-  const outline = (hw: number, z0: number, z1: number) => {
-    g.beginPath();
-    for (const [lx, lz] of [[-hw, z0], [hw, z0], [hw, z1], [-hw, z1]]) {
-      const p = museumPoint(lx, lz);
-      g.lineTo(X(p.x), Z(p.z));
-    }
-    g.closePath();
-  };
-  outline(m.halfW + m.wall + 0.35, -m.halfL - m.wall - 0.35, m.halfL + m.wall + 0.35);
-  g.fillStyle = '#bcd9e6';
-  g.fill();
-  g.strokeStyle = 'rgba(29, 18, 56, 0.6)';
-  g.lineWidth = Math.max(0.8 * s, 1);
-  g.stroke();
-  outline(m.halfW + m.wall + 0.3, m.halfL + m.wall, m.halfL + m.wall + m.porch);
-  g.fillStyle = '#f7f0e2';
-  g.fill();
-  g.stroke();
-  const a0 = museumPoint(0, -m.halfL - m.wall);
-  const a1 = museumPoint(0, m.halfL + m.wall);
-  g.beginPath();
-  g.moveTo(X(a0.x), Z(a0.z));
-  g.lineTo(X(a1.x), Z(a1.z));
-  g.stroke();
-
-  // the Sky Flip from above: its fenced swing and the tower
-  const along = { x: Math.cos(FLIP_YAW), z: -Math.sin(FLIP_YAW) };
-  const out = { x: Math.sin(FLIP_YAW), z: Math.cos(FLIP_YAW) };
-  const fp = (lx: number, lz: number) => [X(LAYOUT.flip.x + along.x * lx + out.x * lz), Z(LAYOUT.flip.z + along.z * lx + out.z * lz)] as const;
-  g.fillStyle = 'rgba(255, 138, 61, 0.35)';
-  g.beginPath();
-  for (const [lx, lz] of [[-26, -4], [26, -4], [26, 16], [-26, 16]]) g.lineTo(...fp(lx, lz));
-  g.fill();
-  g.strokeStyle = PALETTE.candy;
-  g.lineWidth = 2.4 * s;
-  g.beginPath();
-  g.moveTo(...fp(-60, 3.6));
-  g.lineTo(...fp(60, 3.6));
-  g.stroke();
-  g.fillStyle = '#3a3f48';
-  g.beginPath();
-  g.arc(...fp(0, 0), 2.6 * s, 0, Math.PI * 2);
-  g.fill();
+export function addMapShapes(shapes: readonly MapShape[]) {
+  pushMapShapes(shapes);
+  for (const sh of shapes) mapTiles.invalidate('r' in sh ? { x0: sh.x - sh.r, x1: sh.x + sh.r, z0: sh.z - sh.r, z1: sh.z + sh.r } : sh);
 }
 
-/** The visitor's arrow, drawn at the current origin (heading 0 faces up / -z). */
-export function paintVisitor(g: CanvasRenderingContext2D, heading: number, size = 1) {
-  g.save();
-  g.rotate(-heading);
-  g.scale(size, size);
-  g.fillStyle = PALETTE.candy;
-  g.strokeStyle = '#fff';
-  g.lineWidth = 2;
-  g.lineJoin = 'round';
-  g.beginPath();
-  g.moveTo(0, -9);
-  g.lineTo(6.5, 7);
-  g.lineTo(0, 3.5);
-  g.lineTo(-6.5, 7);
-  g.closePath();
-  g.fill();
-  g.stroke();
-  g.restore();
+export { fairBounds };
+export type { MapShape };
+
+/** Something moving or fixed the minimap shows during a flight: AI traffic (with its callsign), or a waypoint. */
+export interface MapMarker {
+  x: number;
+  z: number;
+  kind: 'traffic' | 'fix';
+  label: string;
+  /** Traffic only: which way it's heading (radians, the park's yaw: 0 faces north). */
+  heading?: number;
 }
 
-/** Moving coaster trains as small dots. */
-export function paintTrain(g: CanvasRenderingContext2D, x: number, y: number, color: string, r = 3.5) {
-  g.fillStyle = color;
-  g.strokeStyle = '#1d1238';
-  g.lineWidth = 1.5;
-  g.beginPath();
-  g.arc(x, y, r, 0, Math.PI * 2);
-  g.fill();
-  g.stroke();
-}
+/** Metres from the centre to the edge of the minimap on foot. */
+export const FOOT_VIEW = 55;
+/** Beyond these views, the places are shown a district at a time, then only the airports. */
+const PLACES_VIEW = 450;
+const DISTRICTS_VIEW = 4000;
 
 /**
- * North-up circular minimap in the bottom-left corner. The whole fair is drawn once
- * into an offscreen sheet; each frame we just blit a window of it around the visitor.
- * Click / tap it (or press M) to open the full-screen park map.
+ * North-up circular minimap in the bottom-left corner, over the world's tiles (map-tiles.ts): a
+ * window round the visitor, 55 m out to the edge on foot, wider in vehicles (setView), up to
+ * tens of kilometres in flight. Click / tap it (or press M) to open the full-screen map.
  */
 export class Minimap {
   private canvas: HTMLCanvasElement;
   private g: CanvasRenderingContext2D;
-  private sheet = document.createElement('canvas');
-  private bounds = { x0: 0, z0: 0, x1: 0, z1: 0 };
-  private sheetScale = 1;
   private size = 0;
   private dpr = 1;
   private centre = { x: 0, z: 0 };
+  /** Metres from the centre to the edge: now, and where it's easing to. */
+  private view = FOOT_VIEW;
+  private targetView = FOOT_VIEW;
   /** Attractions closed for maintenance: their icon sits on a red disc. */
   closed: ReadonlySet<ZoneId> = new Set();
+  /** AI traffic and the flight plan's fixes, while flying (set them back to [] afterwards). */
+  markers: readonly MapMarker[] = [];
+  /** The visitor's symbol: the arrow on foot, an airliner when they're flying one. */
+  arrow: 'visitor' | 'aircraft' = 'visitor';
   onOpen: (() => void) | null = null;
 
   constructor(root: HTMLElement) {
     this.canvas = root.querySelector('canvas')!;
     this.g = this.canvas.getContext('2d')!;
-    this.drawSheet();
     root.addEventListener('click', () => this.onOpen?.());
+  }
+
+  /**
+   * How far the minimap reaches, from its centre to the edge, in metres: FOOT_VIEW (55) on foot,
+   * ~300 taxiing or on a jet-ski, 3000–15000 in flight. It eases there unless `instant`.
+   */
+  setView(metres: number, instant = false) {
+    this.targetView = Math.max(20, metres);
+    if (instant) this.view = this.targetView;
   }
 
   /** Paints the fair again (a coaster opened or closed in Creators' Valley). */
   redraw() {
-    this.drawSheet();
-  }
-
-  private drawSheet() {
-    const b = fairBounds();
-    const pad = VIEW;
-    this.bounds = { x0: b.x0 - pad, z0: b.z0 - pad, x1: b.x1 + pad, z1: b.z1 + pad };
-    const w = Math.ceil((this.bounds.x1 - this.bounds.x0) * SHEET_SCALE);
-    const h = Math.ceil((this.bounds.z1 - this.bounds.z0) * SHEET_SCALE);
-    // stay well inside canvas limits on low-end devices
-    const k = Math.min(1, 4096 / Math.max(w, h));
-    this.sheet.width = Math.round(w * k);
-    this.sheet.height = Math.round(h * k);
-    const s = SHEET_SCALE * k;
-    this.sheetScale = s;
-    const g = this.sheet.getContext('2d')!;
-    // desert / outland
-    g.fillStyle = '#c9a774';
-    g.fillRect(0, 0, this.sheet.width, this.sheet.height);
-    paintFair(g, (x) => (x - this.bounds.x0) * s, (z) => (z - this.bounds.z0) * s, s);
+    mapTiles.invalidate(fairBounds());
   }
 
   private resize() {
@@ -386,7 +148,7 @@ export class Minimap {
 
   /** Converts a world position to minimap CSS pixels (relative to the canvas). */
   private toMap(x: number, z: number) {
-    const k = this.size / 2 / VIEW;
+    const k = this.size / 2 / this.view;
     return { x: this.size / 2 + (x - this.centre.x) * k, y: this.size / 2 + (z - this.centre.z) * k };
   }
 
@@ -395,9 +157,15 @@ export class Minimap {
     if (!this.size) return;
     this.centre.x = car.x;
     this.centre.z = car.z;
+    // ease the view's reach in log space, so zooming out to a flight's 15 km feels as even as to 300 m
+    if (this.view !== this.targetView) {
+      const v = Math.exp(Math.log(this.view) + (Math.log(this.targetView) - Math.log(this.view)) * 0.08);
+      this.view = Math.abs(v - this.targetView) < 0.5 ? this.targetView : v;
+    }
 
     const g = this.g;
     const S = this.size;
+    const view = this.view;
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     g.clearRect(0, 0, S, S);
     g.save();
@@ -405,29 +173,26 @@ export class Minimap {
     g.arc(S / 2, S / 2, S / 2, 0, Math.PI * 2);
     g.clip();
 
-    // blit the window of the sheet around the centre
-    const s = this.sheetScale;
-    const sx = (this.centre.x - VIEW - this.bounds.x0) * s;
-    const sz = (this.centre.z - VIEW - this.bounds.z0) * s;
+    // the world's tiles round the centre
     g.imageSmoothingEnabled = true;
-    g.drawImage(this.sheet, sx, sz, VIEW * 2 * s, VIEW * 2 * s, 0, 0, S, S);
+    drawTiles(g, car.x, car.z, S / 2 / view, S, S, this.dpr);
 
-    // moving coaster trains
-    for (const t of trains) {
-      const p = this.toMap(t.x, t.z);
-      paintTrain(g, p.x, p.y, t.color);
-    }
+    // moving coaster trains, karts and buggies (only while they'd be more than a speck)
+    if (view < PLACES_VIEW * 2)
+      for (const t of trains) {
+        const p = this.toMap(t.x, t.z);
+        if (p.x < -6 || p.y < -6 || p.x > S + 6 || p.y > S + 6) continue;
+        paintTrain(g, p.x, p.y, t.color, view > PLACES_VIEW ? 2.5 : 3.5);
+      }
 
-    // attraction icons
+    // the places: each attraction close up; a district at a time further out; the airports far out
     const iconSize = Math.round(Math.max(12, Math.min(18, S / 11)));
     g.font = `${iconSize}px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    for (const { id, icon } of MAP_PLACES) {
-      if (!onMap(id)) continue;
-      const p = this.toMap(ZONES[id].x, ZONES[id].z);
-      if (p.x < -10 || p.y < -10 || p.x > S + 10 || p.y > S + 10) continue;
-      const shut = this.closed.has(id);
+    const icon = (x: number, z: number, glyph: string, shut: boolean) => {
+      const p = this.toMap(x, z);
+      if (p.x < -10 || p.y < -10 || p.x > S + 10 || p.y > S + 10) return;
       g.fillStyle = shut ? 'rgba(255, 77, 109, 0.95)' : 'rgba(255, 245, 227, 0.92)';
       g.beginPath();
       g.arc(p.x, p.y, iconSize * 0.72, 0, Math.PI * 2);
@@ -438,18 +203,59 @@ export class Minimap {
         g.stroke();
       }
       g.fillStyle = '#000';
-      g.fillText(icon, p.x, p.y + 1);
+      g.fillText(glyph, p.x, p.y + 1);
+    };
+    if (view <= PLACES_VIEW) {
+      for (const { id, icon: glyph } of MAP_PLACES) if (onMap(id)) icon(ZONES[id].x, ZONES[id].z, glyph, this.closed.has(id));
+    } else if (view <= DISTRICTS_VIEW) {
+      for (const d of Object.values(DISTRICTS)) icon(d.plaza[0], d.plaza[1], d.icon, false);
+    } else {
+      for (const a of AIRPORT_MARKS) {
+        icon(a.x, a.z, '✈️', false);
+        const p = this.toMap(a.x, a.z);
+        g.font = `700 10px "DM Sans", sans-serif`;
+        g.lineWidth = 3;
+        g.strokeStyle = 'rgba(29, 18, 56, 0.85)';
+        g.strokeText(a.icao, p.x, p.y + iconSize);
+        g.fillStyle = PALETTE.cream;
+        g.fillText(a.icao, p.x, p.y + iconSize);
+        g.font = `${iconSize}px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
+      }
+    }
+
+    // a flight's fixes and the traffic round it
+    for (const m of this.markers) {
+      const p = this.toMap(m.x, m.z);
+      if (p.x < -40 || p.y < -20 || p.x > S + 20 || p.y > S + 20) continue;
+      if (m.kind === 'fix') paintFix(g, p.x, p.y, m.label);
+      else {
+        g.save();
+        g.translate(p.x, p.y);
+        paintAircraft(g, m.heading ?? 0, 0.75, '#f4f7fb');
+        g.restore();
+        g.font = '700 9px "DM Sans", sans-serif';
+        g.textAlign = 'left';
+        g.lineWidth = 3;
+        g.strokeStyle = 'rgba(29, 18, 56, 0.85)';
+        g.strokeText(m.label, p.x + 9, p.y - 7);
+        g.fillStyle = '#ffffff';
+        g.fillText(m.label, p.x + 9, p.y - 7);
+        g.textAlign = 'center';
+      }
     }
 
     // the visitor
     const c = this.toMap(car.x, car.z);
     g.translate(c.x, c.y);
-    paintVisitor(g, car.heading);
+    if (this.arrow === 'aircraft') paintAircraft(g, car.heading, 1.15);
+    else paintVisitor(g, car.heading);
     g.restore();
 
     // north marker
     g.fillStyle = 'rgba(255, 245, 227, 0.9)';
     g.font = `700 10px "DM Sans", sans-serif`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
     g.fillText('N', S / 2, 9);
   }
 }

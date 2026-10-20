@@ -1,0 +1,158 @@
+/* Pirate Cannons' HUD (world/attractions/island/cannons.ts). It builds on the shared .ride-hud card
+   (bottom left) and adds the streak line, the three guns' reload gauges, the wind arrow and the
+   range tag that follows the aiming mark on the water. The colours fall back when the park's
+   variables are absent (the preview harness). */
+
+.cn-hud {
+  width: 268px;
+  z-index: 3;
+}
+.cn-hud[hidden] {
+  display: none;
+}
+.cn-points b {
+  color: var(--mustard, #ffc23d);
+}
+.cn-hud.cn-hurry .cn-clock b {
+  color: var(--candy, #ff4d6d);
+  animation: cn-pulse 0.5s ease-in-out infinite alternate;
+}
+
+.cn-streak {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.cn-mult {
+  padding: 1px 8px;
+  border-radius: 99px;
+  background: rgba(255, 245, 227, 0.15);
+  font: 400 1rem/1.3 var(--display, 'Lilita One', 'Arial Rounded MT Bold', system-ui, sans-serif);
+  transition: background 0.2s, color 0.2s;
+}
+.cn-mult.on {
+  background: var(--candy, #ff4d6d);
+  color: #fff;
+}
+.cn-best {
+  margin-left: auto;
+  opacity: 0.6;
+  font-weight: 600;
+}
+
+/* each gun: a column that fills as its crew reloads, bright when it is ready */
+.cn-guns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.cn-guns i {
+  position: relative;
+  height: 22px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 245, 227, 0.12);
+  font-style: normal;
+}
+.cn-guns i b {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 100%;
+  background: rgba(255, 194, 61, 0.45);
+}
+.cn-guns i.ready b {
+  background: var(--mustard, #ffc23d);
+}
+.cn-guns i span {
+  position: relative;
+  display: block;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 22px;
+  letter-spacing: 0.08em;
+}
+.cn-guns i.ready span {
+  color: var(--ink, #1d1238);
+}
+.cn-guns.cn-nudge {
+  animation: cn-nudge 0.3s ease-in-out;
+}
+
+.cn-wind {
+  display: inline-block;
+  font-style: normal;
+  color: var(--teal, #3fd0c9);
+  transition: transform 0.4s;
+}
+.cn-hud .rh-toast.cn-big {
+  background: var(--candy, #ff4d6d);
+  color: #fff;
+  font-size: 1.25rem;
+}
+
+/* the range and flight time beside the mark (positioned by transform from the script) */
+.cn-tag {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  margin: 18px 0 0 18px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: rgba(29, 18, 56, 0.66);
+  color: var(--cream, #fff5e3);
+  font: 700 0.74rem/1.4 var(--body, 'DM Sans', system-ui, sans-serif);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+/* a screen-sized sight on the mark (whose own ring is small at 300 m and more), centred on the
+   point the tag hangs from: the tag's own corner sits 18px below and right of it */
+.cn-tag::before {
+  content: '';
+  position: absolute;
+  left: -36px;
+  top: -36px;
+  width: 32px;
+  height: 32px;
+  border: 2px solid rgba(255, 245, 227, 0.9);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(29, 18, 56, 0.45), inset 0 0 0 1px rgba(29, 18, 56, 0.45);
+}
+.cn-tag.cn-wait::before {
+  border-color: rgba(255, 138, 122, 0.85);
+}
+.cn-tag[hidden] {
+  display: none;
+}
+.is-cannons canvas {
+  cursor: crosshair;
+}
+
+@keyframes cn-pulse {
+  to {
+    opacity: 0.55;
+  }
+}
+@keyframes cn-nudge {
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+@media (max-width: 640px) {
+  .cn-hud {
+    width: auto;
+    right: 16px;
+  }
+}

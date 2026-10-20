@@ -42,6 +42,8 @@ export class MaintenanceSite {
     const z = ZONES[id];
     const fx = -Math.sin(z.heading);
     const fz = -Math.cos(z.heading);
+    // on the ring's floor (a terminal's tiles stand a little above the ground)
+    this.group.position.y = z.y ?? 0;
 
     // the barricade, near the far edge of the ring; its front (+z) faces back at the visitor
     const barricade = new THREE.Group();

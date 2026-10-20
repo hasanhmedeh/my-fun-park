@@ -1,0 +1,27 @@
+/* The Jet-Ski Race HUD: the race HUD's layout (styles.css .race-hud), in the lagoon's colours.
+   The surf meter fills sea-green from jumps and glows white-hot while it's being burned; the
+   penalty readout only shows once you've missed a buoy. */
+.js-hud {
+  border-color: rgba(46, 196, 182, 0.55);
+}
+.js-hud .rc-pos b,
+.js-hud .rc-pos sup {
+  color: #7ee2d6;
+}
+.js-hud .rc-board li.is-me {
+  color: #7ee2d6;
+}
+.js-surf .dh-bar i {
+  background: linear-gradient(90deg, #1b8fbf, #2ec4b6 60%, #9df5e8);
+}
+.js-surf .dh-bar.is-on i {
+  background: linear-gradient(90deg, #2ec4b6, #ffffff);
+  box-shadow: 0 0 12px #9df5e8;
+}
+.js-pen {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--candy);
+  letter-spacing: 0.04em;
+}

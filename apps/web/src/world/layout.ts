@@ -440,38 +440,166 @@ export function onPath(x: number, z: number, margin = 0) {
   return PLAZAS.some(([px, pz, r]) => Math.hypot(x - px, z - pz) < r + margin);
 }
 
+// ------------------------------------------------------------------------------------------------
+// Where the visitor may walk
+// ------------------------------------------------------------------------------------------------
+
+/** An axis-aligned rectangle on the ground (x0..x1 by z0..z1). */
+export interface WalkRect {
+  x0: number;
+  x1: number;
+  z0: number;
+  z1: number;
+}
+
+/** Where a visitor who falls off the world (or into the sea) is put back on their feet. */
+export interface Respawn {
+  x: number;
+  z: number;
+  heading: number;
+}
+
 /**
- * Where the visitor may walk: inside the fence, along the road to the giant wheel, or along the
- * Valley Road. Returns the nearest walkable point to (x, z), or null when (x, z) is already walkable.
+ * A piece of walkable ground, in one region: `contains` says whether a point is on it, `nearest`
+ * finds its closest point to one that isn't. `respawn` is where a fall from it lands.
  */
-export function clampToGrounds(x: number, z: number): [number, number] | null {
-  const R = PARK.r;
-  const r = parkDistance(x, z);
-  if (r <= R) return null;
-  const { half, end, plaza } = WHEEL_ROAD;
-  // the road runs from just inside the north gate out to the wheel's plaza
-  const gateZ = PARK.z - R + half;
-  if (Math.abs(x - PARK.x) <= half && z <= gateZ && z >= end) return null;
-  const pr = Math.hypot(x - plaza.x, z - plaza.z);
-  if (pr <= plaza.r) return null;
-  // the Valley Road and its verges, from just inside the west gate out to the last plots
-  const w = VALLEY.walk;
-  const westGate = -Math.sqrt(R * R - (VALLEY.road.z - PARK.z) ** 2) + 4;
-  if (x >= w.x1 && x <= westGate && z >= w.z0 && z <= w.z1) return null;
-  const candidates: [number, number][] = [
-    [PARK.x + ((x - PARK.x) * R) / r, PARK.z + ((z - PARK.z) * R) / r],
-    [Math.max(PARK.x - half, Math.min(PARK.x + half, x)), Math.max(end, Math.min(gateZ, z))],
-    [plaza.x + ((x - plaza.x) * plaza.r) / pr, plaza.z + ((z - plaza.z) * plaza.r) / pr],
-    [Math.max(w.x1, Math.min(westGate, x)), Math.max(w.z0, Math.min(w.z1, z))],
-  ];
-  let best = candidates[0];
+export interface WalkArea {
+  region: Region;
+  /** What it is (for debugging, and to replace an area registered later). */
+  name: string;
+  contains(x: number, z: number): boolean;
+  nearest(x: number, z: number): [number, number];
+  respawn: Respawn;
+}
+
+const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
+
+/** A rectangular walk area. */
+export function rectArea(region: Region, name: string, r: WalkRect, respawn: Respawn): WalkArea {
+  return {
+    region,
+    name,
+    contains: (x, z) => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1,
+    nearest: (x, z) => [clamp(x, r.x0, r.x1), clamp(z, r.z0, r.z1)],
+    respawn,
+  };
+}
+
+/** A round walk area. */
+function discArea(region: Region, name: string, cx: number, cz: number, radius: number, respawn: Respawn): WalkArea {
+  return {
+    region,
+    name,
+    contains: (x, z) => (x - cx) ** 2 + (z - cz) ** 2 <= radius * radius,
+    nearest: (x, z) => {
+      const d = Math.hypot(x - cx, z - cz) || 1;
+      return [cx + ((x - cx) * radius) / d, cz + ((z - cz) * radius) / d];
+    },
+    respawn,
+  };
+}
+
+/** Where a fall lands: the fair's entrance, the airport's hall, Palm Cay's arrivals plaza. */
+const FAIR_RESPAWN: Respawn = { ...LAYOUT.spawn };
+const AIRPORT_RESPAWN: Respawn = { x: ZONES.airport.x, z: ZONES.airport.z, heading: ZONES.airport.heading };
+const ISLAND_RESPAWN: Respawn = { x: ZONES.palmcay.x, z: ZONES.palmcay.z, heading: ZONES.palmcay.heading };
+/** Each region's respawn when nothing nearer applies. */
+export const RESPAWN: Record<Region, Respawn> = { home: FAIR_RESPAWN, island: ISLAND_RESPAWN };
+
+/** The road out of the north gate runs from just inside the gate out to the wheel's plaza. */
+const GATE_Z = PARK.z - PARK.r + WHEEL_ROAD.half;
+/** The Valley Road leaves the park just inside the west gate. */
+const WEST_GATE_X = -Math.sqrt(PARK.r ** 2 - (VALLEY.road.z - PARK.z) ** 2) + 4;
+
+/**
+ * Palm Cay's beach park before its own walk areas are registered (from the plan in geo.ts and
+ * island.ts): from the terminal's landside wall down onto the dry sand past the beach boardwalk
+ * (the shore is at z 41525 or further south across the park, and the dry sand reaches to 22 m
+ * short of it), where the jet-skis' dock starts.
+ */
+const PALM_CAY_SEED: WalkRect = { x0: ISLAND.park.x0, x1: ISLAND.park.x1, z0: 40670.5, z1: 41480 };
+
+/**
+ * The ground the visitor may walk on, region by region:
+ *   the fair    inside the fence, the road to the giant wheel and its plaza, the Valley Road
+ *   the airport the forecourt (car parks, the kerb, the SkyLink's station) and the terminal
+ *   Palm Cay    the island terminal and its arrivals plaza, the beach park
+ * The terminals and the beach park register their exact areas once they're built
+ * (registerWalkAreas); these cover them meanwhile.
+ */
+const BASE_AREAS: WalkArea[] = [
+  discArea('home', 'park', PARK.x, PARK.z, PARK.r, FAIR_RESPAWN),
+  rectArea('home', 'wheel road', { x0: PARK.x - WHEEL_ROAD.half, x1: PARK.x + WHEEL_ROAD.half, z0: WHEEL_ROAD.end, z1: GATE_Z }, FAIR_RESPAWN),
+  discArea('home', 'wheel plaza', WHEEL_ROAD.plaza.x, WHEEL_ROAD.plaza.z, WHEEL_ROAD.plaza.r, FAIR_RESPAWN),
+  rectArea('home', 'valley road', { x0: VALLEY.walk.x1, x1: WEST_GATE_X, z0: VALLEY.walk.z0, z1: VALLEY.walk.z1 }, FAIR_RESPAWN),
+  ...AIRPORTS.home.walk.map((r, i) => rectArea('home', `airport ${i + 1}`, r, AIRPORT_RESPAWN)),
+  ...AIRPORTS.island.walk.map((r, i) => rectArea('island', `island terminal ${i + 1}`, r, ISLAND_RESPAWN)),
+  rectArea('island', 'palm cay', PALM_CAY_SEED, ISLAND_RESPAWN),
+];
+
+/** Walk areas registered after construction, by key (registering a key again replaces its areas). */
+const registered = new Map<string, WalkArea[]>();
+
+/** Every walk area, in every region (the base ones first, then those registered). */
+export const WALK_AREAS: WalkArea[] = [...BASE_AREAS];
+/** The same, split by region: the clamp only ever looks in the visitor's own. */
+const BY_REGION: Record<Region, WalkArea[]> = { home: [], island: [] };
+function rebuild() {
+  WALK_AREAS.length = 0;
+  WALK_AREAS.push(...BASE_AREAS, ...[...registered.values()].flat());
+  BY_REGION.home = WALK_AREAS.filter((a) => a.region === 'home');
+  BY_REGION.island = WALK_AREAS.filter((a) => a.region === 'island');
+}
+rebuild();
+
+/**
+ * Adds walkable rectangles (y = 0) to a region, from a building that knows its own floor plan:
+ * the home terminal's and the SkyLink's `walk`, Palm Cay's park and terminal `walk`. Registering
+ * the same `key` again replaces what it added before. A fall from them respawns at `respawn`
+ * (default: the region's own).
+ */
+export function registerWalkAreas(region: Region, rects: readonly WalkRect[], key: string, respawn: Respawn = region === 'home' ? AIRPORT_RESPAWN : ISLAND_RESPAWN) {
+  registered.set(
+    key,
+    rects.map((r, i) => rectArea(region, `${key} ${i + 1}`, r, respawn)),
+  );
+  rebuild();
+}
+
+/** True if (x, z) is on walkable ground (in its own region). */
+export function onWalk(x: number, z: number, region: Region = regionAt(x, z)) {
+  for (const a of BY_REGION[region]) if (a.contains(x, z)) return true;
+  return false;
+}
+
+/** The walk area nearest (x, z) in its region, and that nearest point. */
+function nearestArea(x: number, z: number, region: Region) {
+  let best: WalkArea | null = null;
+  let point: [number, number] = [x, z];
   let bd = Infinity;
-  for (const c of candidates) {
-    const d = (c[0] - x) ** 2 + (c[1] - z) ** 2;
+  for (const a of BY_REGION[region]) {
+    const p = a.nearest(x, z);
+    const d = (p[0] - x) ** 2 + (p[1] - z) ** 2;
     if (d < bd) {
       bd = d;
-      best = c;
+      best = a;
+      point = p;
     }
   }
-  return best;
+  return { area: best, point };
+}
+
+/**
+ * Where the visitor may walk (see WALK_AREAS). Returns the nearest walkable point to (x, z), or
+ * null when (x, z) is already walkable. It only looks in the region (x, z) is in, so nothing ever
+ * pulls a visitor across the sea.
+ */
+export function clampToGrounds(x: number, z: number, region: Region = regionAt(x, z)): [number, number] | null {
+  for (const a of BY_REGION[region]) if (a.contains(x, z)) return null;
+  return nearestArea(x, z, region).point;
+}
+
+/** Where a visitor who fell at (x, z) gets back on their feet: the respawn of the walk area nearest them, in their region. */
+export function respawnFor(x: number, z: number, region: Region = regionAt(x, z)): Respawn {
+  return nearestArea(x, z, region).area?.respawn ?? RESPAWN[region];
 }

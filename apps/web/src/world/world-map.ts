@@ -1,7 +1,12 @@
-import { DISTRICTS, ZONES, type ZoneId } from './layout';
-import { MAP_PLACES, fairBounds, onMap, paintFair, paintTrain, paintVisitor } from './minimap';
+import { FIXES } from '../aviation/airports';
+import { ISLAND, regionAt, type Region } from './geo';
+import { canTravel, DISTRICTS, REGION_INFO, ZONE_REGION, ZONES, type ZoneId } from './layout';
+import { AIRPORT_MARKS, paintFix, paintTrain, paintVisitor, paintWorld, regionBounds, type MapView } from './map-paint';
+import { drawTiles } from './map-tiles';
+import { MAP_PLACES, onMap } from './minimap';
 import { PALETTE } from './textures';
 import { escapeHtml } from './ui';
+import './world-map.css';
 
 type Visitor = { x: number; z: number; heading: number };
 type Train = { x: number; z: number; color: string };
@@ -10,27 +15,60 @@ type Train = { x: number; z: number; color: string };
 const MAX_PPM = 14;
 /** Labels stay hidden below this zoom (except hovered / selected) so they don't pile up. */
 const LABEL_PPM = 4.5;
+/** Below this zoom the districts' names give way to the regions' (and the pins to the airports'). */
+const REGION_PPM = 0.25;
+/** Below this zoom (in device pixels per metre) the map is drawn from the shared tiles rather than painted live. */
+const TILE_PPM = 3.4;
 /** Nice round lengths for the scale bar, in metres. */
-const SCALE_STEPS = [10, 20, 50, 100, 200, 500, 1000, 2000];
+const SCALE_STEPS = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
+
+/** The map's tabs: each landmass, and the world with the sea between. */
+const VIEWS: { id: MapView; label: string; kicker: string; title: string }[] = [
+  { id: 'home', label: '🎪 The Funfair', kicker: 'Park map', title: REGION_INFO.home.name },
+  { id: 'island', label: '🌴 Palm Cay', kicker: 'Island map', title: REGION_INFO.island.name },
+  { id: 'world', label: '🌍 World', kicker: 'World map', title: 'The Funfair & Palm Cay' },
+];
 
 /**
- * The full-screen park map, opened from the minimap or with M, like the pause map in an
- * open-world game: drag to pan, scroll or pinch to zoom, pick a place (on the map or in
- * the legend) and fast travel there.
+ * Where the World view writes each landmass's name: off its outer edge (north of the fair, south of
+ * Palm Cay) and a few pixels further out, so it never sits on the airports' pins and codes, which
+ * face the sea between them.
+ */
+const REGION_LABELS: Record<Region, { x: number; z: number; dy: number; name: string }> = {
+  home: { x: 0, z: -900, dy: -14, name: REGION_INFO.home.name },
+  island: { x: 0, z: ISLAND.centre.z + ISLAND.rz, dy: 30, name: REGION_INFO.island.name },
+};
+
+/** The route the flights fly between the airports (FA101 south; FA102 comes back the same way), for the World view. */
+const ROUTE = ['TOFFY', 'CORAL', 'PALMS'].map((n) => FIXES[n]);
+
+/**
+ * The full-screen map, opened from the minimap or with M, like the pause map in an open-world
+ * game: drag to pan, scroll or pinch to zoom, pick a place (on the map or in the legend) and fast
+ * travel there. One tab per landmass (the fair and its airport; Palm Cay) and a World tab with
+ * the sea between; fast travel stays on the landmass the visitor stands on, and a place across
+ * the sea offers the way there instead: the flight from this side's airport.
  */
 export class WorldMap {
   private canvas: HTMLCanvasElement;
   private g: CanvasRenderingContext2D;
-  /** The fair itself, repainted only when the view moves; trains and the visitor go on top each frame. */
+  /** The world under the pins, repainted only when the view moves; trains and the visitor go on top each frame. */
   private base = document.createElement('canvas');
   private baseKey = '';
   private pins = new Map<ZoneId, HTMLButtonElement>();
   private items = new Map<ZoneId, HTMLButtonElement>();
+  /** The legend's headings: each region's, and each district's (shown with their region's places). */
+  private headings: { el: HTMLElement; region: Region }[] = [];
+  private tabs = new Map<MapView, HTMLButtonElement>();
   private card: HTMLElement;
   private you: HTMLElement;
   private scaleBar: HTMLElement;
   private scaleLabel: HTMLElement;
-  private bounds = fairBounds();
+  private kicker: HTMLElement;
+  private title: HTMLElement;
+  /** Which tab is showing, and the box it frames. */
+  private region: MapView = 'home';
+  private bounds = regionBounds('home');
   private w = 0;
   private h = 0;
   private dpr = 1;
@@ -51,6 +89,7 @@ export class WorldMap {
   isOpen = false;
   canOpen: () => boolean = () => true;
   onToggle: ((open: boolean) => void) | null = null;
+  /** Fast travel to a place (always one on the visitor's own landmass: see canTravel). */
   onTravel: ((id: ZoneId) => void) | null = null;
 
   constructor(private root: HTMLElement) {
@@ -58,22 +97,26 @@ export class WorldMap {
     this.g = this.canvas.getContext('2d')!;
     this.card = root.querySelector('.wm-card')!;
     this.you = root.querySelector('.wm-you')!;
+    this.kicker = root.querySelector('.wm-kicker')!;
+    this.title = root.querySelector('.wm-head h2')!;
     // the visitor's arrow sits above the pins so a nearby attraction never hides it
     const arrow = this.you.querySelector('canvas')!.getContext('2d')!;
     arrow.setTransform(2, 0, 0, 2, 32, 32);
     paintVisitor(arrow, 0, 1.5);
     this.scaleBar = root.querySelector('.wm-scale i')!;
     this.scaleLabel = root.querySelector('.wm-scale span')!;
+    this.buildTabs();
     this.buildPlaces();
     this.refreshPlaces();
 
     root.querySelector('.wm-close')!.addEventListener('click', () => this.close());
-    root.querySelector('[data-wm-locate]')!.addEventListener('click', () => this.flyTo(this.visitor.x, this.visitor.z));
+    root.querySelector('[data-wm-locate]')!.addEventListener('click', () => this.locate());
     root.querySelectorAll<HTMLElement>('[data-wm-zoom]').forEach((b) =>
       b.addEventListener('click', () => this.zoomAt(this.w / 2, this.h / 2, Number(b.dataset.wmZoom) > 0 ? 1.6 : 1 / 1.6)),
     );
     this.card.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).closest('[data-wm-travel]') && this.selected) this.travel(this.selected);
+      const go = (e.target as HTMLElement).closest<HTMLElement>('[data-wm-travel]');
+      if (go && this.selected) this.travel(this.selected);
     });
     this.setupPointer();
     window.addEventListener('keydown', this.onKeyDown);
@@ -82,20 +125,54 @@ export class WorldMap {
     window.addEventListener('resize', () => this.isOpen && this.resize());
   }
 
+  /** The landmass the visitor stands on. */
+  private get here(): Region {
+    return regionAt(this.visitor.x, this.visitor.z);
+  }
+
+  private buildTabs() {
+    const nav = document.createElement('nav');
+    nav.className = 'wm-tabs';
+    nav.setAttribute('aria-label', 'Map regions');
+    for (const v of VIEWS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'wm-tab';
+      b.textContent = v.label;
+      b.setAttribute('aria-pressed', 'false');
+      b.addEventListener('click', () => this.setRegion(v.id, true));
+      nav.appendChild(b);
+      this.tabs.set(v.id, b);
+    }
+    this.root.querySelector('.wm-head')!.appendChild(nav);
+    this.root.classList.add('has-tabs');
+  }
+
   private buildPlaces() {
     const pinLayer = this.root.querySelector('.wm-pins')!;
     const list = this.root.querySelector('.wm-legend ul')!;
     let district = '';
+    let region: Region | '' = '';
     for (const p of MAP_PLACES) {
-      // a heading for each district, in its colour
+      const d = DISTRICTS[p.district];
+      // a heading for each region (shown in the World view, where both are listed)…
+      if (d.region !== region) {
+        region = d.region;
+        const head = document.createElement('li');
+        head.className = 'wm-region';
+        head.textContent = REGION_INFO[region].name;
+        list.appendChild(head);
+        this.headings.push({ el: head, region });
+      }
+      // …and one for each district, in its colour
       if (p.district !== district) {
         district = p.district;
-        const d = DISTRICTS[p.district];
         const head = document.createElement('li');
         head.className = 'wm-group';
         head.style.setProperty('--district', d.color);
         head.innerHTML = `<span aria-hidden="true">${d.icon}</span>${escapeHtml(d.name)}`;
         list.appendChild(head);
+        this.headings.push({ el: head, region: d.region });
       }
       const pin = document.createElement('button');
       pin.type = 'button';
@@ -113,7 +190,7 @@ export class WorldMap {
       const li = document.createElement('li');
       const item = document.createElement('button');
       item.type = 'button';
-      item.innerHTML = `<span class="wm-item-icon">${p.icon}</span><span class="wm-item-label">${escapeHtml(p.label)}</span><span class="wm-item-closed">Maintenance</span><span class="wm-item-here">Here</span>`;
+      item.innerHTML = `<span class="wm-item-icon">${p.icon}</span><span class="wm-item-label">${escapeHtml(p.label)}</span><span class="wm-item-closed">Maintenance</span><span class="wm-item-here">Here</span><span class="wm-item-away">✈️ Fly</span>`;
       item.addEventListener('click', () => this.pick(p.id, true));
       item.addEventListener('pointerenter', () => (this.hovered = p.id));
       item.addEventListener('pointerleave', () => this.hovered === p.id && (this.hovered = null));
@@ -124,27 +201,66 @@ export class WorldMap {
   }
 
   /**
-   * Creators' Valley changed (a coaster opened or closed on a plot): each place's name, the plots
-   * on the map and in the legend (only those with a coaster), and the valley painted again.
+   * Creators' Valley changed (a coaster opened or closed on a plot), or the tab or the visitor's
+   * landmass did: each place's name, which places the map and the legend show (the tab's region;
+   * plots only with a coaster), which are across the sea, and the map painted again.
    */
   refreshPlaces() {
+    const here = this.here;
     for (const p of MAP_PLACES) {
+      const inTab = this.region === 'world' || ZONE_REGION[p.id] === this.region;
       const shown = onMap(p.id);
+      const away = !canTravel(here, p.id);
       const pin = this.pins.get(p.id);
       const item = this.items.get(p.id);
       if (pin) {
         pin.hidden = !shown;
+        pin.classList.toggle('is-away', away);
         pin.querySelector('.wm-pin-label')!.textContent = p.label;
-        pin.setAttribute('aria-label', this.closed.has(p.id) ? `${p.label}, under maintenance` : p.label);
+        pin.setAttribute('aria-label', this.closed.has(p.id) ? `${p.label}, under maintenance` : away ? `${p.label}, across the sea` : p.label);
       }
       if (item) {
-        item.parentElement!.hidden = !shown;
+        item.parentElement!.hidden = !shown || !inTab;
+        item.classList.toggle('is-away', away);
         item.querySelector('.wm-item-label')!.textContent = p.label;
       }
     }
+    // the districts' headings with their region's places; the regions' own only where both are listed
+    for (const h of this.headings) h.el.hidden = h.el.classList.contains('wm-region') ? this.region !== 'world' : this.region !== 'world' && h.region !== this.region;
     if (this.selected && !onMap(this.selected)) this.select(null, false);
     this.baseKey = '';
     if (this.isOpen) this.renderCard();
+  }
+
+  /**
+   * Shows a tab: one landmass (its places in the legend, the view framed on it) or the World.
+   * `fly` eases the view over to it; otherwise it only frames the bounds (open() places the view).
+   */
+  setRegion(r: MapView, fly = false) {
+    this.region = r;
+    this.bounds = regionBounds(r);
+    const v = VIEWS.find((k) => k.id === r)!;
+    this.kicker.textContent = v.kicker;
+    this.title.textContent = v.title;
+    for (const [id, b] of this.tabs) {
+      b.classList.toggle('is-active', id === r);
+      b.setAttribute('aria-pressed', String(id === r));
+    }
+    this.refreshPlaces();
+    if (fly) {
+      if (r === this.here) this.flyTo(this.visitor.x, this.visitor.z, this.fitPpm());
+      else {
+        // frame the whole tab
+        const b = this.bounds;
+        this.flyTo((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, 0);
+      }
+    }
+    if (this.selected && r !== 'world' && ZONE_REGION[this.selected] !== r) this.select(null, false);
+  }
+
+  /** The zoom the map opens at: framing the park round the visitor (never so far out on a phone that the pins pile up). */
+  private fitPpm() {
+    return Math.max(1.8, Math.min(this.w, this.h) / 440);
   }
 
   open() {
@@ -153,9 +269,9 @@ export class WorldMap {
     this.returnFocus = document.activeElement as HTMLElement | null;
     this.root.hidden = false;
     this.resize();
-    // open centred on the visitor, framing the park, with a short zoom-out flourish
-    // (never so far out on a phone that the pins pile up)
-    const fit = Math.max(1.8, Math.min(this.w, this.h) / 440);
+    // open on the visitor's own landmass, centred on them, with a short zoom-out flourish
+    this.setRegion(this.here);
+    const fit = this.fitPpm();
     this.target = { x: this.visitor.x, z: this.visitor.z, ppm: this.clampPpm(fit) };
     this.view = { ...this.target, ppm: this.clampPpm(fit * 1.6) };
     this.clampCentre(this.target);
@@ -203,9 +319,20 @@ export class WorldMap {
     if (this.isOpen) this.renderCard();
   }
 
+  /** Back to the visitor: their own landmass's tab, centred on them. */
+  private locate() {
+    if (this.region !== this.here && this.region !== 'world') this.setRegion(this.here);
+    this.flyTo(this.visitor.x, this.visitor.z, Math.max(this.target.ppm, this.region === 'world' ? this.fitPpm() : 0));
+  }
+
+  /**
+   * Fast travel to a place: only ever on the visitor's own landmass. A place across the sea
+   * takes them to this side's departure gate instead (the flight is the way over).
+   */
   private travel(id: ZoneId) {
+    const to = canTravel(this.here, id) ? id : REGION_INFO[this.here].departure;
     this.close();
-    this.onTravel?.(id);
+    this.onTravel?.(to);
   }
 
   /** First pick selects a place; picking it again travels there. */
@@ -234,19 +361,33 @@ export class WorldMap {
     const p = MAP_PLACES.find((m) => m.id === id)!;
     const z = ZONES[id];
     const here = this.near === id;
+    const from = this.here;
+    const reachable = canTravel(from, id);
     const d = Math.hypot(z.x - this.visitor.x, z.z - this.visitor.z);
     const sign = this.closed.get(id);
-    const dist = here ? 'You are here' : d < 1000 ? `${Math.round(d / 5) * 5} m away` : `${(d / 1000).toFixed(1)} km away`;
+    const dist = here ? 'You are here' : d < 1000 ? `${Math.round(d / 5) * 5} m away` : `${(d / 1000).toFixed(d < 10000 ? 1 : 0)} km away`;
+    let action = `<button type="button" class="btn btn-primary wm-travel" data-wm-travel>Fast travel <kbd>Enter</kbd></button>`;
+    let away = '';
+    if (!reachable) {
+      // across the sea: say where it is and offer this side's gate (the flight is the way there)
+      const there = ZONE_REGION[id];
+      const gate = ZONES[REGION_INFO[from].departure];
+      const where = there === 'island' ? `On ${REGION_INFO.island.name}, ${Math.round(d / 1000)} km south` : `At the fair, ${Math.round(d / 1000)} km north`;
+      const fly = from === 'home' ? 'fly from Gate 3' : `fly from ${REGION_INFO.island.name}’s gate 2`;
+      away = `<p class="wm-card-away">✈️ ${where} · ${fly}</p>`;
+      action = `<button type="button" class="btn btn-primary wm-travel" data-wm-travel>Go to ${escapeHtml(gate.title)} <kbd>Enter</kbd></button>`;
+    }
     this.card.innerHTML = `
       <span class="wm-card-icon" aria-hidden="true">${p.icon}</span>
       <div class="wm-card-text">
         <p class="wm-card-dist">${dist}</p>
         <h3>${escapeHtml(p.label)}</h3>
-        <p>${escapeHtml(p.blurb)}</p>${
+        <p>${escapeHtml(p.blurb)}</p>${away}${
           this.closed.has(id) ? `<p class="wm-card-closed">🚧 Under maintenance${sign ? `: ${escapeHtml(sign)}` : '. Back soon!'}</p>` : ''
         }
       </div>
-      <button type="button" class="btn btn-primary wm-travel" data-wm-travel>Fast travel <kbd>Enter</kbd></button>`;
+      ${action}`;
+    this.card.classList.toggle('is-away', !reachable);
     this.card.hidden = false;
   }
 
@@ -359,9 +500,15 @@ export class WorldMap {
       this.travel(this.selected);
       return;
     }
+    // 1 / 2 / 3: the tabs
+    const tab = ['Digit1', 'Digit2', 'Digit3'].indexOf(e.code);
+    if (tab >= 0) {
+      this.setRegion(VIEWS[tab].id, true);
+      return;
+    }
     if (e.code === 'Equal' || e.code === 'NumpadAdd' || e.code === 'KeyE') this.zoomAt(this.w / 2, this.h / 2, 1.4);
     else if (e.code === 'Minus' || e.code === 'NumpadSubtract' || e.code === 'KeyQ') this.zoomAt(this.w / 2, this.h / 2, 1 / 1.4);
-    else if (e.code === 'KeyC' || e.code === 'Space') this.flyTo(this.visitor.x, this.visitor.z);
+    else if (e.code === 'KeyC' || e.code === 'Space') this.locate();
     else if (e.code === 'Tab') return; // keep normal focus order through the legend
     const pan = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyZ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
     if (pan.includes(e.code) || e.code === 'Space') e.preventDefault();
@@ -386,7 +533,9 @@ export class WorldMap {
 
   /** Called every frame with the visitor and the trains; draws only while the map is open. */
   update(dt: number, visitor: Visitor, trains: Train[]) {
+    const crossed = regionAt(visitor.x, visitor.z) !== this.here;
     this.visitor = visitor;
+    if (crossed) this.refreshPlaces();
     if (!this.isOpen) return;
     this.resize();
     if (!this.w || !this.h) return;
@@ -412,8 +561,8 @@ export class WorldMap {
     g.drawImage(this.base, 0, 0);
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
-    // a dashed route to the chosen place, like a waypoint
-    if (this.selected && this.selected !== this.near) {
+    // a dashed route to the chosen place, like a waypoint (only on the visitor's own landmass)
+    if (this.selected && this.selected !== this.near && canTravel(this.here, this.selected)) {
       const a = this.toScreen(visitor.x, visitor.z);
       const b = this.toScreen(ZONES[this.selected].x, ZONES[this.selected].z);
       g.save();
@@ -432,10 +581,11 @@ export class WorldMap {
       g.restore();
     }
 
-    for (const tr of trains) {
-      const p = this.toScreen(tr.x, tr.z);
-      paintTrain(g, p.x, p.y, tr.color, 5);
-    }
+    if (v.ppm > REGION_PPM)
+      for (const tr of trains) {
+        const p = this.toScreen(tr.x, tr.z);
+        paintTrain(g, p.x, p.y, tr.color, 5);
+      }
 
     const c = this.toScreen(visitor.x, visitor.z);
     this.you.style.transform = `translate3d(${c.x.toFixed(1)}px, ${c.y.toFixed(1)}px, 0) rotate(${-visitor.heading}rad)`;
@@ -453,13 +603,30 @@ export class WorldMap {
     const v = this.view;
     const key = `${v.x.toFixed(2)},${v.z.toFixed(2)},${v.ppm.toFixed(4)},${this.w},${this.h}`;
     if (key === this.baseKey) return;
-    this.baseKey = key;
     const g = this.base.getContext('2d')!;
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    g.fillStyle = '#c9a774';
-    g.fillRect(0, 0, this.w, this.h);
-    // a faint survey grid every 50 m gives the eye something to track while panning
-    const step = v.ppm < 1.2 ? 250 : v.ppm < 3 ? 100 : 50;
+    // zoomed out, the shared tiles (cheap to pan over 40 km); close in, painted live and crisp
+    if (v.ppm * this.dpr < TILE_PPM) {
+      g.fillStyle = '#2b83b5';
+      g.fillRect(0, 0, this.w, this.h);
+      g.imageSmoothingEnabled = true;
+      // until every tile's painted, keep drawing (the key stays stale)
+      if (drawTiles(g, v.x, v.z, v.ppm, this.w, this.h, this.dpr)) this.baseKey = key;
+    } else {
+      this.baseKey = key;
+      const x0 = v.x - this.w / 2 / v.ppm;
+      const z0 = v.z - this.h / 2 / v.ppm;
+      paintWorld(g, (x) => this.toScreen(x, 0).x, (z) => this.toScreen(0, z).y, v.ppm, { x0, z0, x1: x0 + this.w / v.ppm, z1: z0 + this.h / v.ppm }, 40);
+    }
+    this.paintGrid(g);
+    if (v.ppm < REGION_PPM) this.paintWorldLabels(g);
+    else if (v.ppm < LABEL_PPM) this.paintDistrictLabels(g);
+  }
+
+  /** A faint survey grid gives the eye something to track while panning: every 50 m close in, up to 10 km far out. */
+  private paintGrid(g: CanvasRenderingContext2D) {
+    const v = this.view;
+    const step = v.ppm < 0.012 ? 10000 : v.ppm < 0.05 ? 5000 : v.ppm < 0.3 ? 1000 : v.ppm < 1.2 ? 250 : v.ppm < 3 ? 100 : 50;
     g.strokeStyle = 'rgba(29, 18, 56, 0.08)';
     g.lineWidth = 1;
     g.beginPath();
@@ -476,32 +643,95 @@ export class WorldMap {
       g.lineTo(this.w, sy);
     }
     g.stroke();
-    paintFair(g, (x) => this.toScreen(x, 0).x, (z) => this.toScreen(0, z).y, v.ppm);
-    // zoomed out (where the places' own labels are hidden), each district's name across its plaza
-    if (v.ppm < LABEL_PPM) {
-      const size = Math.round(Math.min(22, Math.max(12, v.ppm * 5.5)));
-      g.font = `${size}px "Lilita One", "Arial Rounded MT Bold", sans-serif`;
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      g.lineJoin = 'round';
-      for (const d of Object.values(DISTRICTS)) {
-        const p = this.toScreen(d.label[0], d.label[1]);
-        const label = d.name.toUpperCase();
-        g.lineWidth = Math.max(3, size * 0.32);
-        g.strokeStyle = 'rgba(29, 18, 56, 0.85)';
-        g.strokeText(label, p.x, p.y);
-        g.fillStyle = d.color;
-        g.fillText(label, p.x, p.y);
-      }
+  }
+
+  /** Zoomed out (where the places' own labels are hidden), each district's name across its plaza. */
+  private paintDistrictLabels(g: CanvasRenderingContext2D) {
+    const v = this.view;
+    const size = Math.round(Math.min(22, Math.max(12, v.ppm * 5.5)));
+    g.font = `${size}px "Lilita One", "Arial Rounded MT Bold", sans-serif`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.lineJoin = 'round';
+    for (const d of Object.values(DISTRICTS)) {
+      const p = this.toScreen(d.label[0], d.label[1]);
+      if (p.x < -200 || p.y < -40 || p.x > this.w + 200 || p.y > this.h + 40) continue;
+      const label = d.name.toUpperCase();
+      g.lineWidth = Math.max(3, size * 0.32);
+      g.strokeStyle = 'rgba(29, 18, 56, 0.85)';
+      g.strokeText(label, p.x, p.y);
+      g.fillStyle = d.color;
+      g.fillText(label, p.x, p.y);
     }
   }
 
+  /** The World view: each landmass's name, the airports, and the flights' route across the sea with its fixes. */
+  private paintWorldLabels(g: CanvasRenderingContext2D) {
+    const [home, isle] = (['home', 'island'] as const).map((r) => AIRPORT_MARKS.find((a) => a.region === r)!);
+    const pts = [home, ...ROUTE, isle].map((p) => this.toScreen(p.x, p.z));
+    g.save();
+    g.lineCap = g.lineJoin = 'round';
+    g.setLineDash([12, 9]);
+    g.lineDashOffset = -this.t * 20;
+    g.strokeStyle = 'rgba(29, 18, 56, 0.5)';
+    g.lineWidth = 6;
+    g.beginPath();
+    for (const p of pts) g.lineTo(p.x, p.y);
+    g.stroke();
+    g.strokeStyle = PALETTE.cream;
+    g.lineWidth = 2.5;
+    g.stroke();
+    g.setLineDash([]);
+    ROUTE.forEach((f, i) => paintFix(g, pts[i + 1].x, pts[i + 1].y, f.name));
+    // the flight numbers along the line, between the coasts
+    const mid = this.toScreen(ROUTE[1].x, ROUTE[1].z);
+    g.font = '700 13px "DM Sans", sans-serif';
+    g.textAlign = 'right';
+    g.textBaseline = 'middle';
+    g.lineWidth = 4;
+    g.strokeStyle = 'rgba(29, 18, 56, 0.85)';
+    const text = `✈️ FA101 south · FA102 north · ${Math.round((isle.z - home.z) / 1000)} km`;
+    g.strokeText(text, mid.x - 14, mid.y);
+    g.fillStyle = PALETTE.cream;
+    g.fillText(text, mid.x - 14, mid.y);
+    // the landmasses' names and the airports' codes
+    g.textAlign = 'center';
+    for (const r of ['home', 'island'] as const) {
+      const l = REGION_LABELS[r];
+      const p = this.toScreen(l.x, l.z);
+      p.y += l.dy;
+      g.font = `26px "Lilita One", "Arial Rounded MT Bold", sans-serif`;
+      g.lineWidth = 7;
+      g.strokeStyle = 'rgba(29, 18, 56, 0.85)';
+      g.strokeText(l.name.toUpperCase(), p.x, p.y);
+      g.fillStyle = r === 'home' ? '#ffd166' : '#7ef0c2';
+      g.fillText(l.name.toUpperCase(), p.x, p.y);
+    }
+    for (const a of AIRPORT_MARKS) {
+      const p = this.toScreen(a.x, a.z);
+      g.font = '700 12px "DM Sans", sans-serif';
+      g.lineWidth = 4;
+      g.strokeStyle = 'rgba(29, 18, 56, 0.85)';
+      const label = `${a.icao} · ${a.name}`;
+      const y = a.region === 'home' ? p.y + 22 : p.y - 22;
+      g.strokeText(label, p.x, y);
+      g.fillStyle = '#ffffff';
+      g.fillText(label, p.x, y);
+    }
+    g.restore();
+  }
+
   private placePins() {
-    const showLabels = this.view.ppm >= LABEL_PPM;
+    const ppm = this.view.ppm;
+    const showLabels = ppm >= LABEL_PPM;
+    // far out (the World), only the gates the flights leave from keep their pins
+    const far = ppm < REGION_PPM;
     for (const [id, pin] of this.pins) {
       const p = this.toScreen(ZONES[id].x, ZONES[id].z);
       pin.style.transform = `translate3d(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px, 0)`;
-      pin.classList.toggle('show-label', showLabels || id === this.hovered || id === this.selected);
+      const gate = id === REGION_INFO.home.departure || id === REGION_INFO.island.departure;
+      pin.classList.toggle('is-far', far && !gate && id !== this.selected);
+      pin.classList.toggle('show-label', showLabels || id === this.hovered || id === this.selected || (far && gate));
       pin.classList.toggle('is-hovered', id === this.hovered);
     }
   }

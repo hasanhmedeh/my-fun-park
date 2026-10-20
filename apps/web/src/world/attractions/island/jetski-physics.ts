@@ -61,17 +61,21 @@ export interface Craft {
   stunT: number;
   /** In the shallows beyond the course's edge (set by the race each frame). */
   shallow: boolean;
+  /** Seconds before the rider can bounce the ski up for another hop. */
+  hopT: number;
   /** This frame's controls. */
   throttle: number;
   steerIn: number;
   wantBoost: boolean;
+  /** The rider throws their weight back and bounces the ski out of the water (Space). */
+  wantHop: boolean;
 }
 
 export function newCraft(): Craft {
   return {
     x: 0, z: 0, h: 0, vx: 0, vz: 0, y: 0, vy: 0, pitch: 0, pitchV: 0, roll: 0, yawRate: 0, steer: 0, plane: 0,
     air: false, airT: 0, airYaw: 0, ramp: -1, boosting: false, burst: 0, surf: 0, stunT: 0, shallow: false,
-    throttle: 0, steerIn: 0, wantBoost: false,
+    hopT: 0, throttle: 0, steerIn: 0, wantBoost: false, wantHop: false,
   };
 }
 
@@ -85,8 +89,11 @@ export interface StepEvents {
 
 export const forwardSpeed = (c: Craft) => -c.vx * Math.sin(c.h) - c.vz * Math.cos(c.h);
 
-/** Yaw rate the nozzle can give at speed v (rad/s): quick when slow, a wider arc at full tilt. */
-export const yawMax = (v: number) => (1.9 * Math.min(1, Math.abs(v) / 3)) / (1 + Math.abs(v) / 17);
+/**
+ * Yaw rate the nozzle can give at speed v (rad/s): quick when slow, a much wider arc at full tilt
+ * (a 5 m circle at 18 km/h, about 50 m flat out), so the tight bends want the throttle eased.
+ */
+export const yawMax = (v: number) => (1.6 * Math.min(1, Math.abs(v) / 3)) / (1 + Math.abs(v) / 7);
 
 const BOOST_DRAIN = 1 / 2.6; // a full meter lasts 2.6 s
 const ev: StepEvents = { launched: 0, landed: null };
@@ -114,6 +121,13 @@ export function stepCraft(c: Craft, dt: number, water: number, slope: number, ra
   c.boosting = (c.wantBoost || c.burst > 0) && c.surf > 0 && !stunned && c.throttle > 0;
   if (c.boosting) c.surf = Math.max(0, c.surf - BOOST_DRAIN * dt);
   if (c.surf <= 0) c.burst = 0;
+
+  // ---- a hop: up on the plane, the rider pumps the ski clear of the water (over a wake, say)
+  if (c.hopT > 0) c.hopT -= dt;
+  if (c.wantHop && !c.air && c.ramp < 0 && c.plane > 0.5 && c.hopT <= 0 && !stunned) {
+    c.vy += 3.4;
+    c.hopT = 1.1;
+  }
 
   // ---- vertical: riding up a ramp, floating, or flying
   const wasAir = c.air;
@@ -205,10 +219,10 @@ export function stepCraft(c: Craft, dt: number, water: number, slope: number, ra
   c.steer += (c.steerIn - c.steer) * Math.min(1, dt * 8);
   let yaw: number;
   if (c.air) {
-    yaw = c.steer * 4.6;
+    yaw = c.steerIn * 4.6;
     c.airYaw += c.yawRate * dt;
   } else {
-    const push = c.ramp >= 0 ? 0.25 : 0.32 + 0.68 * Math.max(0, thr);
+    const push = c.ramp >= 0 ? 0.25 : 0.45 + 0.55 * Math.max(0, thr);
     yaw = c.steer * yawMax(vf) * push * Math.sign(vf || 1);
   }
   c.yawRate += (yaw - c.yawRate) * Math.min(1, dt * (c.air ? 5 : 6));
@@ -241,7 +255,7 @@ export function stepCraft(c: Craft, dt: number, water: number, slope: number, ra
   // the throttle lifts it (the trick to a flat landing)
   if (c.ramp < 0) {
     let want: number;
-    if (c.air) want = 0.55 * Math.atan2(c.vy, Math.max(4, Math.abs(vf))) + (c.throttle <= 0 ? 0.2 : 0) - (c.throttle > 0.5 ? 0.04 : 0);
+    if (c.air) want = 0.55 * Math.atan2(c.vy, Math.max(4, Math.abs(vf))) + (c.throttle > 0.5 ? -0.1 : c.throttle < -0.05 ? 0.32 : 0.2);
     else {
       const hump = Math.sin(Math.PI * Math.min(1, c.plane * 1.4)) * 0.11 * Math.max(0, thr);
       want = Math.atan(slope) + hump + 0.02 * c.plane + (thr < 0 && vf > 2 ? -0.06 : 0);
@@ -265,6 +279,6 @@ export function stepCraft(c: Craft, dt: number, water: number, slope: number, ra
 export function placeCraft(c: Craft, x: number, z: number, h: number, water: number) {
   Object.assign(c, {
     x, z, h, vx: 0, vz: 0, y: water - DRAFT.low, vy: 0, pitch: 0, pitchV: 0, roll: 0, yawRate: 0, steer: 0, plane: 0,
-    air: false, airT: 0, airYaw: 0, ramp: -1, boosting: false, burst: 0, stunT: 0, shallow: false, throttle: 0, steerIn: 0, wantBoost: false,
+    air: false, airT: 0, airYaw: 0, ramp: -1, boosting: false, burst: 0, stunT: 0, shallow: false, hopT: 0, throttle: 0, steerIn: 0, wantBoost: false, wantHop: false,
   });
 }

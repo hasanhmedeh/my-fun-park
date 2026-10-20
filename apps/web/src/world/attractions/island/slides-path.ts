@@ -64,6 +64,8 @@ export interface SlidePath {
   /** Curvature vector dT/ds (points to the centre of the bend, 1/radius long). */
   curv: THREE.Vector3[];
   sec: Section[];
+  /** Which of the spec's pieces each sample belongs to (the supports find the helices' axes by it). */
+  piece: number[];
   length: number;
   /** Per sample: how far up each wall the trough goes (radians from the bottom; π = closed). */
   lipL: number[];
@@ -78,15 +80,19 @@ export interface SlidePath {
 export function buildSlide(spec: SlideSpec): SlidePath {
   const pos: THREE.Vector3[] = [];
   const sec: Section[] = [];
+  const piece: number[] = [];
   const p = new THREE.Vector3(spec.start.x, spec.start.y, spec.start.z);
   let heading = spec.heading * DEG;
   let pitch = 0;
   const dir = () => new THREE.Vector3(Math.sin(heading) * Math.cos(pitch), Math.sin(pitch), -Math.cos(heading) * Math.cos(pitch));
+  let k = 0;
   const push = (s: Section) => {
     pos.push(p.clone());
     sec.push(s);
+    piece.push(k);
   };
-  for (const e of spec.pieces) {
+  for (; k < spec.pieces.length; k++) {
+    const e = spec.pieces[k];
     const s = e.sec ?? 'open';
     if (e.t === 'straight') {
       const n = Math.max(1, Math.round(e.len / DS));
@@ -106,7 +112,8 @@ export function buildSlide(spec: SlideSpec): SlidePath {
       }
     }
   }
-  push(spec.pieces[spec.pieces.length - 1].sec ?? 'open');
+  k = spec.pieces.length - 1;
+  push(spec.pieces[k].sec ?? 'open');
 
   const n = pos.length;
   const tan: THREE.Vector3[] = [];
@@ -134,6 +141,7 @@ export function buildSlide(spec: SlideSpec): SlidePath {
     right,
     curv,
     sec,
+    piece,
     length: (n - 1) * DS,
     lipL: sec.map((s) => (closed(s) ? Math.PI : 0)),
     lipR: sec.map((s) => (closed(s) ? Math.PI : 0)),
@@ -224,6 +232,10 @@ export interface RiderInput {
   lean: number;
 }
 
+/** The flume's water speed (m/s), and the splash lane's ploughing drag (a = k·v²). */
+const FLOW = 2.4;
+const LANE_DRAG = 0.05;
+
 const tmp = frame();
 const A = new THREE.Vector3();
 
@@ -263,7 +275,9 @@ export function stepRider(path: SlidePath, st: RiderState, inp: RiderInput | nul
   const drag = spec.drag * (tuck > 0 ? 1 - 0.25 * tuck : 1 - 0.6 * tuck);
   let a = -G * f.t.y - drag * st.v * Math.abs(st.v) - mu * st.normal * Math.sign(st.v);
   // the splash lane's standing water ploughs the rider to a gentle speed
-  if (sec === 'lane') a -= 0.075 * st.v * Math.abs(st.v) + 0.4 * Math.sign(st.v);
+  if (sec === 'lane') a -= LANE_DRAG * st.v * Math.abs(st.v) + 0.3;
+  // elsewhere the water running down the flume carries a slow rider along (the push-off, flat run-outs)
+  else if (st.v < FLOW) a += (FLOW - st.v) * 0.9;
   st.v += a * dt;
   // a slide never runs backwards: at worst the rider is stuck and scoots along (the start's lip, a flat run-out)
   if (st.v < 0.8) st.v = 0.8;
@@ -336,12 +350,12 @@ export const SLIDES: SlideSpec[] = [
     start: { x: 0, y: TOWER.deck + 0.05 + 0.62, z: TOWER.z + TOWER.half - 0.6 },
     heading: 180,
     pieces: [
-      { t: 'straight', len: 2.2 },
+      { t: 'straight', len: 1.4 },
       { t: 'pitch', angle: -52, radius: 5.5 },
-      { t: 'straight', len: 15.6 },
+      { t: 'straight', len: 13.7 },
       { t: 'pitch', angle: 52, radius: 26 },
       { t: 'straight', len: 3 },
-      { t: 'straight', len: 25.4, sec: 'lane' },
+      { t: 'straight', len: 22.4, sec: 'lane' },
     ],
     colour: '#e8333b',
     stripe: '#ffffff',
@@ -353,25 +367,26 @@ export const SLIDES: SlideSpec[] = [
     name: 'Typhoon',
     radius: 0.7,
     inset: 0.17,
-    mu: 0.04,
-    drag: 0.0018,
+    mu: 0.07,
+    drag: 0.0025,
     start: { x: TOWER.x - TOWER.half + 0.6, y: TOWER.deck + 0.05 + 0.7, z: TOWER.z },
     heading: 270,
     pieces: [
-      { t: 'straight', len: 2.4 },
-      { t: 'pitch', angle: -14, radius: 8, sec: 'tube' },
-      { t: 'straight', len: 7, sec: 'tube' },
-      { t: 'turn', angle: 360, radius: 7.2, sec: 'clear' },
-      { t: 'straight', len: 3, sec: 'tube' },
-      { t: 'turn', angle: -50, radius: 9, sec: 'tube' },
-      { t: 'turn', angle: 140, radius: 8.5, sec: 'clear' },
-      { t: 'pitch', angle: 4, radius: 20, sec: 'tube' },
-      { t: 'straight', len: 9, sec: 'tube' },
-      { t: 'turn', angle: -35, radius: 12, sec: 'clear' },
-      { t: 'turn', angle: 35, radius: 12, sec: 'clear' },
-      { t: 'straight', len: 6, sec: 'tube' },
-      { t: 'pitch', angle: 10, radius: 10, sec: 'tube' },
-      { t: 'straight', len: 2.2 },
+      { t: 'straight', len: 1.6 },
+      { t: 'pitch', angle: -16, radius: 6, sec: 'tube' },
+      { t: 'straight', len: 5, sec: 'tube' },
+      { t: 'pitch', angle: 6, radius: 12, sec: 'tube' },
+      { t: 'turn', angle: 360, radius: 7, sec: 'clear' },
+      { t: 'turn', angle: 360, radius: 7, sec: 'tube' },
+      { t: 'pitch', angle: 5.3, radius: 16, sec: 'tube' },
+      { t: 'turn', angle: 90, radius: 9, sec: 'tube' },
+      { t: 'straight', len: 4, sec: 'tube' },
+      { t: 'turn', angle: 50, radius: 10, sec: 'clear' },
+      { t: 'turn', angle: -100, radius: 10, sec: 'clear' },
+      { t: 'turn', angle: 50, radius: 10, sec: 'clear' },
+      { t: 'straight', len: 8, sec: 'tube' },
+      { t: 'pitch', angle: 2.5, radius: 12, sec: 'tube' },
+      { t: 'straight', len: 12 },
     ],
     colour: '#1e7fd6',
     stripe: '#ffd23d',
@@ -383,23 +398,24 @@ export const SLIDES: SlideSpec[] = [
     name: 'Lazy Loop',
     radius: 1.25,
     inset: 0.45,
-    mu: 0.05,
-    drag: 0.0028,
+    mu: 0.08,
+    drag: 0.0035,
     start: { x: TOWER.x + TOWER.half - 0.6, y: TOWER.deck + 0.05 + 1.25, z: TOWER.z },
     heading: 90,
     pieces: [
+      { t: 'straight', len: 2.5 },
+      { t: 'pitch', angle: -10, radius: 10 },
+      { t: 'straight', len: 12 },
+      { t: 'pitch', angle: 2.3, radius: 12 },
+      { t: 'turn', angle: -450, radius: 13 },
+      { t: 'straight', len: 4 },
+      { t: 'turn', angle: -60, radius: 14 },
+      { t: 'turn', angle: 60, radius: 14 },
+      { t: 'straight', len: 6 },
+      { t: 'turn', angle: -30, radius: 12 },
+      { t: 'turn', angle: 30, radius: 12 },
+      { t: 'pitch', angle: 8, radius: 14 },
       { t: 'straight', len: 3 },
-      { t: 'pitch', angle: -9, radius: 14 },
-      { t: 'straight', len: 3 },
-      { t: 'turn', angle: -90, radius: 13 },
-      { t: 'straight', len: 7 },
-      { t: 'turn', angle: 360, radius: 11 },
-      { t: 'straight', len: 5 },
-      { t: 'turn', angle: -40, radius: 12 },
-      { t: 'turn', angle: 40, radius: 12 },
-      { t: 'straight', len: 10 },
-      { t: 'pitch', angle: 9, radius: 14 },
-      { t: 'straight', len: 2 },
     ],
     colour: '#ffb12b',
     stripe: '#ff5d7a',

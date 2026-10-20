@@ -1,0 +1,659 @@
+/* ---------- The A320 flight's HUD and touch controls (world/flight/flight-hud.ts, touch.ts) ----------
+   The cockpit's own panel fills the bottom of the screen in the cockpit view (cockpit.css), so
+   everything here lives at the top: the next step and the taxi guide in the middle, the radio log on
+   the left, the camera, the toggles and the key help on the right. The touch controls sit round the
+   instruments: the stick on the left, the thrust lever and the radio button on the right. */
+
+.fl-hud[hidden],
+.fl-hud [hidden],
+.fl-touch [hidden] {
+  display: none !important;
+}
+
+.fl-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-family: var(--body, system-ui, sans-serif);
+  color: #fff;
+}
+
+/* the middle column: the hint, the progress line, the taxi guide and the toasts */
+.fl-top {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, calc(100% - 760px));
+  min-width: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.fl-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(14, 16, 22, 0.78);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(6px);
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  text-align: center;
+}
+.fl-hint-key {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--cream, #fff5e3);
+  color: var(--ink, #1d1238);
+  font: 700 0.85rem/1.4 ui-monospace, monospace;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+}
+.fl-progress {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(14, 16, 22, 0.6);
+  font: 600 0.82rem/1.4 ui-monospace, monospace;
+  color: #cfe7ff;
+}
+.fl-taxi {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px 8px 10px;
+  border-radius: 14px;
+  background: rgba(10, 40, 22, 0.82);
+  border: 2px solid #39d26b;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+}
+.fl-taxi.is-fast {
+  background: rgba(70, 30, 6, 0.86);
+  border-color: #ffb43c;
+}
+.fl-taxi-arrow {
+  font-size: 1.9rem;
+  line-height: 1;
+  color: #4dff88;
+}
+.fl-taxi.is-fast .fl-taxi-arrow {
+  color: #ffc24a;
+}
+.fl-taxi-text {
+  font-weight: 700;
+  font-size: 1rem;
+}
+.fl-taxi-speed {
+  font: 600 0.82rem/1.3 ui-monospace, monospace;
+  color: #bfe9cc;
+  white-space: nowrap;
+}
+.fl-taxi.is-fast .fl-taxi-speed {
+  color: #ffd690;
+}
+.fl-toasts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.fl-toast {
+  padding: 6px 14px;
+  border-radius: 10px;
+  background: rgba(20, 24, 32, 0.86);
+  font-weight: 700;
+  font-size: 0.9rem;
+  animation: fl-toast-in 0.25s ease-out;
+}
+.fl-toast.is-bad {
+  background: rgba(150, 22, 30, 0.9);
+}
+.fl-toast.is-good {
+  background: rgba(22, 120, 60, 0.9);
+}
+@keyframes fl-toast-in {
+  from {
+    transform: translateY(-6px);
+    opacity: 0;
+  }
+}
+
+/* the radio log: the last three lines, coloured by who's talking */
+.fl-radio {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top));
+  left: max(16px, env(safe-area-inset-left));
+  width: min(340px, 30vw);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fl-line {
+  padding: 6px 10px;
+  border-radius: 10px;
+  border-left: 4px solid #9aa5b1;
+  background: rgba(14, 16, 22, 0.74);
+  font-size: 0.84rem;
+  line-height: 1.35;
+  transition: opacity 0.4s;
+}
+.fl-line b {
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.fl-atc {
+  border-left-color: #4dc3ff;
+}
+.fl-atc b {
+  color: #8fd8ff;
+}
+.fl-pilot,
+.fl-captain,
+.fl-fo {
+  border-left-color: #4dff88;
+}
+.fl-pilot b,
+.fl-captain b,
+.fl-fo b {
+  color: #9dffbd;
+}
+.fl-cabin,
+.fl-pa {
+  border-left-color: #ffc24a;
+}
+.fl-cabin b,
+.fl-pa b {
+  color: #ffd98a;
+}
+
+/* the camera, the toggles and the key help: top right, under the ℹ️ and the exit button */
+.fl-side {
+  position: absolute;
+  top: calc(max(16px, env(safe-area-inset-top)) + 58px);
+  right: max(16px, env(safe-area-inset-right));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 260px;
+}
+.fl-cam {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(14, 16, 22, 0.7);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.fl-tools {
+  display: flex;
+  gap: 6px;
+}
+.fl-tool {
+  pointer-events: auto;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(14, 16, 22, 0.7);
+  color: #cfd6de;
+  font: 700 0.78rem/1.3 var(--body, system-ui, sans-serif);
+  cursor: pointer;
+}
+.fl-tool[aria-pressed='true'] {
+  background: #ff4fd8;
+  color: #fff;
+}
+.fl-tool[data-fl-voice][aria-pressed='true'] {
+  background: #2f8cff;
+}
+.fl-keys {
+  pointer-events: auto;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: rgba(14, 16, 22, 0.78);
+  font-size: 0.8rem;
+}
+.fl-keys summary {
+  cursor: pointer;
+  font-weight: 700;
+  text-align: right;
+}
+.fl-keys dl {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 2px 12px;
+  margin: 8px 0 2px;
+}
+.fl-keys dt {
+  font: 700 0.76rem/1.5 ui-monospace, monospace;
+  color: #ffd98a;
+  white-space: nowrap;
+}
+.fl-keys dd {
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* the black fade (skipping the taxi-in) */
+.fl-fade {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  transition: opacity 0.45s;
+}
+.fl-fade.on {
+  opacity: 1;
+}
+
+/* the Game's exit button moves up out of the instruments' way, beside the ℹ️ */
+.is-piloting .ride-exit {
+  top: max(16px, env(safe-area-inset-top));
+  bottom: auto;
+  left: auto;
+  right: calc(max(16px, env(safe-area-inset-right)) + 60px);
+  transform: none;
+}
+/* the booking card's extras */
+.fl-offer-tod {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0.4em 0 0.8em;
+}
+.fl-offer-tod button {
+  padding: 5px 12px;
+  border: 2px solid rgba(255, 245, 227, 0.4);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: 700 0.85rem/1.3 var(--body, system-ui, sans-serif);
+  cursor: pointer;
+}
+.fl-offer-tod button[aria-pressed='true'] {
+  background: var(--cream, #fff5e3);
+  color: var(--ink, #1d1238);
+  border-color: var(--cream, #fff5e3);
+}
+.fl-offer-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  margin: 0.6em 0;
+  font-size: 0.88rem;
+}
+.fl-offer-facts dt {
+  font-weight: 700;
+  opacity: 0.8;
+}
+.fl-offer-facts dd {
+  margin: 0;
+}
+.fl-offer-metar {
+  margin: 0.4em 0 0.8em;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  font: 0.74rem/1.45 ui-monospace, monospace;
+  word-break: break-word;
+}
+.fl-report ol {
+  margin: 0.5em 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+.fl-report .fl-bad {
+  color: #ff9a9a;
+}
+.fl-report .fl-good {
+  color: #9dffbd;
+}
+
+/* ---------- touch: the stick, the thrust lever, the buttons ---------- */
+.fl-touch {
+  position: absolute;
+  inset: 0;
+  display: none;
+  pointer-events: none;
+}
+.is-piloting .fl-touch {
+  display: block;
+}
+.is-piloting .stick {
+  display: block;
+  bottom: max(16px, env(safe-area-inset-bottom));
+}
+.is-piloting .minimap,
+.is-piloting .touch-lift {
+  display: none;
+}
+.is-piloting .touch-action {
+  right: calc(max(16px, env(safe-area-inset-right)) + 124px);
+  bottom: max(18px, env(safe-area-inset-bottom));
+}
+.fl-thrust {
+  position: absolute;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  width: 64px;
+  height: 200px;
+  border-radius: 14px;
+  background: rgba(10, 12, 16, 0.78);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+  touch-action: none;
+}
+.fl-thrust-track {
+  position: absolute;
+  inset: 16px 0;
+  touch-action: none;
+}
+.fl-thrust-track::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  margin-left: -3px;
+  border-radius: 3px;
+  background: #2a3037;
+}
+.fl-thrust-track i {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.45);
+}
+.fl-thrust-track b {
+  position: absolute;
+  right: calc(100% + 12px);
+  top: -7px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: rgba(10, 12, 16, 0.7);
+  font: 700 0.62rem/14px ui-monospace, monospace;
+  color: #cfd6de;
+  white-space: nowrap;
+}
+.fl-thrust-handle {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 22px;
+  margin-bottom: -11px;
+  border-radius: 6px;
+  background: linear-gradient(#f2f4f6, #b9c0c7);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+.fl-tbtns {
+  position: absolute;
+  display: grid;
+  gap: 6px;
+  pointer-events: none;
+}
+.fl-tbtns button {
+  pointer-events: auto;
+  touch-action: none;
+  min-width: 64px;
+  height: 40px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(10, 12, 16, 0.78);
+  color: #e8edf2;
+  font: 700 0.76rem/1 ui-monospace, monospace;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.fl-tbtns button.is-on {
+  background: #1f8a4c;
+  color: #fff;
+}
+.fl-tbtns-a {
+  left: max(16px, env(safe-area-inset-left));
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + var(--stick, 124px) + 14px);
+  grid-template-columns: repeat(3, auto);
+}
+.fl-tbtns-b {
+  right: max(16px, env(safe-area-inset-right));
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 214px);
+  grid-template-columns: repeat(2, auto);
+}
+
+/* ---------- phones held sideways: everything smaller, round the instruments in the middle ---------- */
+@media (orientation: landscape) and (max-height: 540px) {
+  .fl-top {
+    top: max(6px, env(safe-area-inset-top));
+    width: min(440px, 52vw);
+    min-width: 0;
+    gap: 4px;
+  }
+  .fl-hint {
+    padding: 4px 10px;
+    font-size: 0.78rem;
+  }
+  .fl-progress {
+    font-size: 0.7rem;
+    padding: 2px 8px;
+  }
+  .fl-taxi {
+    padding: 4px 10px 4px 6px;
+    gap: 8px;
+  }
+  .fl-taxi-arrow {
+    font-size: 1.3rem;
+  }
+  .fl-taxi-text {
+    font-size: 0.8rem;
+  }
+  .fl-taxi-speed {
+    font-size: 0.68rem;
+  }
+  .fl-toast {
+    padding: 3px 10px;
+    font-size: 0.74rem;
+  }
+  /* under the instruments strip (top-left on phones) */
+  .fl-radio {
+    top: auto;
+    bottom: calc(50% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(420px, 50vw);
+    gap: 3px;
+  }
+  .fl-line {
+    padding: 3px 8px;
+    font-size: 0.7rem;
+  }
+  .fl-line:not(:last-child) {
+    display: none;
+  }
+  .fl-line b {
+    display: inline;
+    margin-right: 6px;
+    font-size: 0.62rem;
+  }
+  .fl-side {
+    top: calc(max(8px, env(safe-area-inset-top)) + 48px);
+    gap: 4px;
+  }
+  .fl-cam {
+    font-size: 0.7rem;
+    padding: 2px 8px;
+  }
+  .fl-tool {
+    font-size: 0.66rem;
+    padding: 3px 8px;
+  }
+  .is-piloting .stick {
+    --stick: 108px;
+    width: 108px;
+    height: 108px;
+    left: max(14px, env(safe-area-inset-left));
+    bottom: max(10px, env(safe-area-inset-bottom));
+  }
+  .fl-thrust {
+    width: 56px;
+    height: 160px;
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+  }
+  .is-piloting .touch-action {
+    width: 58px;
+    height: 58px;
+    font-size: 1.3rem;
+    right: calc(max(12px, env(safe-area-inset-right)) + 108px);
+    bottom: max(12px, env(safe-area-inset-bottom));
+  }
+  .fl-tbtns {
+    gap: 4px;
+  }
+  .fl-tbtns button {
+    min-width: 54px;
+    height: 32px;
+    font-size: 0.64rem;
+  }
+  .fl-tbtns-a {
+    left: max(12px, env(safe-area-inset-left));
+    bottom: calc(max(10px, env(safe-area-inset-bottom)) + 120px);
+  }
+  .fl-tbtns-b {
+    right: max(12px, env(safe-area-inset-right));
+    bottom: calc(max(10px, env(safe-area-inset-bottom)) + 168px);
+  }
+}
+
+/* ---------- phones held upright: the controls in the sky above the instruments and down their sides ---------- */
+@media (orientation: portrait) and (max-width: 720px) {
+  .fl-top {
+    top: calc(max(8px, env(safe-area-inset-top)) + 4px);
+    left: calc(max(8px, env(safe-area-inset-left)) + 132px);
+    right: 60px;
+    width: auto;
+    min-width: 0;
+    transform: none;
+    gap: 4px;
+  }
+  .fl-hint {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.74rem;
+  }
+  .fl-progress {
+    font-size: 0.66rem;
+    padding: 2px 8px;
+  }
+  .fl-taxi {
+    padding: 4px 8px 4px 6px;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .fl-taxi-arrow {
+    font-size: 1.2rem;
+  }
+  .fl-taxi-text {
+    font-size: 0.74rem;
+  }
+  .fl-taxi-speed {
+    font-size: 0.64rem;
+  }
+  .fl-toast {
+    padding: 3px 8px;
+    font-size: 0.7rem;
+  }
+  .fl-radio {
+    top: auto;
+    bottom: calc(48% + 178px);
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    width: auto;
+    gap: 3px;
+  }
+  .fl-line {
+    padding: 3px 8px;
+    font-size: 0.68rem;
+  }
+  .fl-line:not(:last-child) {
+    display: none;
+  }
+  .fl-line b {
+    display: inline;
+    margin-right: 6px;
+    font-size: 0.6rem;
+  }
+  .fl-side {
+    top: calc(max(8px, env(safe-area-inset-top)) + 104px);
+    right: max(8px, env(safe-area-inset-right));
+    gap: 4px;
+  }
+  .fl-cam {
+    font-size: 0.68rem;
+    padding: 2px 8px;
+  }
+  .fl-tool {
+    font-size: 0.64rem;
+    padding: 3px 8px;
+  }
+  /* above the stick: the hint takes the top */
+  .is-piloting .ride-exit {
+    top: auto;
+    bottom: calc(48% + 134px);
+    left: max(10px, env(safe-area-inset-left));
+    right: auto;
+  }
+  .is-piloting .stick {
+    --stick: 112px;
+    width: 112px;
+    height: 112px;
+    left: max(10px, env(safe-area-inset-left));
+    bottom: calc(48% + 12px);
+  }
+  .fl-thrust {
+    width: 56px;
+    height: 150px;
+    right: max(10px, env(safe-area-inset-right));
+    bottom: calc(48% + 12px);
+  }
+  .is-piloting .touch-action {
+    width: 58px;
+    height: 58px;
+    font-size: 1.3rem;
+    right: calc(max(10px, env(safe-area-inset-right)) + 104px);
+    bottom: calc(48% + 14px);
+  }
+  .fl-tbtns {
+    gap: 5px;
+    grid-template-columns: 1fr;
+  }
+  .fl-tbtns button {
+    min-width: 0;
+    width: 88px;
+    height: 38px;
+    font-size: 0.66rem;
+  }
+  /* down the sides of the PFD and the ND */
+  .fl-tbtns-a {
+    left: max(6px, env(safe-area-inset-left));
+    bottom: max(14px, env(safe-area-inset-bottom));
+  }
+  .fl-tbtns-b {
+    right: max(6px, env(safe-area-inset-right));
+    bottom: max(14px, env(safe-area-inset-bottom));
+  }
+}

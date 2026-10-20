@@ -35,6 +35,17 @@ export interface Look {
   legEnd: number;
   /** Width multiplier: slimmer or broader builds. */
   build: number;
+  /**
+   * Where the top starts, as a fraction of height, when it doesn't reach down to the waistband: a
+   * bikini top's lower edge. Above 1 there is no top at all (bare-chested, in swim shorts).
+   */
+  topFrom?: number;
+  /** The neckline as a fraction of height (default 0.9, a crew neck; lower for a swimsuit). */
+  neckline?: number;
+  /** The waistband as a fraction of height (default by gender; lower for swim shorts and bikinis). */
+  waist?: number;
+  /** Something painted over the top: reflective hi-vis bands round the body and sleeves, or a tie. */
+  trim?: { kind: 'bands' | 'tie'; colour: THREE.Color };
 }
 
 const pick = <T>(r: () => number, a: readonly T[]) => a[Math.floor(r() * a.length)];
@@ -92,6 +103,100 @@ export function randomLook(r: () => number, opts: { child?: boolean; gender?: Ge
   };
 }
 
+// ------------------------------------------------------------------------------------ uniforms and holiday clothes
+
+const col = (hex: string) => new THREE.Color(hex);
+/** Funfair Air's colours: the fair's ink navy, its red and its gold. */
+const AIRLINE = { ink: '#1d1238', red: '#c8233f', gold: '#ffc23d' };
+
+/** A Funfair Air pilot: white short-sleeved shirt with a navy tie, navy trousers, black shoes. */
+export function pilotLook(r: () => number): Look {
+  const base = randomLook(r, { gender: r() < 0.3 ? 'f' : 'm', age: r() < 0.25 ? 'old' : 'young' });
+  return {
+    ...base,
+    hairStyle: base.gender === 'm' ? pick(r, ['Hair_SimpleParted', 'Hair_Buzzed']) : 'Hair_Buns',
+    beard: false,
+    top: col('#f4f6f8'),
+    pants: col('#1b2033'),
+    shoe: col('#141414'),
+    sleeve: 0.3,
+    legEnd: 0.045,
+    build: 0.96 + r() * 0.1,
+    trim: { kind: 'tie', colour: col('#1b2033') },
+  };
+}
+
+/** Funfair Air cabin crew: the airline's red jacket with a gold neckerchief, navy trousers. */
+export function cabinCrewLook(r: () => number): Look {
+  const base = randomLook(r, { gender: r() < 0.7 ? 'f' : 'm', age: 'young' });
+  return {
+    ...base,
+    hairStyle: base.gender === 'm' ? 'Hair_SimpleParted' : pick(r, ['Hair_Buns', 'Hair_Buns', 'Hair_Long']),
+    beard: false,
+    top: col(AIRLINE.red),
+    pants: col(AIRLINE.ink),
+    shoe: col('#141414'),
+    sleeve: 0.96,
+    legEnd: 0.045,
+    build: 0.94 + r() * 0.08,
+    trim: { kind: 'tie', colour: col(AIRLINE.gold) },
+  };
+}
+
+/** Ramp and ground crew: a fluorescent orange or yellow top with silver reflective bands, work trousers, boots. */
+export function groundCrewLook(r: () => number): Look {
+  const base = randomLook(r, { gender: r() < 0.25 ? 'f' : 'm' });
+  return {
+    ...base,
+    top: col(r() < 0.5 ? '#ff6a13' : '#d4ef1f'),
+    pants: col(pick(r, ['#22262d', '#2b3447', '#3a3a36'])),
+    shoe: col('#1a1612'),
+    sleeve: r() < 0.6 ? 0.96 : 0.3,
+    legEnd: 0.045,
+    build: 1 + r() * 0.12,
+    trim: { kind: 'bands', colour: col('#d9dde0') },
+  };
+}
+
+const HOLIDAY_TOPS = ['#ffffff', '#f6e7c8', '#ff8a65', '#4fc3f7', '#ffd54f', '#f48fb1', '#81c784', '#ba68c8', '#4db6ac', '#ff7043', '#90caf9', '#e1f5fe'];
+const HOLIDAY_SHORTS = ['#e8dcc4', '#c9b48a', '#3d5c8e', '#4f6f9e', '#f4f1ea', '#7aa6c2', '#556b2f', '#d97a5b'];
+const SANDALS = ['#8a5a3c', '#2e5eaa', '#ff6f91', '#f4f4f2', '#ffcf3d', '#1a1a1a', '#2ec4b6'];
+const SWIM = ['#e53950', '#1e88e5', '#ffb300', '#00acc1', '#8e24aa', '#43a047', '#f06292', '#ff7043', '#263238', '#fdd835'];
+
+/** A traveller dressed for the flight out to the island (or back): comfortable, often summery. */
+export function travellerLook(r: () => number, opts: { child?: boolean; gender?: Gender } = {}): Look {
+  const look = randomLook(r, opts);
+  if (r() < 0.35) look.top = col(pick(r, HOLIDAY_TOPS));
+  return look;
+}
+
+/** A holidaymaker on Palm Cay's promenade: shorts, a tee or a vest, bright colours, sandals. */
+export function beachLook(r: () => number, opts: { child?: boolean; gender?: Gender } = {}): Look {
+  const look = randomLook(r, opts);
+  return {
+    ...look,
+    top: col(pick(r, HOLIDAY_TOPS)),
+    pants: col(pick(r, HOLIDAY_SHORTS)),
+    shoe: col(pick(r, SANDALS)),
+    sleeve: r() < 0.35 ? -0.1 : 0.2 + r() * 0.1,
+    legEnd: look.gender === 'f' && r() < 0.4 ? 0.36 + r() * 0.04 : 0.3 + r() * 0.05,
+  };
+}
+
+/**
+ * Swimwear on the sand: swim shorts (bare-chested), a bikini, or a one-piece. Children wear swim
+ * shorts with a rash vest.
+ */
+export function swimLook(r: () => number, opts: { child?: boolean; gender?: Gender } = {}): Look {
+  const look = randomLook(r, opts);
+  const c = col(pick(r, SWIM));
+  const swim = { ...look, pants: c, shoe: col(pick(r, SANDALS)) };
+  if (look.child) return { ...swim, top: col(pick(r, SWIM)), sleeve: 0.25, legEnd: 0.33 };
+  if (look.gender === 'm') return { ...swim, topFrom: 2, legEnd: 0.36 + r() * 0.05, waist: 0.535 };
+  if (r() < 0.6) return { ...swim, top: c, topFrom: 0.685, neckline: 0.755, sleeve: -0.1, waist: 0.53, legEnd: 0.47 };
+  return { ...swim, top: c, sleeve: -0.1, neckline: 0.86, waist: 0.56, legEnd: 0.475 };
+}
+
 // ------------------------------------------------------------------------------------ shader
 
 const bodyUniforms = () => ({
@@ -101,6 +206,9 @@ const bodyUniforms = () => ({
   uSkin: { value: new THREE.Color() },
   uCut: { value: new THREE.Vector4() }, // sleeve end, leg end, waist, neckline
   uInflate: { value: 0.012 },
+  // (both off by default, so every everyday outfit is drawn exactly as before)
+  uTopFrom: { value: 0 },
+  uTrim: { value: new THREE.Vector4() }, // colour, kind (0 none, 1 hi-vis bands, 2 tie)
 });
 type BodyUniforms = ReturnType<typeof bodyUniforms>;
 
@@ -111,7 +219,7 @@ const GARMENT = /* glsl */ `
     float arm = r.y;
     bool isArm = arm > -0.5;
     float shoe = (r.z > 0.5 || y < 0.045) ? 1.0 : 0.0;
-    float top = isArm ? step(arm, uCut.x) : step(uCut.z, y) * step(y, uCut.w) * step(r.w, 0.5);
+    float top = isArm ? step(arm, uCut.x) * step(uTopFrom, 1.0) : step(max(uCut.z, uTopFrom), y) * step(y, uCut.w) * step(r.w, 0.5);
     float pants = isArm ? 0.0 : step(y, uCut.z + 0.004) * step(uCut.y, y);
     pants *= 1.0 - shoe;
     top *= (1.0 - shoe) * (1.0 - pants);
@@ -156,6 +264,7 @@ function dressBody(mat: THREE.MeshStandardMaterial, u: BodyUniforms) {
     const decl = /* glsl */ `
       uniform vec3 uTop; uniform vec3 uPants; uniform vec3 uShoe; uniform vec3 uSkin;
       uniform vec4 uCut; uniform float uInflate;
+      uniform float uTopFrom; uniform vec4 uTrim;
       varying vec4 vRegion;
       varying vec3 vObj;
       varying vec3 vObjN;
@@ -202,6 +311,17 @@ function dressBody(mat: THREE.MeshStandardMaterial, u: BodyUniforms) {
         top *= 1.0 - 0.1 * sleeveHem;
         float shirtHem = vRegion.y < -0.5 ? 1.0 - smoothstep(0.0, 0.016, y - uCut.z) : 0.0;
         top *= 1.0 - 0.12 * shirtHem;
+        // a uniform's trim: hi-vis bands (two round the body, one round each upper arm), or a tie
+        // down the shirt front from under the collar, narrow at the knot and wider at the blade
+        if (uTrim.w > 0.5) {
+          float trim;
+          if (uTrim.w < 1.5) trim = vRegion.y > -0.5 ? step(abs(vRegion.y - 0.42), 0.045) : step(abs(y - 0.665), 0.012) + step(abs(y - 0.615), 0.012);
+          else {
+            float tw = mix(0.03, 0.011, smoothstep(0.66, 0.86, y));
+            trim = step(vRegion.y, -0.5) * step(0.25, frontness) * step(abs(vObj.x), tw) * step(0.64, y) * step(y, uCut.w - 0.02);
+          }
+          top = mix(top, uTrim.rgb, clamp(trim, 0.0, 1.0));
+        }
         // ---- the trousers: denim fades on the thighs and knees, darker side seams and turn-ups
         vec3 legs = uPants;
         float fade = smoothstep(0.25, 0.95, frontness) * (smoothstep(0.24, 0.32, y) * (1.0 - smoothstep(0.44, 0.52, y)) + 0.7 * smoothstep(0.2, 0.25, y) * (1.0 - smoothstep(0.27, 0.31, y)));
@@ -681,11 +801,13 @@ export class PeopleFactory {
     u.uPants.value.copy(look.pants);
     u.uShoe.value.copy(look.shoe);
     u.uSkin.value.copy(look.skin);
-    const waist = look.gender === 'm' ? 0.56 : 0.575;
+    const waist = look.waist ?? (look.gender === 'm' ? 0.56 : 0.575);
     // crew neck: up to the neck (whose vertices are excluded by their head/neck weights)
-    const neck = 0.9;
+    const neck = look.neckline ?? 0.9;
     u.uCut.value.set(look.sleeve, look.legEnd, waist, neck);
     u.uInflate.value = 0.016 * look.build;
+    u.uTopFrom.value = look.topFrom ?? 0;
+    if (look.trim) u.uTrim.value.set(look.trim.colour.r, look.trim.colour.g, look.trim.colour.b, look.trim.kind === 'bands' ? 1 : 2);
     const bodyMat = (body.material as THREE.MeshStandardMaterial).clone();
     dressBody(bodyMat, u);
     body.material = bodyMat;

@@ -1,0 +1,184 @@
+/* ---------- Splash Tower (world/attractions/island/slides.ts) ---------- */
+
+/* The slide picker at the top of the tower: three cards, one per slide, in the slide's colour */
+.sl-pick {
+  position: absolute;
+  left: 50%;
+  bottom: max(22px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(780px, calc(100% - 32px));
+  padding: 16px 18px 14px;
+  border-radius: var(--radius, 18px);
+  background: rgba(29, 18, 56, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow, 0 10px 30px rgba(0, 0, 0, 0.3));
+  color: var(--cream, #fff5e3);
+  font-family: var(--body, system-ui, sans-serif);
+  text-align: center;
+  animation: sl-rise 0.35s ease-out;
+}
+.sl-pick .sl-eyebrow {
+  margin: 0 0 4px;
+  font: 700 0.72rem/1 var(--body, system-ui, sans-serif);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--mustard, #ffc23d);
+}
+.sl-pick h2 {
+  margin: 0 0 12px;
+  font: 400 1.75rem/1.1 var(--display, sans-serif);
+}
+.sl-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.sl-card {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px 10px;
+  border: 0;
+  border-top: 5px solid var(--c);
+  border-radius: 14px;
+  background: rgba(255, 245, 227, 0.08);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+  transition:
+    transform 0.15s,
+    background 0.15s,
+    outline-color 0.15s;
+}
+.sl-card:hover,
+.sl-card.is-on {
+  background: rgba(255, 245, 227, 0.17);
+}
+.sl-card.is-on {
+  outline-color: var(--c);
+  transform: translateY(-3px);
+}
+.sl-card .sl-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 400 1.25rem/1 var(--display, sans-serif);
+}
+.sl-card .sl-name b {
+  display: inline-grid;
+  place-items: center;
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 50%;
+  background: var(--c);
+  color: #fff;
+  font-size: 0.85em;
+  font-weight: 400;
+}
+.sl-card .sl-what {
+  font-size: 0.78rem;
+  line-height: 1.3;
+  opacity: 0.82;
+}
+.sl-card .sl-thrill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.sl-card .sl-thrill i {
+  font-style: normal;
+  letter-spacing: 2px;
+  color: var(--c);
+}
+.sl-card .sl-best {
+  font-size: 0.72rem;
+  opacity: 0.7;
+}
+.sl-hint {
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+.sl-hint kbd,
+.sl-hud kbd {
+  font: 700 0.75em/1 var(--body, system-ui, sans-serif);
+}
+
+/* Under the water after the splash */
+.sl-under {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(ellipse at 50% 20%, rgba(150, 235, 250, 0.35), transparent 60%),
+    linear-gradient(rgba(40, 160, 200, 0.55), rgba(5, 60, 100, 0.85));
+  transition: opacity 0.12s;
+}
+
+/* Riding: the joystick comes back for leaning and tucking */
+.is-sliding .stick {
+  display: block;
+}
+
+@keyframes sl-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 16px);
+  }
+}
+
+@media (max-width: 720px) {
+  .sl-pick {
+    bottom: auto;
+    top: calc(max(12px, env(safe-area-inset-top)) + 54px);
+    padding: 12px 12px 10px;
+  }
+  .sl-pick h2 {
+    font-size: 1.3rem;
+    margin-bottom: 8px;
+  }
+  .sl-cards {
+    gap: 6px;
+  }
+  .sl-card {
+    padding: 8px 8px;
+  }
+  .sl-card .sl-name {
+    font-size: 1rem;
+    gap: 5px;
+  }
+  .sl-card .sl-what {
+    display: none;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+  .sl-pick {
+    top: auto;
+    bottom: calc(var(--gut-b, 12px) + 8px);
+    width: min(620px, calc(100% - 300px));
+    padding: 10px 12px 8px;
+  }
+  .sl-pick h2 {
+    display: none;
+  }
+  .sl-card .sl-what {
+    display: none;
+  }
+}
+
+@media (pointer: coarse) {
+  #sl-keys,
+  .sl-hint {
+    display: none;
+  }
+}

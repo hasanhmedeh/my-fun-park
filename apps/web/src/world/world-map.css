@@ -1,0 +1,112 @@
+/* The full-screen map's region tabs, the legend's region headings and the places across the sea
+   (the rest of the map's styles are in styles.css). */
+
+.wm-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  pointer-events: auto;
+}
+.wm-tab {
+  padding: 7px 13px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(29, 18, 56, 0.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--cream);
+  font: 700 0.82rem/1 var(--body);
+  white-space: nowrap;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.wm-tab:hover {
+  background: rgba(29, 18, 56, 0.92);
+}
+.wm-tab:focus-visible {
+  outline: 3px solid var(--mustard);
+  outline-offset: 2px;
+}
+.wm-tab.is-active {
+  background: var(--mustard);
+  color: var(--ink);
+}
+
+/* the legend starts below the tabs */
+.world-map.has-tabs .wm-legend {
+  top: calc(max(18px, env(safe-area-inset-top)) + 112px);
+  max-height: calc(100% - 250px);
+}
+
+/* each region's heading, in the World view's legend */
+.wm-region {
+  margin: 12px 4px 0;
+  padding: 0 4px 4px;
+  border-bottom: 1px solid rgba(255, 245, 227, 0.2);
+  color: var(--cream);
+  font: 700 0.68rem/1 var(--body);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.wm-region:first-child {
+  margin-top: 2px;
+}
+
+/* places across the sea: reached by flying, not by fast travel */
+.wm-item-away {
+  display: none;
+  margin-left: 8px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(91, 108, 255, 0.85);
+  color: #fff;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.wm-legend button.is-away .wm-item-away {
+  display: inline-block;
+}
+.wm-legend button.is-away .wm-item-icon {
+  filter: saturate(0.6);
+}
+.wm-pin.is-away .wm-pin-icon {
+  filter: saturate(0.55) brightness(0.92);
+}
+/* the World view keeps only the flights' gates as pins */
+.wm-pin.is-far {
+  opacity: 0;
+  pointer-events: none;
+}
+.wm-card-text .wm-card-away {
+  margin-top: 6px;
+  color: #3f4bd6;
+  font-weight: 700;
+}
+.wm-card.is-away {
+  border-top-color: #5b6cff;
+}
+
+@media (max-width: 720px) {
+  .wm-tabs {
+    margin-top: 8px;
+    gap: 4px;
+  }
+  .wm-tab {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+  }
+  .world-map.has-tabs .wm-legend {
+    top: auto;
+    max-height: none;
+  }
+  .wm-region {
+    margin: 0 2px 0 10px;
+    padding: 0;
+    border: 0;
+    align-self: center;
+  }
+}

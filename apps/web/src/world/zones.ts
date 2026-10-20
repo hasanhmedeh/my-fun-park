@@ -10,6 +10,8 @@ interface Marker {
   fill: THREE.Mesh;
   label: THREE.Sprite;
   baseY: number;
+  /** Within reach of the visitor (see REACH): only these are drawn and animated. */
+  near: boolean;
   closed: boolean;
   /** Switched off (an empty plot in Creators' Valley): no ring, no label, no prompt. */
   off: boolean;
@@ -17,9 +19,17 @@ interface Marker {
   site: MaintenanceSite | null;
 }
 
+/**
+ * How far away a ring is still drawn and animated. The world has places 40 km apart (the airport,
+ * Palm Cay): only those round the visitor are worth a draw call or a thought.
+ */
+const REACH = 600;
+
 /** Glowing ground rings: step onto one to get the "Press E" prompt. */
 export class Zones {
   private markers: Marker[] = [];
+  /** The labels are hidden during a ride (setVisible). */
+  private labels = true;
   active: ZoneId | null = null;
 
   constructor(private ctx: Ctx) {
@@ -30,17 +40,20 @@ export class Zones {
         new THREE.MeshBasicMaterial({ color: hdr(PALETTE.mustard, 2.4), transparent: true, opacity: 0.95 }),
       );
       ring.rotation.x = -Math.PI / 2;
-      ring.position.set(z.x, 0.04, z.z);
+      // on its floor: the ground, or a terminal's tiles a little above it
+      const y = z.y ?? 0;
+      ring.position.set(z.x, y + 0.04, z.z);
       const fill = new THREE.Mesh(
         new THREE.CircleGeometry(z.radius - 0.35, 48),
         new THREE.MeshBasicMaterial({ color: PALETTE.mustard, transparent: true, opacity: 0.12, depthWrite: false }),
       );
       fill.rotation.x = -Math.PI / 2;
-      fill.position.set(z.x, 0.03, z.z);
+      fill.position.set(z.x, y + 0.03, z.z);
       const label = makeSprite(floatingTextTexture(z.title, z.action), 7);
-      label.position.set(z.x, 3.4, z.z);
+      label.position.set(z.x, y + 3.4, z.z);
+      ring.visible = fill.visible = label.visible = false;
       ctx.scene.add(ring, fill, label);
-      this.markers.push({ id, ring, fill, label, baseY: 3.4, closed: false, off: false, site: null });
+      this.markers.push({ id, ring, fill, label, baseY: y + 3.4, near: false, closed: false, off: false, site: null });
     }
   }
 
@@ -59,7 +72,7 @@ export class Zones {
       mat.map = now ? floatingTextTexture(z.title, '🚧 Under maintenance') : floatingTextTexture(z.title, z.action);
       mat.needsUpdate = true;
       if (now && !m.site) this.ctx.scene.add((m.site = new MaintenanceSite(m.id)).group);
-      if (m.site) m.site.group.visible = now && !m.off;
+      if (m.site) m.site.group.visible = now && !m.off && m.near;
     }
   }
 
@@ -71,8 +84,7 @@ export class Zones {
     const m = this.markers.find((k) => k.id === id);
     if (!m) return;
     m.off = !on;
-    m.ring.visible = m.fill.visible = m.label.visible = on;
-    if (m.site) m.site.group.visible = on && m.closed;
+    this.show(m);
     const z = ZONES[id];
     const mat = m.label.material as THREE.SpriteMaterial;
     mat.map?.dispose();
@@ -82,14 +94,29 @@ export class Zones {
   }
 
   setVisible(v: boolean) {
-    for (const m of this.markers) m.label.visible = v && !m.off;
+    this.labels = v;
+    for (const m of this.markers) this.show(m);
+  }
+
+  /** Shows or hides a marker's ring, fill, label and roadworks: only near the visitor, and not when switched off. */
+  private show(m: Marker) {
+    const on = m.near && !m.off;
+    m.ring.visible = m.fill.visible = on;
+    m.label.visible = on && this.labels;
+    if (m.site) m.site.group.visible = on && m.closed;
   }
 
   update(carPos: THREE.Vector3, t: number) {
     let found: ZoneId | null = null;
     for (const m of this.markers) {
-      if (m.off) continue;
       const z = ZONES[m.id];
+      // the far ones (another district of the airport, the other side of the sea) sleep
+      const near = Math.abs(carPos.x - z.x) < REACH && Math.abs(carPos.z - z.z) < REACH;
+      if (near !== m.near) {
+        m.near = near;
+        this.show(m);
+      }
+      if (m.off || !near) continue;
       const inside = Math.hypot(carPos.x - z.x, carPos.z - z.z) < z.radius;
       if (inside) found = m.id;
       const k = inside ? 1 : 0;

@@ -1,0 +1,783 @@
+@import url('https://fonts.googleapis.com/css2?family=B612:wght@400;700&family=B612+Mono:wght@400;700&display=swap');
+
+/* ---------- The A320 flight deck (world/flight/instruments) ----------
+   A full-screen layer over the 3D view in the cockpit camera: the windscreen structure is a canvas
+   (frame.ts), the glareshield and main panel are DOM below the outside view, with the display
+   units as canvases. From the outside cameras only the compact strip shows. Only the controls
+   take the pointer, so dragging anywhere else still looks round. */
+
+.hud > .ck-host {
+  pointer-events: none;
+}
+
+/* the cockpit's own elements toggle with the hidden attribute, whatever the page's stylesheet says */
+.ck-root[hidden],
+.ck-root [hidden] {
+  display: none !important;
+}
+
+.ck-root {
+  --ck-split: 55%;
+  --ck-glare-h: 54px;
+  --ck-gap: 14px;
+  --ck-du: min(calc(45vh - var(--ck-glare-h) - 66px), 19vw);
+  --ck-panel: #47515a;
+  --ck-glare: #1e2226;
+  --ck-label: #eef1f4;
+  --ck-glow: 0;
+  --ck-lcd: #ffb24a;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-family: 'B612', 'DM Sans', system-ui, sans-serif;
+  color: var(--ck-label);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ck-cockpit {
+  position: absolute;
+  inset: 0;
+}
+
+.ck-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* the glareshield and the main panel under the outside view */
+.ck-deck {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--ck-split);
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(255, 255, 255, 0.05), transparent 60%),
+    var(--ck-panel);
+  box-shadow: 0 -2px 0 rgba(0, 0, 0, 0.55);
+}
+
+.ck-glare {
+  position: relative;
+  flex: none;
+  height: var(--ck-glare-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ck-glare) 70%, #fff 6%), var(--ck-glare) 26%, var(--ck-glare));
+  border-radius: 46% 46% 0 0 / 18px 18px 0 0;
+  margin-top: -14px;
+  box-shadow: 0 6px 14px -4px rgba(0, 0, 0, 0.7);
+}
+
+.ck-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--ck-gap);
+  padding: 12px 16px 0 calc(var(--map, 168px) + 32px);
+}
+
+/* a display unit: black glass in a bezel, glowing faintly at night */
+.ck-du {
+  position: relative;
+  flex: none;
+  width: var(--ck-du);
+  height: var(--ck-du);
+  background: #000;
+  border-radius: 5px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 4px #1c2025,
+    0 0 0 5px color-mix(in srgb, var(--ck-panel) 60%, #fff 25%),
+    0 0 calc(var(--ck-glow) * 26px) rgba(90, 170, 255, calc(var(--ck-glow) * 0.3));
+}
+
+.ck-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.ck-du-click {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.ck-ndmode {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  padding: 2px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  background: rgba(20, 24, 28, 0.6);
+  color: #cfd6dc;
+  font: 700 9px 'B612', 'DM Sans', system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  opacity: 0.55;
+  pointer-events: auto;
+}
+
+.ck-ndmode:hover {
+  opacity: 1;
+}
+
+.ck-col {
+  flex: none;
+  width: calc(var(--ck-du) * 0.56);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.ck-du-isis {
+  width: calc(var(--ck-du) * 0.46);
+  height: calc(var(--ck-du) * 0.46);
+}
+
+/* ---------- FCU ---------- */
+.ck-fcu {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #67727c, #48525b);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 2px 6px rgba(0, 0, 0, 0.6);
+  pointer-events: auto;
+  filter: brightness(calc(1 - var(--ck-glow) * 0.45));
+}
+
+.ck-knob {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: var(--ck-label);
+  cursor: pointer;
+  font: inherit;
+}
+
+.ck-klabel {
+  font: 700 10px 'B612', 'DM Sans', system-ui, sans-serif;
+  letter-spacing: 0.06em;
+}
+
+.ck-win {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 82px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: #120e08;
+  box-shadow: inset 0 1px 4px #000;
+  color: var(--ck-lcd);
+  font: 700 20px 'B612 Mono', ui-monospace, monospace;
+  text-shadow: 0 0 6px rgba(255, 170, 60, 0.45);
+  line-height: 1.25;
+}
+
+.ck-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2c2010;
+  flex: none;
+}
+
+.ck-dot.on {
+  background: var(--ck-lcd);
+  box-shadow: 0 0 6px var(--ck-lcd);
+}
+
+.ck-knob.sel .ck-win {
+  outline: 2px solid #30e6ff;
+  outline-offset: 1px;
+}
+
+.ck-fcu-mid {
+  display: flex;
+  gap: 6px;
+}
+
+.ck-pb {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 54px;
+  padding: 5px 8px 6px;
+  border: 1px solid #1b2025;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #737e88, #4d575f);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  color: var(--ck-label);
+  font: 700 11px 'B612', 'DM Sans', system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.ck-pb:active {
+  transform: translateY(1px);
+}
+
+.ck-pb i {
+  display: block;
+  width: 72%;
+  height: 4px;
+  border-radius: 2px;
+  background: #18261b;
+}
+
+.ck-pb.on i {
+  background: #3cff4e;
+  box-shadow: 0 0 7px #3cff4e;
+}
+
+/* the knob's popover: turn, push (managed), pull (selected) */
+.ck-pop {
+  position: absolute;
+  top: 100%;
+  z-index: 3;
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 6px;
+  border-radius: 9px;
+  background: rgba(16, 19, 23, 0.95);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.6);
+  transform: translateX(-50%);
+  pointer-events: auto;
+  filter: none;
+}
+
+.ck-popb {
+  appearance: none;
+  min-width: 42px;
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid #5d6872;
+  border-radius: 7px;
+  background: #3a434c;
+  color: #fff;
+  font: 700 13px 'B612', 'DM Sans', system-ui, sans-serif;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.ck-popb:active {
+  background: #56616b;
+}
+
+/* ---------- master lights ---------- */
+.ck-masters {
+  position: absolute;
+  left: calc(var(--map, 168px) + 36px);
+  top: 50%;
+  display: flex;
+  gap: 8px;
+  transform: translateY(-50%);
+}
+
+.ck-master {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 36px;
+  border: 1px solid #000;
+  border-radius: 4px;
+  font: 700 9px/1.15 'B612', 'DM Sans', system-ui, sans-serif;
+  letter-spacing: 0.05em;
+}
+
+.ck-master-w {
+  background: #2a1311;
+  color: #5a2a24;
+}
+
+.ck-master-c {
+  background: #2a2009;
+  color: #5c4a1f;
+}
+
+.ck-master-w.on {
+  background: #ff3b30;
+  color: #fff;
+  box-shadow: 0 0 16px #ff3b30;
+}
+
+.ck-master-c.on {
+  background: #ffa31a;
+  color: #1e1300;
+  box-shadow: 0 0 16px #ffa31a;
+}
+
+/* ---------- the centre panel: gear, autobrake, brakes, clock ---------- */
+.ck-centre {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  font: 700 10px 'B612', 'DM Sans', system-ui, sans-serif;
+}
+
+.ck-plabel {
+  font: 700 9px 'B612', 'DM Sans', system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  opacity: 0.85;
+}
+
+.ck-gear,
+.ck-abrk,
+.ck-misc {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.ck-gear-arrows {
+  display: flex;
+  gap: 3px;
+}
+
+.ck-garrow {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  background: #0b0d0f;
+  font: 700 13px/1 'B612', 'DM Sans', system-ui, sans-serif;
+}
+
+.ck-garrow b {
+  color: #17291a;
+}
+
+.ck-garrow em {
+  display: none;
+  font: 700 6px 'B612', 'DM Sans', system-ui, sans-serif;
+  font-style: normal;
+  color: #ff3b30;
+}
+
+.ck-garrow.down b {
+  color: #3cff4e;
+  text-shadow: 0 0 6px #3cff4e;
+}
+
+.ck-garrow.unlk b {
+  display: none;
+}
+
+.ck-garrow.unlk em {
+  display: block;
+}
+
+.ck-lever {
+  position: relative;
+  appearance: none;
+  width: 44px;
+  height: 26px;
+  padding: 0 0 0 4px;
+  border: 1px solid #1b2025;
+  border-radius: 4px;
+  background: #2b3137;
+  color: var(--ck-label);
+  font: 700 8px 'B612', 'DM Sans', system-ui, sans-serif;
+  text-align: left;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.ck-lever i {
+  position: absolute;
+  right: 4px;
+  top: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, #b9c2ca 60%, #6d7780);
+  transition: top 0.3s;
+}
+
+.ck-lever.down i {
+  top: 11px;
+}
+
+.ck-abrk-row {
+  display: flex;
+  gap: 3px;
+}
+
+.ck-abb {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 34px;
+  padding: 2px 0 3px;
+  border: 1px solid #1b2025;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #67727c, #4a545d);
+  color: var(--ck-label);
+  font: 700 8px 'B612', 'DM Sans', system-ui, sans-serif;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.ck-abb em,
+.ck-abb i {
+  font-style: normal;
+  font-size: 6px;
+  letter-spacing: 0.04em;
+}
+
+.ck-abb em {
+  color: #1d3320;
+}
+
+.ck-abb i {
+  color: #10303a;
+}
+
+.ck-abb.on i {
+  color: #30e6ff;
+  text-shadow: 0 0 5px #30e6ff;
+}
+
+.ck-abb.decel em {
+  color: #3cff4e;
+  text-shadow: 0 0 5px #3cff4e;
+}
+
+.ck-brk {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ck-brk-bars {
+  display: flex;
+  gap: 3px;
+}
+
+.ck-brk-bar {
+  position: relative;
+  width: 6px;
+  height: 22px;
+  border-radius: 2px;
+  background: #0b0d0f;
+  overflow: hidden;
+}
+
+.ck-brk-bar i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0;
+  background: #3cff4e;
+}
+
+.ck-park {
+  font-size: 8px;
+  color: #3a3220;
+}
+
+.ck-park.on {
+  color: #ffa31a;
+  text-shadow: 0 0 5px rgba(255, 163, 26, 0.6);
+}
+
+.ck-flaplvr {
+  font: 700 9px 'B612 Mono', ui-monospace, monospace;
+}
+
+.ck-clock {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 2px 8px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: #050607;
+}
+
+.ck-utc,
+.ck-chr {
+  color: #3cff4e;
+  font: 700 12px 'B612 Mono', ui-monospace, monospace;
+}
+
+.ck-chr:empty::before {
+  content: '--:--';
+  color: #1e4a22;
+}
+
+.ck-chrb {
+  justify-self: start;
+  appearance: none;
+  padding: 1px 4px;
+  border: 1px solid #39424a;
+  border-radius: 3px;
+  background: #2b3137;
+  color: var(--ck-label);
+  font: 700 8px 'B612', 'DM Sans', system-ui, sans-serif;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* ---------- the outside views' strip ---------- */
+.ck-strip {
+  --ck-s: 178px;
+  position: absolute;
+  left: calc(var(--map, 168px) + 32px);
+  bottom: max(16px, env(safe-area-inset-bottom));
+  padding: 4px 6px 6px;
+  border-radius: 12px;
+  background: rgba(10, 12, 16, 0.8);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+}
+
+.ck-strip-tab {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 2px 4px 4px;
+  border: 0;
+  background: none;
+  color: #cfd6dc;
+  font: 700 11px 'B612', 'DM Sans', system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.ck-strip-tab i {
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translate(-2px, -2px);
+}
+
+.ck-strip.collapsed .ck-strip-tab i {
+  transform: rotate(-135deg) translate(-2px, -2px);
+}
+
+.ck-strip.collapsed .ck-strip-body {
+  display: none;
+}
+
+.ck-strip-body {
+  display: flex;
+  gap: 6px;
+}
+
+.ck-du-s {
+  width: var(--ck-s);
+  height: var(--ck-s);
+  box-shadow: 0 0 0 2px #1c2025;
+}
+
+.ck-strip-data {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-content: center;
+  gap: 4px 10px;
+  margin: 0;
+  padding: 0 4px;
+  font: 700 11px 'B612 Mono', ui-monospace, monospace;
+}
+
+.ck-strip-data dt {
+  color: #9aa1ab;
+}
+
+.ck-strip-data dd {
+  margin: 0;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.ck-strip-data dd.g {
+  color: #3cff4e;
+}
+
+.ck-strip-data dd.r {
+  color: #ff3b30;
+}
+
+/* ---------- phones held sideways: PFD + ND under a narrower glareshield ---------- */
+@media (orientation: landscape) and (max-height: 540px) {
+  .ck-root {
+    --ck-split: 50%;
+    --ck-glare-h: 34px;
+    --ck-gap: 8px;
+    --ck-du: calc(50vh - var(--ck-glare-h) - 12px);
+  }
+  .ck-glare {
+    margin-top: -8px;
+    border-radius: 46% 46% 0 0 / 10px 10px 0 0;
+  }
+  .ck-panel {
+    padding: 6px 0 0;
+  }
+  .ck-du-ewd,
+  .ck-col {
+    display: none;
+  }
+  .ck-fcu {
+    gap: 5px;
+    padding: 2px 6px;
+  }
+  .ck-klabel {
+    display: none;
+  }
+  .ck-win {
+    min-width: 50px;
+    padding: 1px 4px;
+    font-size: 13px;
+    gap: 3px;
+  }
+  .ck-dot {
+    width: 5px;
+    height: 5px;
+  }
+  .ck-pb {
+    min-width: 38px;
+    padding: 3px 4px 4px;
+    font-size: 8px;
+    gap: 2px;
+  }
+  .ck-masters {
+    left: max(10px, env(safe-area-inset-left));
+    gap: 4px;
+  }
+  .ck-master {
+    width: 34px;
+    height: 22px;
+    font-size: 6px;
+  }
+  .ck-strip {
+    --ck-s: 124px;
+    top: max(8px, env(safe-area-inset-top));
+    bottom: auto;
+    left: max(8px, env(safe-area-inset-left));
+  }
+  .ck-strip-data {
+    display: none;
+  }
+}
+
+/* ---------- phones held upright: PFD and ND stacked at the bottom ---------- */
+@media (orientation: portrait) and (max-width: 720px) {
+  .ck-root {
+    --ck-split: 52%;
+    --ck-glare-h: 36px;
+    --ck-gap: 6px;
+    --ck-du: min(calc((48vh - var(--ck-glare-h) - 28px) / 2), 60vw);
+  }
+  .ck-glare {
+    margin-top: -8px;
+    border-radius: 46% 46% 0 0 / 10px 10px 0 0;
+  }
+  .ck-panel {
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 0 0;
+  }
+  .ck-du-ewd,
+  .ck-col {
+    display: none;
+  }
+  .ck-fcu {
+    gap: 4px;
+    padding: 2px 5px;
+  }
+  .ck-fcu-mid {
+    gap: 3px;
+  }
+  .ck-klabel {
+    display: none;
+  }
+  .ck-win {
+    min-width: 40px;
+    padding: 1px 3px;
+    font-size: 12px;
+    gap: 2px;
+  }
+  .ck-dot {
+    width: 4px;
+    height: 4px;
+  }
+  .ck-pb {
+    min-width: 32px;
+    padding: 3px 3px 4px;
+    font-size: 7px;
+    gap: 2px;
+  }
+  /* no room in the glareshield: the masters sit on the panel beside the PFD */
+  .ck-masters {
+    left: max(8px, env(safe-area-inset-left));
+    top: calc(100% + 14px);
+    transform: none;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .ck-master {
+    width: 38px;
+    height: 24px;
+    font-size: 6px;
+  }
+  .ck-popb {
+    min-width: 40px;
+    height: 40px;
+  }
+  .ck-strip {
+    --ck-s: 120px;
+    top: max(8px, env(safe-area-inset-top));
+    bottom: auto;
+    left: max(8px, env(safe-area-inset-left));
+  }
+  .ck-strip-data {
+    display: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .ck-ndmode {
+    opacity: 0.8;
+  }
+}

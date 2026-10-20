@@ -214,10 +214,11 @@ function ramp(s: number, d: number): Ramp {
 
 /**
  * Two floating kickers on the straights, off to one side: take them for air (and surf), or don't.
- * The first is on the straight past the dock (where the spectators are), the second in the middle
- * of the back straight.
+ * The first is on the straight past the dock (where the spectators are), the second where the back
+ * straight runs dead straight before its S (both land on the inside of what follows, so a ski
+ * flying straight on comes down in the lane).
  */
-export const RAMPS: Ramp[] = [ramp(START_S + 105, -4.2), ramp(locate(60, 41870).s, 4.5)];
+export const RAMPS: Ramp[] = [ramp(START_S + 105, -4.2), ramp(locate(145, 41854).s, 3.5)];
 
 /** A point's place on a ramp: `along` metres up the slope from the foot, `across` off its middle (left +). */
 export function onRamp(r: Ramp, x: number, z: number, out = { along: 0, across: 0 }) {
