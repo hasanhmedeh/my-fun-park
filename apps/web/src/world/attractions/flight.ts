@@ -81,7 +81,24 @@ const DOOR_S = 2.5;
 const DOCK_DELAY_S = 1.5;
 /** The hint once the report is up (the sim's own would go on about the stand or the aftermath). */
 const REPORT_HINT: Hint = { text: 'Flight report · Continue', keys: 'E' };
-const STORE = { ils: 'funfair.flight.ils', voices: 'funfair.flight.voices', keys: 'funfair.flight.keys', flown: 'funfair.flight.flown' };
+const STORE = {
+  ils: 'funfair.flight.ils',
+  voices: 'funfair.flight.voices',
+  keys: 'funfair.flight.keys',
+  flown: 'funfair.flight.flown',
+  skip: 'funfair.flight.skip',
+  autoTaxi: 'funfair.flight.autotaxi',
+  autoland: 'funfair.flight.autoland',
+};
+/** The booking card's first officer switches (all off until the visitor turns one on, then remembered). */
+const ASSISTS = [
+  { id: 'skip', store: STORE.skip, label: '⏩ Skip to the runway', sub: 'Start lined up, engines running, cleared for takeoff' },
+  { id: 'autoTaxi', store: STORE.autoTaxi, label: '🚕 Auto taxi', sub: 'The first officer taxis out, and in to the stand after landing' },
+  { id: 'autoland', store: STORE.autoland, label: '🛬 Autoland', sub: 'The autopilot lands it (4 stars at most)' },
+] as const;
+/** The fade over the skip to the runway: the jump at JUMP_S, the fade lifts at FADE_S. */
+const JUMP_S = 0.5;
+const FADE_S = 0.9;
 
 function load(key: string): string | null {
   try {
@@ -163,6 +180,8 @@ export class Flight implements Attraction {
   private dockT = 0;
   private tugT = 0;
   private skipT = -1;
+  /** The skip to the runway's fade (s), or -1. */
+  private runwayT = -1;
   private reportShown = false;
   private completeFired = false;
   private hintClock = 0;
@@ -224,6 +243,24 @@ export class Flight implements Attraction {
       save(STORE.voices, sim.voices ? '1' : '0');
       this.hud.toggles(this.ilsOn, sim.voices);
     };
+    // the first officer's switches: remembered for the booking card too
+    this.hud.onAutoTaxi = () => {
+      const fo = this.sim?.fo;
+      if (!fo) return;
+      fo.autoTaxi = !fo.autoTaxi;
+      save(STORE.autoTaxi, fo.autoTaxi ? '1' : '0');
+      this.hud.assists(fo.autoTaxi, fo.autoland);
+      this.hud.toast(fo.autoTaxi ? 'Auto taxi on: the first officer taxis' : 'Auto taxi off: you have control');
+    };
+    this.hud.onAutoland = () => {
+      const fo = this.sim?.fo;
+      if (!fo) return;
+      fo.autoland = !fo.autoland;
+      save(STORE.autoland, fo.autoland ? '1' : '0');
+      this.hud.assists(fo.autoTaxi, fo.autoland);
+      this.hud.toast(fo.autoland ? 'Autoland on: the autopilot lands, the first officer configures' : 'Autoland off: you land it');
+    };
+    this.hud.onSkip = () => this.skipToRunway();
     this.hud.onKeyHelp = () => save(STORE.keys, this.hud.keysOpen ? '1' : '0');
 
     // the hero waits at home with its door on the bridge
@@ -253,6 +290,10 @@ export class Flight implements Attraction {
     const controls = this.ctx.mobile
       ? 'The stick flies it, the lever on the right is the thrust, the buttons do the rest; <kbd>E</kbd> talks to ATC.'
       : '<kbd>W</kbd><kbd>S</kbd> pitch, <kbd>A</kbd><kbd>D</kbd> roll and steer, <kbd>Y</kbd> TOGA, <kbd>P</kbd> autopilot, <kbd>E</kbd> talks to ATC. The full list is on screen.';
+    const assists = ASSISTS.map(
+      (a) =>
+        `<label class="fl-switch"><input type="checkbox" data-fl-assist="${a.id}"${load(a.store) === '1' ? ' checked' : ''}><span class="fl-switch-track" aria-hidden="true"></span><span><b>${a.label}</b><small>${a.sub}</small></span></label>`,
+    ).join('');
     return `<div class="fl-offer" data-fl-offer>
 <p class="eyebrow">Funfair Air · Gate ${stand?.gate ?? ''} · ${dep.icao}</p>
 <h2>${f.flightNo} to ${arr.name} ✈️</h2>
@@ -260,6 +301,8 @@ export class Flight implements Attraction {
 <p class="drone-offer"><span>🛫 ${f.flightNo}</span><span>⏱️ ${blockText(f.plan.blockTimeS + SCHEDULE_PAD_S)}</span><span>👥 ${f.passengers} aboard</span><span>🎟️ ${tickets}</span></p>
 <p class="sub">Fly at</p>
 <div class="fl-offer-tod" role="group" aria-label="Time of day">${tod}</div>
+<p class="sub">Your first officer</p>
+<div class="fl-offer-assist" role="group" aria-label="Your first officer">${assists}</div>
 <dl class="fl-offer-facts">
 <dt>Route</dt><dd>${dep.name} (${dep.icao}) → ${arr.name} (${arr.icao})</dd>
 <dt>Aircraft</dt><dd>Airbus A320neo · ${f.registration}</dd>
@@ -277,10 +320,17 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
 </div>`;
   }
 
-  /** The card's time-of-day picker (it redraws the card for the new weather) and its Board button. */
+  /** The card's time-of-day picker (it redraws the card for the new weather), its first officer switches and its Board button. */
   wireOffer(panel: HTMLElement, onBook: () => void): void {
     const card = panel.querySelector<HTMLElement>('[data-fl-offer]');
     if (!card) return;
+    card.querySelectorAll<HTMLInputElement>('[data-fl-assist]').forEach((box) =>
+      box.addEventListener('change', () => {
+        const a = ASSISTS.find((x) => x.id === box.dataset.flAssist);
+        if (a) save(a.store, box.checked ? '1' : '0');
+        this.ctx.sfx.pop();
+      }),
+    );
     card.querySelectorAll<HTMLButtonElement>('[data-fl-tod]').forEach((b) =>
       b.addEventListener('click', () => {
         this.tod = b.dataset.flTod as TimeOfDay;
@@ -301,6 +351,11 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
     const info = bookFlight(from, this.booking?.timeOfDay ?? this.tod);
     const voices = load(STORE.voices) === '1';
     const sim = new FlightSim({ info, ground: d.ground, sfx: this.ctx.sfx, traffic: d.traffic, speak: voices, speech: this.speech });
+    // the booking card's switches
+    const skip = load(STORE.skip) === '1';
+    sim.fo.autoTaxi = load(STORE.autoTaxi) === '1';
+    sim.fo.autoland = load(STORE.autoland) === '1';
+    sim.fo.onChange = () => this.hud.assists(sim.fo.autoTaxi, sim.fo.autoland);
     this.sim = sim;
     this.active = true;
     this.completed = false;
@@ -311,6 +366,7 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
     this.completeFired = false;
     this.aftermathT = 0;
     this.skipT = -1;
+    this.runwayT = -1;
     this.tugT = 0;
     this.hintClock = 0;
     this.utcSec = -1;
@@ -366,7 +422,7 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
     this.slides.visible = false;
     this.ils.setRunway(sim.arrRw);
     this.ils.show(false);
-    this.run = d.travellers.board(from, WALKERS, this.boardPath(from));
+    this.run = skip ? null : d.travellers.board(from, WALKERS, this.boardPath(from));
     this.runT = 0;
     this.cams.set('cockpit');
     this.cams.orbit = false;
@@ -378,6 +434,7 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
       this.controls.onNote = (t) => this.hud.toast(t);
       this.controls.onCamera = () => this.cycleCamera();
       this.controls.onWarp = () => this.warp();
+      this.controls.onSkip = () => this.skipToRunway();
       this.controls.attach(sim);
       this.controls.enabled = false;
     }
@@ -386,19 +443,53 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
     this.hud.show(true);
     this.hud.clear();
     this.hud.toggles(this.ilsOn, voices);
+    this.hud.assists(sim.fo.autoTaxi, sim.fo.autoland);
     this.hud.keysOpen = load(STORE.keys) === '1';
     this.hud.camera('Gate window');
     document.body.classList.add('is-piloting');
     this.ctx.sfx.startAircraft();
     this.ctx.sfx.chime();
+    if (skip) {
+      // straight to the runway: no boarding to watch, and the hint says what's next
+      this.jumpToRunway();
+      return;
+    }
     this.ctx.ui.setIntro(
       'flight-intro',
       'Funfair Air',
       `<p class="eyebrow">Funfair Air · ${info.flightNo} · ${info.callsign}</p><h2>Welcome aboard, Captain</h2><p>The passengers are boarding. Once the doors are closed, press <kbd>E</kbd> to call ATC for the pushback, then for taxi and for takeoff. The hint at the top always says what comes next.</p><p>${
         this.ctx.mobile ? 'The stick flies it; the lever on the right sets the thrust; the buttons do flaps, gear, brakes, the autopilot and the camera.' : 'The keys are listed on the right of the screen (Keys). <kbd>C</kbd> changes the camera; drag to look round.'
-      }</p>`,
+      }</p><p>In a hurry? <b>⏩ Skip to the runway</b>${this.ctx.mobile ? '' : ' (<kbd>N</kbd>)'} puts you on the runway with the engines running, any time before the takeoff.</p>`,
       {},
     );
+  }
+
+  /** ⏩ (or N): the boarding, the pushback and the taxi skipped, behind a fade. */
+  private skipToRunway() {
+    const sim = this.sim;
+    if (!this.active || !sim || !sim.canSkip || this.runwayT >= 0 || this.skipT >= 0 || this.reportShown) return;
+    this.ctx.sfx.pop();
+    this.hud.fade(true);
+    this.runwayT = 0;
+  }
+
+  /** The skip itself: the aircraft on the runway (the sim), the passengers aboard, the doors shut, the bridge or the stairs away, the captain's seat. */
+  private jumpToRunway() {
+    const sim = this.sim!;
+    if (!sim.skipToRunway()) return;
+    this.run?.skip();
+    this.run = null;
+    this.doorK = this.doorTarget = 0;
+    this.cargoK = 0;
+    if (this.docked) {
+      this.retract(sim.from, true);
+      this.docked = false;
+    }
+    this.cams.fixed = null;
+    this.cams.orbit = false;
+    this.cams.set('cockpit');
+    this.hud.camera(CAM_LABEL.cockpit);
+    if (this.ctx.ui.panelOpenKey === 'flight-intro') this.ctx.ui.hidePanel();
   }
 
   private prevRadio: Traffic['onRadioAt'] = null;
@@ -651,6 +742,17 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
         this.skipT = -1;
       }
     }
+    // the skip to the runway: the same fade over the jump
+    if (this.runwayT >= 0) {
+      const before = this.runwayT;
+      this.runwayT += realDt;
+      if (before < JUMP_S && this.runwayT >= JUMP_S) this.jumpToRunway();
+      if (this.runwayT > FADE_S) {
+        this.hud.fade(false);
+        this.runwayT = -1;
+      }
+    }
+    this.hud.skipShown(sim.canSkip && this.runwayT < 0 && !this.reportShown);
 
     // the passengers, and what they set going
     if (this.run) {
@@ -1043,6 +1145,7 @@ ${gate ?? `<p><button class="btn btn-primary btn-small" type="button" data-fligh
     d.masterCaution = sim.callouts.masterCaution;
     d.knob = this.controls?.knob ?? null;
     d.chronoS = this.controls?.chronoS ?? null;
+    d.autoland = sim.fo.autoland;
     // the ECAM's lists a few times a second (they're built afresh), the clock once a second
     this.ecamClock -= dt;
     if (this.ecamClock <= 0) {

@@ -194,8 +194,10 @@ export type CrashReason = 'impact' | 'ditching' | 'gear-collapse' | 'belly-landi
 // Autopilot / FCU
 // ------------------------------------------------------------------------------------------------
 
-export type LateralMode = 'none' | 'HDG' | 'NAV' | 'LOC*' | 'LOC' | 'RWY' | 'RWY TRK';
-export type VerticalMode = 'none' | 'SRS' | 'CLB' | 'OP CLB' | 'DES' | 'OP DES' | 'ALT*' | 'ALT' | 'V/S' | 'G/S*' | 'G/S' | 'FLARE';
+/** The autoland's common modes: LAND, FLARE and ROLL OUT are both the lateral and the vertical mode (the FMA writes them across both columns). */
+export type LandMode = 'LAND' | 'FLARE' | 'ROLL OUT';
+export type LateralMode = 'none' | 'HDG' | 'NAV' | 'LOC*' | 'LOC' | 'RWY' | 'RWY TRK' | LandMode;
+export type VerticalMode = 'none' | 'SRS' | 'CLB' | 'OP CLB' | 'DES' | 'OP DES' | 'ALT*' | 'ALT' | 'V/S' | 'G/S*' | 'G/S' | LandMode;
 export type ThrustMode = 'none' | 'MAN TOGA' | 'MAN FLX' | 'THR CLB' | 'THR IDLE' | 'SPEED' | 'A.FLOOR' | 'TOGA LK' | 'THR LVR';
 
 /** The Flight Control Unit's selections and the flight mode annunciator (what the PFD shows on top). */

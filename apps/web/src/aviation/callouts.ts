@@ -13,6 +13,7 @@
 // Each alert is said again every couple of seconds while it lasts; the most urgent one wins.
 
 import { A320 } from './a320';
+import { isLandMode } from './autopilot';
 import { takeoffSpeeds, type FlightPhase, type VSpeeds } from './nav';
 import { FO_NAME, type Speech } from './speech';
 import type { Sfx } from '../world/audio';
@@ -247,7 +248,8 @@ export class Callouts {
         // a newer callout makes any still waiting stale
         this.speech.cancelWhere((u) => u.from === CALLOUT_FROM);
         this.say({ speaker: 'gpws', from: CALLOUT_FROM, text: c.text, say: c.say, priority: 2 });
-        if (c.ft === 20 && !this.leversIdle(s, fcu, throttle)) {
+        // (an autoland retards at 10 ft)
+        if (c.ft === (isLandMode(fcu.fma.vertical) ? 10 : 20) && !this.leversIdle(s, fcu, throttle)) {
           this.retarding = true;
           this.retardClock = 0.35;
         }

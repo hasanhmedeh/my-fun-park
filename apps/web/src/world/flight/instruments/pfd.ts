@@ -97,13 +97,19 @@ export class Pfd {
     if (fma.vertical !== 'none') cols[1][0] = { text: fma.vertical, colour: C.green };
     if (fma.armedVertical !== 'none') cols[1][1] = { text: fma.armedVertical, colour: C.cyan };
     else if (['SRS', 'CLB', 'OP CLB', 'DES', 'OP DES', 'V/S'].includes(fma.vertical) && Math.abs(fcu.alt - s.altFt) > 250) cols[1][1] = { text: 'ALT', colour: C.cyan };
-    // 3: lateral
-    if (fma.lateral !== 'none') cols[2][0] = { text: fma.lateral, colour: C.green };
+    // 3: lateral (LAND, FLARE and ROLL OUT are written once, across the second and third columns: fma())
+    if (fma.lateral !== 'none' && !landSpan(fma)) cols[2][0] = { text: fma.lateral, colour: C.green };
     if (fma.armedLateral !== 'none') cols[2][1] = { text: fma.armedLateral, colour: C.cyan };
-    // 4: approach capability (a CAT 1 ILS here) and the decision height
-    if (fcu.appr || fma.vertical === 'G/S' || fma.vertical === 'G/S*') {
-      cols[3][0] = { text: 'CAT 1', colour: C.white };
-      cols[3][2] = { text: `DH ${d.dhFt ?? 200}`, colour: C.cyan };
+    // 4: approach capability (a CAT 1 ILS here, CAT 3 for an autoland) and the decision height
+    if (fcu.appr || fma.vertical === 'G/S' || fma.vertical === 'G/S*' || landSpan(fma)) {
+      if (d.autoland) {
+        cols[3][0] = { text: 'CAT 3', colour: C.white };
+        cols[3][1] = { text: 'SINGLE', colour: C.white };
+        cols[3][2] = { text: 'NO DH', colour: C.cyan };
+      } else {
+        cols[3][0] = { text: 'CAT 1', colour: C.white };
+        cols[3][2] = { text: `DH ${d.dhFt ?? 200}`, colour: C.cyan };
+      }
     }
     // 5: AP, FD, A/THR engagement
     if (fcu.ap) cols[4][0] = { text: 'AP1', colour: C.white };
@@ -125,15 +131,21 @@ export class Pfd {
   }
 
   private fma(g: CanvasRenderingContext2D, d: CockpitData) {
-    for (let i = 1; i < 5; i++) line(g, FMA_COLS[i], 8, FMA_COLS[i], 140, C.grey, 3);
+    // the autoland's modes span the vertical and lateral columns: no line between them on the first row
+    const span = landSpan(d.fcu.fma);
+    for (let i = 1; i < 5; i++) line(g, FMA_COLS[i], span && i === 2 ? FMA_ROWS[0] + 24 : 8, FMA_COLS[i], 140, C.grey, 3);
     const cols = this.fmaCells(d);
     for (let c = 0; c < 5; c++) {
-      const cx = (FMA_COLS[c] + FMA_COLS[c + 1]) / 2;
+      const right = span && c === 1 ? FMA_COLS[3] : FMA_COLS[c + 1];
+      const cx = (FMA_COLS[c] + right) / 2;
       for (let r = 0; r < 3; r++) {
         const cell = cols[c][r];
-        if (cell) text(g, cell.text, cx, FMA_ROWS[r], cell.colour, cell.text.length > 8 ? FMA_SIZE - 6 : FMA_SIZE);
+        if (!cell) continue;
+        // (the spanning mode's row only; the armed modes below stay in their own columns)
+        const x = r === 0 ? cx : (FMA_COLS[c] + FMA_COLS[c + 1]) / 2;
+        text(g, cell.text, x, FMA_ROWS[r], cell.colour, cell.text.length > 8 ? FMA_SIZE - 6 : FMA_SIZE);
       }
-      const w = FMA_COLS[c + 1] - FMA_COLS[c] - 18;
+      const w = right - FMA_COLS[c] - 18;
       // a new mode is boxed in white for ten seconds
       if (this.t - this.fmaSince[c] < FMA_BOX_S && cols[c][0]) box(g, FMA_COLS[c] + 9, FMA_ROWS[0] - 22, w, 44, C.white, 3);
     }
@@ -560,6 +572,9 @@ function speedMark(g: CanvasRenderingContext2D, y: number, letter: string) {
 }
 
 const isApproach = (p: CockpitData['phase']) => p === 'approach' || p === 'final' || p === 'landing';
+
+/** The autoland's LAND, FLARE or ROLL OUT: one mode written across the vertical and lateral columns. */
+const landSpan = (fma: FcuState['fma']) => fma.vertical === fma.lateral && (fma.vertical === 'LAND' || fma.vertical === 'FLARE' || fma.vertical === 'ROLL OUT');
 
 /** "SPEED SPEED SPEED": low energy on the approach (well below VLS without the thrust to recover). */
 function lowEnergy(d: CockpitData) {

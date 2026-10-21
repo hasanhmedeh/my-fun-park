@@ -19,11 +19,18 @@
 // disconnects at 200 ft for the manual landing (the cavalry charge), the flight director stays, and
 // the autothrust retards to idle at 20 ft ("RETARD"); it disconnects when the levers reach idle or
 // the aircraft touches down.
+//
+// With an autoland briefed (`autoland`) the autopilot stays in: LAND from 400 ft (the localizer and
+// the glide slope both held, the rudder joining in from 60 ft to line the nose up with the runway),
+// FLARE from 50 ft (the sink eased off with height, a wing down into the crosswind from 30 ft,
+// RETARD at 10 ft rather than 20), and
+// ROLL OUT on the runway (the nose wheel down, the rudder and the nose wheel on the localizer) until
+// the crew disconnect it at taxi speed.
 
 import { A320 } from './a320';
 import { leverN1, n1Lever } from './fdm';
-import { FPM, KT } from '../world/geo';
-import type { AircraftState, Controls, FcuState, LateralMode, NavSource, ThrustMode, VerticalMode } from './types';
+import { FPM, KT, headingVec } from '../world/geo';
+import type { AircraftState, Controls, FcuState, LandMode, LateralMode, NavSource, ThrustMode, VerticalMode } from './types';
 
 const G = 9.80665;
 const DEG = Math.PI / 180;
@@ -43,8 +50,15 @@ const AP_MIN_FT = 100;
 const AP_MIN_S = 5;
 /** On an ILS approach the autopilot hands over at this radio height (manual landing). */
 const AP_OFF_APPR_FT = 200;
+/** The autoland: LAND engages below this radio height, FLARE below the next. */
+const LAND_FT = 400;
+const FLARE_FT = 50;
+/** How fast the autopilot's sidestick may move in the flare and the roll out (per second): the flare's pull is quick. */
+const FLARE_SLEW = 2.5;
 /** The autothrust retards to idle at this radio height on the approach. */
 const RETARD_FT = 20;
+/** An autoland retards later, at 10 ft: the thrust holds the speed through the flare. */
+export const AUTOLAND_RETARD_FT = 10;
 /** Sidestick deflection that disconnects the autopilot (the pilot taking over). */
 const INSTINCTIVE = 0.5;
 /** How fast the autopilot's sidestick orders may change (per second). */
@@ -88,6 +102,9 @@ const ALERT_DEVIATE_FT = 250;
 /** Vertical modes in which the speed is flown on the elevator. */
 const SPEED_ON_ELEVATOR: ReadonlySet<VerticalMode> = new Set(['SRS', 'CLB', 'OP CLB', 'DES', 'OP DES']);
 
+/** Whether a mode is one of the autoland's (LAND, FLARE, ROLL OUT). */
+export const isLandMode = (m: VerticalMode | LateralMode): m is LandMode => m === 'LAND' || m === 'FLARE' || m === 'ROLL OUT';
+
 export class Autopilot {
   readonly fcu: FcuState = {
     ap: false,
@@ -111,12 +128,20 @@ export class Autopilot {
   targetAlt = 0;
   /** The autothrust is driving the engines now (not just armed). */
   athrActive = false;
+  /** An autoland is briefed: the autopilot keeps the approach past 200 ft and lands (LAND, FLARE, ROLL OUT). */
+  autoland = false;
 
   private readonly nav: NavSource;
   private n1Cmd = 0;
   /** The autopilot's sidestick orders, slewed like a servo so they never jerk the aircraft. */
   private apPitch = 0;
   private apRoll = 0;
+  /** The flare: its integral (deg of pitch), and the flight model's flare-law nose-down so far (deg, estimated). */
+  private flareI = 0;
+  private flareDown = 0;
+  /** The sink rate a frame ago and its rate of change (fpm/s, smoothed), for the flare's damping. */
+  private flareVs = 0;
+  private flareAz = 0;
   private aFloor = false;
   private airborneT = 0;
   private wasOnGround = true;
@@ -268,6 +293,12 @@ export class Autopilot {
       if (this.airborneT > 0.5) this.wasOnGround = false;
     }
     const inAir = !this.wasOnGround;
+    // the autoland called off (or the autopilot gone, or one column changed by hand, a V/S pulled
+    // in LAND): back to the ILS for the flight director, or nothing on the runway
+    if ((isLandMode(fma.vertical) || isLandMode(fma.lateral)) && (!this.autoland || !fcu.ap || fma.vertical !== fma.lateral)) {
+      if (isLandMode(fma.vertical)) fma.vertical = inAir ? 'G/S' : 'none';
+      if (isLandMode(fma.lateral)) fma.lateral = inAir ? 'LOC' : 'none';
+    }
 
     // the takeoff: the levers to FLX or TOGA on the ground arm the autothrust and engage SRS / RWY
     if (s.onGround && pilot.throttle >= A320.detents.flx - DETENT_TOL && fma.vertical !== 'SRS') {
@@ -279,7 +310,7 @@ export class Autopilot {
       fma.armedLateral = this.nav.navLeg(s) ? 'NAV' : 'none';
       this.trackHold = s.heading;
     }
-    if (s.onGround && fcu.ap) this.disconnectAp();
+    if (s.onGround && fcu.ap && fma.vertical !== 'ROLL OUT') this.disconnectAp();
 
     // ---------------------------------------------------------------- vertical mode transitions
     const alt = s.altFt;
@@ -341,9 +372,13 @@ export class Autopilot {
       this.gsStable = Math.abs(ils.gsFt) < 25 ? this.gsStable + dt : 0;
       if (this.gsStable > 2) this.setVertical('G/S');
     }
-    const onGs = fma.vertical === 'G/S' || fma.vertical === 'G/S*';
-    if (fcu.ap && onGs && s.radioAltFt < AP_OFF_APPR_FT) this.disconnectAp();
-    this.retard = onGs && s.radioAltFt < RETARD_FT && inAir;
+    // the autoland: LAND once the localizer and the glide slope are both held low down, then the flare
+    if (this.autoland && fcu.ap && inAir && fma.vertical === 'G/S' && fma.lateral === 'LOC' && s.radioAltFt < LAND_FT) this.setLand('LAND');
+    if (fma.vertical === 'LAND' && s.radioAltFt < FLARE_FT) this.setLand('FLARE');
+    const landing = isLandMode(fma.vertical);
+    const onGs = fma.vertical === 'G/S' || fma.vertical === 'G/S*' || landing;
+    if (fcu.ap && onGs && !landing && s.radioAltFt < AP_OFF_APPR_FT) this.disconnectAp();
+    this.retard = onGs && s.radioAltFt < (landing ? AUTOLAND_RETARD_FT : RETARD_FT) && inAir;
 
     // RWY TRK after liftoff; NAV engages from 30 ft if armed
     if (inAir && fma.lateral === 'RWY') {
@@ -403,7 +438,7 @@ export class Autopilot {
         // (on the managed path the thrust is near idle: if the speed still runs over 250 kt (or a higher target) the
         // descent eases off, the FMGS's speed protection, rather than break the 250 kt limit)
         vsCmd = desVs !== null ? Math.min(0, desVs + Math.max(0, s.ias - Math.max(spd, A320.speedLimitLow) - 1) * 200) : fcu.vs;
-      } else if (ils && (vMode === 'G/S' || vMode === 'G/S*')) {
+      } else if (ils && (vMode === 'G/S' || vMode === 'G/S*' || vMode === 'LAND')) {
         vsCmd = this.pathVs(s) - clamp((ils.gsFt * 60) / GS_TAU, -600, 600);
         if (vMode === 'G/S*') nzLim = NZ_CAPTURE;
       }
@@ -416,8 +451,20 @@ export class Autopilot {
     const flapsOut = s.config > 0 || s.slatsDeg > 1;
     const nzMax = flapsOut ? A320.nzMax[1] : A320.nzMax[0];
     const nzMin = flapsOut ? A320.nzMin[1] : A320.nzMin[0];
-    const apPitch = dn >= 0 ? dn / (nzMax - 1) : dn / (1 - nzMin);
+    let apPitch = dn >= 0 ? dn / (nzMax - 1) : dn / (1 - nzMin);
     fcu.fdPitch = vMode === 'none' || !inAir ? null : s.pitch + clamp((gammaTgt - gamma) / DEG, -10, 10);
+    // the flare and the roll out are flown on the stick itself, quicker than the path modes
+    let stickMax = 0.5;
+    let slew = STICK_SLEW;
+    if (vMode !== 'FLARE') {
+      this.flareI = this.flareDown = this.flareAz = 0;
+      this.flareVs = s.vs;
+    }
+    if (vMode === 'FLARE' || vMode === 'ROLL OUT') {
+      apPitch = vMode === 'FLARE' && inAir ? this.flarePitch(s, dt) : 0;
+      stickMax = 1;
+      slew = FLARE_SLEW;
+    }
 
     // ---------------------------------------------------------------- lateral guidance → bank
     let bankCmd: number | null = null;
@@ -431,21 +478,43 @@ export class Autopilot {
     else if (lat === 'NAV') {
       const leg = this.nav.navLeg(s);
       if (leg) trackCmd = leg.track - Math.asin(clamp(leg.xtkM / (V * NAV_TAU), -0.5, 0.5)) / DEG;
-    } else if ((lat === 'LOC*' || lat === 'LOC') && ils) {
+    } else if ((lat === 'LOC*' || lat === 'LOC' || lat === 'LAND' || lat === 'FLARE') && ils) {
       const vLatCmd = clamp(-ils.locM / LOC_TAU, -V * 0.5, V * 0.5);
       trackCmd = ils.course + Math.asin(vLatCmd / V) / DEG;
     }
-    if (inAir && lat !== 'none' && lat !== 'RWY') {
+    if (inAir && lat !== 'none' && lat !== 'RWY' && lat !== 'ROLL OUT') {
       const err = angleDiff(trackCmd, useTrack ? s.track : s.heading);
       // a turn whose rate closes the error with the TURN_TAU time constant
       const rateCmd = (err * DEG) / TURN_TAU;
       bankCmd = clamp(Math.atan((rateCmd * V) / G) / DEG, -BANK_LIMIT, BANK_LIMIT);
     }
     fcu.fdBank = bankCmd;
-    const apRoll = bankCmd === null ? 0 : clamp(0.6 * (bankCmd - s.bank), -ROLL_RATE, ROLL_RATE) / A320.rollRateMax;
+    let apRoll = bankCmd === null ? 0 : clamp(0.6 * (bankCmd - s.bank), -ROLL_RATE, ROLL_RATE) / A320.rollRateMax;
+    // the autoland's last 60 ft: the rudder lines the nose up with the runway (the decrab) and a wing
+    // goes down into the wind to hold the centreline against the drift; on the runway the rudder and
+    // the nose wheel steer for the centreline
+    let apYaw: number | null = null;
+    if (landing && ils) {
+      const ra = s.radioAltFt;
+      if (lat === 'ROLL OUT') {
+        apRoll = 0;
+        apYaw = clamp(angleDiff(ils.course - clamp(ils.locM * 0.4, -3, 3), s.heading) * 0.15 - s.r * 0.3, -1, 1);
+      } else {
+        if (ra < 60) {
+          apYaw = clamp(angleDiff(ils.course, s.heading) / 8 - s.r * 0.1, -1, 1);
+          const fw = headingVec(ils.course);
+          // the drift across the runway (m/s, + right), from the velocity
+          const drift = s.vel.x * -fw.z + s.vel.z * fw.x;
+          const bankT = clamp(-(ils.locM * 0.5 + drift * 3.5), -8, 8);
+          apRoll = clamp((bankT - s.bank) * 0.12 - s.p * 0.02, -0.4, 0.4);
+        }
+      }
+    }
 
     // ---------------------------------------------------------------- autopilot
     if (fcu.ap && (Math.abs(pilot.pitch) > INSTINCTIVE || Math.abs(pilot.roll) > INSTINCTIVE)) this.disconnectAp();
+    // in the autoland's last feet and on the runway the pedals and the tiller take over too
+    if (fcu.ap && landing && (Math.abs(pilot.yaw) > INSTINCTIVE || Math.abs(pilot.tiller) > INSTINCTIVE)) this.disconnectAp();
     if (fcu.ap) {
       if (fma.vertical === 'none') {
         fcu.vs = Math.round(s.vs / 100) * 100;
@@ -455,10 +524,14 @@ export class Autopilot {
         fcu.hdg = Math.round(s.heading) % 360;
         this.setLateral('HDG');
       }
-      this.apPitch = approach(this.apPitch, clamp(apPitch, -0.5, 0.5), STICK_SLEW * dt);
-      this.apRoll = approach(this.apRoll, clamp(apRoll, -0.5, 0.5), STICK_SLEW * dt);
+      this.apPitch = approach(this.apPitch, clamp(apPitch, -stickMax, stickMax), slew * dt);
+      this.apRoll = approach(this.apRoll, clamp(apRoll, -0.5, 0.5), slew * dt);
       out.pitch = this.apPitch;
       out.roll = this.apRoll;
+      if (apYaw !== null) {
+        out.yaw = apYaw;
+        out.tiller = 0;
+      }
     } else {
       // engaging starts from neutral, like the real servos
       this.apPitch = 0;
@@ -553,6 +626,39 @@ export class Autopilot {
     this.fcu.fma.lateral = m;
   }
 
+  /** LAND, FLARE or ROLL OUT: both columns at once, nothing armed. */
+  private setLand(m: LandMode) {
+    const fma = this.fcu.fma;
+    fma.vertical = m;
+    fma.lateral = m;
+    fma.armedVertical = 'none';
+    fma.armedLateral = 'none';
+  }
+
+  /**
+   * The flare's sidestick. The FDM's flare law takes the stick below 50 ft as a pitch attitude
+   * (8° a full stick), so this asks for the attitude change that brings the sink rate to a target
+   * falling with the height (18 fpm a foot, about 3 s to the runway, down to 80 fpm): proportional,
+   * an integral for the trim it needs, the sink's rate of change damping the pull, and the flare
+   * law's nose-down bias below 30 ft held off. The target never asks to sink faster than the
+   * aircraft is already (no pushing over at 50 ft) unless it has floated well above the profile
+   * (11 fpm a foot): leveling off in ground effect runs the touchdown past the zone.
+   */
+  private flarePitch(s: AircraftState, dt: number) {
+    const ra = s.radioAltFt;
+    if (ra < 30) this.flareDown = Math.min(2, this.flareDown + 0.25 * dt);
+    if (dt > 0) this.flareAz += ((s.vs - this.flareVs) / dt - this.flareAz) * Math.min(1, dt / 0.3);
+    this.flareVs = s.vs;
+    const vsT = -clamp(ra * 18, 80, Math.max(80, -s.vs, ra * 11));
+    const e = vsT - s.vs;
+    // fpm of sink a degree of pitch is worth at this ground speed
+    const fpmPerDeg = Math.max(150, s.gs * 101.3 * 0.01745);
+    this.flareI = clamp(this.flareI + (e / fpmPerDeg) * 0.5 * dt, -3, 6);
+    const dTheta = (e / fpmPerDeg) * 4 + this.flareI + this.flareDown - (1.5 * this.flareAz) / fpmPerDeg;
+    return clamp(dTheta / 8, -0.35, 0.9);
+  }
+
+
   /** ALT pulled or pushed: OP CLB / OP DES (or CLB / DES managed) towards the selected altitude, or hold here. */
   private levelChange(open: boolean) {
     if (this.wasOnGround) return;
@@ -601,11 +707,19 @@ export class Autopilot {
     if (was) this.emit('athr-off');
   }
 
-  /** Touchdown at the end of a flight: everything drops out, ready for the next one. */
+  /** Touchdown at the end of a flight: everything drops out, ready for the next one (but an autoland's ROLL OUT). */
   private landed() {
+    const fma = this.fcu.fma;
+    if (this.fcu.ap && this.autoland && (fma.vertical === 'FLARE' || fma.vertical === 'LAND')) {
+      this.disconnectAthr();
+      this.setLand('ROLL OUT');
+      this.fcu.loc = false;
+      this.fcu.appr = false;
+      this.lvrClb = false;
+      return;
+    }
     this.disconnectAp();
     this.disconnectAthr();
-    const fma = this.fcu.fma;
     fma.vertical = 'none';
     fma.lateral = 'none';
     fma.armedVertical = 'none';

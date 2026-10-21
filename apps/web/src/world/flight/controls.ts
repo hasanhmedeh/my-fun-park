@@ -41,6 +41,7 @@ export const CAPTURED_KEYS = [
   'KeyL',
   'KeyK',
   'KeyT',
+  'KeyN',
 ];
 
 /** How fast the stick and the rudder follow the keys (full travel per second), and the thrust levers. */
@@ -60,14 +61,17 @@ export class FlightControls {
   chronoS: number | null = null;
   /** A note for the toasts ("Flaps 2", "Autobrake MED"). */
   onNote: ((text: string) => void) | null = null;
-  /** The camera (CAM on touch) and the time warp (T, ×2 on touch): the screen handles those. */
+  /** The camera (CAM on touch), the time warp (T, ×2 on touch) and the skip to the runway (N): the screen handles those. */
   onCamera: (() => void) | null = null;
   onWarp: (() => void) | null = null;
+  onSkip: (() => void) | null = null;
   /** Whether the visitor's hands are on the controls (false while the passengers board, and in the aftermath). */
   enabled = false;
 
   private sim: FlightSim | null = null;
   private unsub: (() => void)[] = [];
+  /** A thrust lever or brake key pressed (or the touch lever moved) since the last frame: sim.handsOn. */
+  private touched = false;
 
   constructor(
     private readonly input: Input,
@@ -76,7 +80,9 @@ export class FlightControls {
     if (touch) {
       touch.onCommand = (c) => this.touchCommand(c);
       touch.onThrust = (v) => {
-        if (this.sim && this.enabled) this.sim.pilot.throttle = v;
+        if (!this.sim || !this.enabled) return;
+        this.sim.pilot.throttle = v;
+        this.touched = true;
       };
     }
   }
@@ -96,6 +102,7 @@ export class FlightControls {
     on('KeyR', () => {
       // the reversers only come out with the levers at idle
       p().throttle = 0;
+      this.touched = true;
     });
     on('KeyF', () => this.flaps(-1));
     on('KeyV', () => this.flaps(1));
@@ -103,6 +110,7 @@ export class FlightControls {
     on('KeyB', (e) => {
       if (!e.shiftKey) return;
       p().parkingBrake = !p().parkingBrake;
+      this.touched = true;
       this.onNote?.(p().parkingBrake ? 'Parking brake set' : 'Parking brake released');
     });
     on('Slash', (e) => {
@@ -131,6 +139,8 @@ export class FlightControls {
     on('Backslash', () => this.fcu({ kind: 'push', knob: this.knob ?? 'hdg' }));
     on('Quote', () => this.fcu({ kind: 'pull', knob: this.knob ?? 'hdg' }));
     on('KeyT', () => this.onWarp?.());
+    // (the skip works while the passengers board too, hands off the controls)
+    this.unsub.push(this.input.onKey('KeyN', () => this.sim && this.onSkip?.()));
   }
 
   /** Lets go of the keys (the round's over). */
@@ -141,15 +151,21 @@ export class FlightControls {
     this.touch?.release();
     this.sim = null;
     this.enabled = false;
+    this.touched = false;
   }
 
   /**
    * The continuous controls, every simulation step (FlightSim.step's pilotInput): the stick, the
-   * rudder and the tiller, the thrust levers held up or down, the brakes and the reversers.
+   * rudder and the tiller, the thrust levers held up or down, the brakes and the reversers. Any
+   * steering, thrust or brake input sets sim.handsOn (the first officer's auto taxi lets go).
    */
   readonly frame = (dt: number) => {
     const sim = this.sim;
-    if (!sim || !this.enabled) return;
+    if (!sim) return;
+    if (!this.enabled) {
+      sim.handsOn = this.touched = false;
+      return;
+    }
     const c = sim.pilot;
     const s = sim.state;
     const inp = this.input;
@@ -180,6 +196,8 @@ export class FlightControls {
     const rev = inp.held('KeyR') || (this.touch?.reverse ?? false);
     if (rev && s.onGround) c.throttle = 0;
     c.reverse = toward(c.reverse, rev && s.onGround ? 1 : 0, 2 * dt);
+    sim.handsOn = this.touched || wantRoll !== 0 || rud !== 0 || lv !== 0 || b > 0 || rev;
+    this.touched = false;
   };
 
   /** The FCU: the cockpit's buttons and knobs, and the keyboard's. */
@@ -265,6 +283,7 @@ export class FlightControls {
 
   private lever(v: number, name: string) {
     this.sim!.pilot.throttle = v;
+    this.touched = true;
     this.onNote?.(`Thrust ${name}`);
   }
 

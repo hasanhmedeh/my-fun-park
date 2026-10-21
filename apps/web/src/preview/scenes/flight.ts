@@ -7,6 +7,7 @@
 //
 //   ?scene=flight&phase=offer                        the booking card at gate 3
 //   ?scene=flight&phase=boarding                     passengers walking on, from the gate window
+//   ?scene=flight&phase=skip                         ⏩ pressed while boarding (at=seconds): on the runway after the fade
 //   ?scene=flight&phase=pushback&cam=chase           the tug pushing back, engines starting
 //   ?scene=flight&phase=taxi                         taxiing out on the greens, the taxi guide
 //   ?scene=flight&phase=lineup                       lined up on the runway
@@ -46,7 +47,7 @@ import type { Post } from '../../world/post';
 import type { UI } from '../../world/ui';
 import type { Boarding, Travellers } from '../../world/crowd/travellers';
 
-type Phase = 'offer' | 'boarding' | 'pushback' | 'taxi' | 'lineup' | 'rotate' | 'climb' | 'cruise' | 'final' | 'flare' | 'rollout' | 'deplane' | 'report' | 'ditch' | 'goaround' | 'abandon';
+type Phase = 'offer' | 'boarding' | 'skip' | 'pushback' | 'taxi' | 'lineup' | 'rotate' | 'climb' | 'cruise' | 'final' | 'flare' | 'rollout' | 'deplane' | 'report' | 'ditch' | 'goaround' | 'abandon';
 
 /** The game's HUD markup that the flight hangs its overlays on (index.html's #hud, #panel and #touch). */
 function hudDom(touch: boolean) {
@@ -131,7 +132,7 @@ const preview: PreviewScene = async (p: PreviewApi) => {
     },
   });
   ctx.scene.add(traffic.group);
-  const gate = phase === 'boarding' || phase === 'deplane' || phase === 'offer';
+  const gate = phase === 'boarding' || phase === 'skip' || phase === 'deplane' || phase === 'offer';
   let travellers = quickTravellers();
   if (gate) {
     const [{ GLTFLoader }, people, isle, crowd] = await Promise.all([
@@ -212,6 +213,8 @@ const preview: PreviewScene = async (p: PreviewApi) => {
     switch (phase) {
       case 'boarding':
         return sim.realT > Number(params.get('at') ?? 9);
+      case 'skip':
+        return skippedAt >= 0 && sim.realT > skippedAt + 1.5;
       case 'pushback':
         return st === 'push' && sim.towing && sim.stageT > 30;
       case 'taxi':
@@ -247,7 +250,14 @@ const preview: PreviewScene = async (p: PreviewApi) => {
   const fast = !gate;
   let n = 0;
   let ditched = false;
+  let skippedAt = -1;
   while (!reached() && n < 30 * 60 * 40) {
+    // the skip: the HUD's own button, then hands off (the aircraft waits lined up)
+    if (phase === 'skip' && skippedAt < 0 && sim.realT > Number(params.get('at') ?? 5)) {
+      document.querySelector<HTMLButtonElement>('[data-fl-skip]')?.click();
+      flight.pilotOverride = null;
+      skippedAt = sim.realT;
+    }
     // the ditching: from the cruise, put down on the sea with the gear up
     if (phase === 'ditch' && !ditched && sim.nav.phase === 'cruise') {
       ditched = true;

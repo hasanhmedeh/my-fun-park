@@ -54,6 +54,8 @@ export interface CockpitData {
   knob?: FcuKnob | null;
   /** The decision height for the approach (ft, radio). Default 200. */
   dhFt?: number;
+  /** An autoland is briefed: the FMA's approach capability reads CAT 3 SINGLE, no DH. */
+  autoland?: boolean;
 }
 
 /**

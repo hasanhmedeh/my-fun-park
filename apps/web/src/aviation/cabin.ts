@@ -93,6 +93,18 @@ export class Cabin {
     }
   }
 
+  /**
+   * The departure skipped to the runway: boarded, doors armed, the safety demonstration given and
+   * the crew seated, all taken as done (nothing queued for them is said), and the captain's one
+   * line for the takeoff.
+   */
+  skipToRunway() {
+    this.boarded = 1;
+    this.queue.length = 0;
+    for (const k of ['welcome', 'stow', 'nearly', 'arm', 'safety']) this.done.add(k);
+    this.captain('seats-takeoff', 'Cabin crew, seats for takeoff.', undefined, 'single');
+  }
+
   /** The aircraft is on the stand at the destination (also call it when the taxi-in is skipped). */
   arrived() {
     if (this.done.has('disarm')) return;

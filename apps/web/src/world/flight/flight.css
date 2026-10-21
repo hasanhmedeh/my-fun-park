@@ -215,6 +215,32 @@
 .fl-tool[data-fl-voice][aria-pressed='true'] {
   background: #2f8cff;
 }
+/* the first officer's switches */
+.fl-tool[data-fl-autotaxi][aria-pressed='true'],
+.fl-tool[data-fl-autoland][aria-pressed='true'] {
+  background: #1fa971;
+}
+/* the skip to the runway (before the takeoff) */
+.fl-skip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  background: var(--cream, #fff5e3);
+  color: var(--ink, #1d1238);
+  font-size: 0.82rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+.fl-skip:hover {
+  background: #fff;
+}
+.fl-skip kbd {
+  padding: 0 6px;
+  border-radius: 5px;
+  background: var(--ink, #1d1238);
+  color: var(--cream, #fff5e3);
+  font: 700 0.75rem/1.5 ui-monospace, monospace;
+}
 .fl-keys {
   pointer-events: auto;
   padding: 6px 12px;
@@ -506,8 +532,15 @@
     margin-right: 6px;
     font-size: 0.62rem;
   }
+  /* the camera's name, the toggles and the skip in wrapping rows: a column of four runs into the
+     AP and A/THR buttons */
   .fl-side {
     top: calc(max(8px, env(safe-area-inset-top)) + 48px);
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    max-width: min(280px, 34vw);
     gap: 4px;
   }
   .fl-cam {

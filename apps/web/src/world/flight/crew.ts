@@ -7,15 +7,18 @@
 //
 // It drives the same inputs the visitor's keys do (sim.pilot and the autopilot's buttons), so the
 // node check (scripts/flight-check.mjs) and the preview (preview/scenes/flight.ts) exercise the
-// real flight, not a shortcut. The flying is adapted from aviation/sim-check.ts's crew.
+// real flight, not a shortcut. The flying is adapted from aviation/sim-check.ts's crew; the ground
+// work is GroundCrew's (shared with the first officer's auto taxi). Like a visitor, it can leave
+// the taxiing and the landing to the first officer and the autoland (sim.fo, sim.ap.autoland).
 
 import { A320 } from '../../aviation/a320';
-import { runwayFrame, taxiRoute } from '../../aviation/airports';
+import { runwayFrame } from '../../aviation/airports';
+import { isLandMode } from '../../aviation/autopilot';
 import { angleDiff, phaseIndex } from '../../aviation/nav';
 import type { FdmEvent } from '../../aviation/types';
-import { KT, headingVec, vecHeading } from '../geo';
+import { headingVec } from '../geo';
+import { GroundCrew } from './ground-crew';
 import type { FlightSim } from './sim';
-import { TaxiPath } from './taxi';
 
 const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
 
@@ -26,6 +29,10 @@ export interface CrewOptions {
   autopilot?: boolean;
   /** Go around (TOGA) from the first approach at this radio height (ft), then come round and land (default 0: never). */
   goAroundFt?: number;
+  /** Leave the radio calls and the taxiing, out and in, to the first officer's auto taxi (sim.fo.autoTaxi): the crew only takes off. */
+  autoTaxi?: boolean;
+  /** Leave the approach's configuration, the landing and the rollout to the autoland (sim.ap.autoland) and the first officer. */
+  autoland?: boolean;
 }
 
 /** What the crew noticed (for the check's report). */
@@ -46,20 +53,18 @@ export class Crew {
   private apprArmed = false;
   private fromAbove = false;
   private clearedAlt = 0;
-  private exitPath: TaxiPath | null = null;
-  private disarmedAutobrake = false;
-  private asked = 0;
   /** The go-arounds already flown (nav.goArounds), and whether the one asked for has been. */
   private goArounds = 0;
   private wentAround = false;
-  private readonly tgt = { x: 0, z: 0 };
+  private readonly ground: GroundCrew;
   private readonly opts: Required<CrewOptions>;
 
   constructor(
     private readonly sim: FlightSim,
     opts: CrewOptions = {},
   ) {
-    this.opts = { skipTaxiIn: opts.skipTaxiIn ?? false, autopilot: opts.autopilot ?? true, goAroundFt: opts.goAroundFt ?? 0 };
+    this.ground = new GroundCrew(sim);
+    this.opts = { skipTaxiIn: opts.skipTaxiIn ?? false, autopilot: opts.autopilot ?? true, goAroundFt: opts.goAroundFt ?? 0, autoTaxi: opts.autoTaxi ?? false, autoland: opts.autoland ?? false };
     sim.onEvent = (e) => {
       if (e.kind === 'touchdown' && e.gear === 'main' && !this.log.touchdown && phaseIndex(sim.nav.phase) >= phaseIndex('approach')) {
         this.log.touchdown = e;
@@ -73,15 +78,22 @@ export class Crew {
     };
   }
 
+  /** The way off the runway and the steering target (the check's trace). */
+  get exitPath() {
+    return this.ground.exitPath;
+  }
+  get tgt() {
+    return this.ground.tgt;
+  }
+
   /** One frame of the crew (FlightSim.step's pilot input). */
   frame = (dt: number) => {
     const sim = this.sim;
     const c = sim.pilot;
-    const next = sim.atc.nextRequest;
-    this.asked = Math.max(0, this.asked - dt);
+    this.ground.tick(dt);
     switch (sim.stage) {
       case 'stand':
-        if (next === 'pushback' && !this.asked) this.ask();
+        if (!this.opts.autoTaxi) this.ground.ask('pushback');
         return;
       case 'push':
         return;
@@ -92,70 +104,27 @@ export class Crew {
         this.fly(dt);
         return;
       case 'taxi-in':
-        this.taxiIn(dt);
+        if (!this.opts.autoTaxi) this.ground.taxiIn(this.opts.skipTaxiIn);
         return;
       default:
         c.pitch = c.roll = c.yaw = c.tiller = 0;
     }
   };
 
-  private ask() {
-    this.sim.action();
-    this.asked = 2;
-  }
-
   // ---------------------------------------------------------------------------------------------- on the ground
 
-  private taxiOut(_dt: number) {
+  private taxiOut(dt: number) {
     const sim = this.sim;
-    const s = sim.state;
     const c = sim.pilot;
-    const clr = sim.atc.clearance;
-    const running = sim.fm.sys.engineRunning[0] && sim.fm.sys.engineRunning[1];
-    // the before-takeoff flow: CONF 1+F, ground spoilers armed, autobrake MAX, the climb on the FCU
-    c.flapLever = 1;
-    c.spoilersArmed = true;
-    c.autobrake = 'max';
-    if (!running) {
-      this.hold();
+    // once rolling it's the takeoff whatever the line-up looked like
+    if (this.rotating || c.throttle >= A320.detents.flx) {
+      this.takeoffRoll();
       return;
     }
-    if (!clr.taxi) {
-      this.hold();
-      if (sim.atc.nextRequest === 'taxi' && !this.asked) this.ask();
-      return;
-    }
-    const route = sim.route;
-    if (!route) {
-      this.hold();
-      return;
-    }
-    if (sim.routeKind === 'out') {
-      // at the holding point: stop short of the bar and call ready
-      const left = route.lengthM - route.along;
-      if (sim.atc.nextRequest === 'takeoff' && left < 250 && !this.asked) this.ask();
-      if (left < 18) {
-        this.hold();
-        this.log.waitedAtHoldS += _dt;
-        return;
-      }
-      this.follow(route, Math.min(route ? sim.guide.adviceKt : 10, 26));
-      return;
-    }
-    // the line-up: onto the runway at a walking pace, then the takeoff
-    const rw = sim.depRw;
-    const fr = runwayFrame(rw, s.pos.x, s.pos.z);
-    const err = angleDiff(rw.heading, s.heading);
-    const onCentre = Math.abs(fr.right) < 4 && Math.abs(err) < 6 && route.along > route.lengthM - 300 + 30;
-    if (!this.rotating && !(onCentre && clr.takeoff) && c.throttle < A320.detents.flx) {
-      if (onCentre && !clr.takeoff) {
-        this.hold();
-        return;
-      }
-      this.follow(route, 8);
-      return;
-    }
-    this.takeoffRoll();
+    // with the auto taxi the first officer brings it onto the runway; the takeoff is the crew's
+    const lined = this.opts.autoTaxi ? sim.fo.readyForTakeoff : this.ground.taxiOut(dt);
+    this.log.waitedAtHoldS = this.ground.waitedAtHoldS;
+    if (lined) this.takeoffRoll();
   }
 
   private takeoffRoll() {
@@ -172,66 +141,6 @@ export class Crew {
     c.yaw = s.onGround ? clamp(angleDiff(rw.heading - clamp(fr.right * 0.4, -3, 3), s.heading) * 0.15 - s.r * 0.3, -1, 1) : 0;
     if (s.ias >= sim.nav.vSpeeds.vr) this.rotating = true;
     if (this.rotating) c.pitch = clamp(0.3 + 0.12 * (3 - s.q), 0, 0.8);
-  }
-
-  private hold() {
-    const c = this.sim.pilot;
-    c.throttle = 0;
-    c.tiller = 0;
-    c.brakeL = c.brakeR = this.sim.state.gs > 0.3 ? 0.5 : 0.3;
-  }
-
-  /** Pure pursuit along a route at a speed (kt), with the throttle and the toe brakes. */
-  private follow(route: TaxiPath, kt: number) {
-    const s = this.sim.state;
-    const c = this.sim.pilot;
-    const v = s.gs;
-    // the sim tracks its own cleared route; the crew's exit path is tracked here
-    if (route !== this.sim.route) route.track(s.pos.x, s.pos.z);
-    const look = clamp(12 + v * KT * 2.5, 14, 34);
-    route.pointAhead(look, this.tgt);
-    const want = vecHeading(this.tgt.x - s.pos.x, this.tgt.z - s.pos.z);
-    const err = angleDiff(want, s.heading);
-    // full tiller from a standstill only scrubs the nose wheel: roll first, then turn
-    const most = v < 2 ? 0.35 : v < 5 ? 0.7 : 1;
-    c.tiller = clamp(err / 30 - s.r * 0.04, -most, most);
-    c.yaw = 0;
-    // a sharp turn ahead of the nose: slow for it
-    const target = Math.abs(err) > 25 ? Math.min(kt, 8) : kt;
-    if (v < target - 0.5) {
-      c.throttle = clamp(0.2 + (target - v) * 0.02 + (v < 1 ? 0.08 : 0), 0, 0.36);
-      c.brakeL = c.brakeR = 0;
-    } else {
-      c.throttle = 0;
-      c.brakeL = c.brakeR = v > target + 1.5 ? clamp((v - target) * 0.06, 0.05, 0.55) : 0;
-    }
-  }
-
-  private taxiIn(_dt: number) {
-    const sim = this.sim;
-    const s = sim.state;
-    const c = sim.pilot;
-    c.reverse = 0;
-    c.pitch = c.roll = 0;
-    c.flapLever = 0;
-    c.spoilersArmed = false;
-    if (this.opts.skipTaxiIn) {
-      this.hold();
-      if (sim.atc.nextRequest === 'skip-taxi-in' && !this.asked) this.ask();
-      return;
-    }
-    const route = sim.route ?? this.exitPath;
-    if (!route) {
-      this.hold();
-      return;
-    }
-    const left = route === sim.route ? route.lengthM - route.along : Infinity;
-    if (left < 1.5 || (route === sim.route && route.distToEnd(s.pos.x, s.pos.z) < 2)) {
-      this.hold();
-      c.brakeL = c.brakeR = 0.8;
-      return;
-    }
-    this.follow(route, route === sim.route ? Math.min(sim.guide.adviceKt, 20) : 12);
   }
 
   // ---------------------------------------------------------------------------------------------- in the air
@@ -260,7 +169,7 @@ export class Crew {
     // triggering on final
     if (phase === 'final' && !s.onGround && s.radioAltFt > 30 && c.throttle < A320.detents.toga && (s.alphaFloor || fcu.fma.thrust === 'TOGA LK')) c.throttle = A320.detents.toga;
     // not stabilised by 700 ft (no glide slope, or the gear still up): go around, as the SOP says
-    if (phase === 'final' && !s.onGround && s.radioAltFt < 700 && s.radioAltFt > 100 && c.throttle < A320.detents.toga && !sim.nav.goingAround && this.engaged && !this.manual && (s.gear < 0.9 || (fcu.fma.vertical !== 'G/S' && fcu.fma.vertical !== 'G/S*'))) c.throttle = A320.detents.toga;
+    if (phase === 'final' && !s.onGround && s.radioAltFt < 700 && s.radioAltFt > 100 && c.throttle < A320.detents.toga && !sim.nav.goingAround && this.engaged && !this.manual && (s.gear < 0.9 || (fcu.fma.vertical !== 'G/S' && fcu.fma.vertical !== 'G/S*' && !isLandMode(fcu.fma.vertical)))) c.throttle = A320.detents.toga;
     // the tower says go around (traffic still on the runway): the approach clearance is withdrawn
     if (phase === 'final' && !s.onGround && s.radioAltFt > 30 && c.throttle < A320.detents.toga && !sim.nav.goingAround && !sim.atc.clearance.approach && !sim.atc.clearance.land) c.throttle = A320.detents.toga;
     // round again, whatever started it: the approach is flown afresh once ATC clears it
@@ -309,8 +218,10 @@ export class Crew {
     // cleared lower but held level at a constraint already behind (the managed descent stops at the
     // initial approach fix's altitude and doesn't resume, which after a go-around leaves the aircraft
     // at the missed approach altitude down the final): an open descent to what ATC cleared
-    if (this.engaged && !this.fromAbove && phase === 'approach' && sim.atc.clearance.approach && fcu.fma.vertical === 'ALT' && fcu.alt < s.altFt - 200) ap.pullAlt();
-    if ((phase === 'approach' || phase === 'final') && !this.apprArmed && !missed) {
+    // (with the autoland the first officer flies the approach's configuration and its descents: flight/first-officer.ts)
+    const own = !this.opts.autoland;
+    if (own && this.engaged && !this.fromAbove && phase === 'approach' && sim.atc.clearance.approach && fcu.fma.vertical === 'ALT' && fcu.alt < s.altFt - 200) ap.pullAlt();
+    if (own && (phase === 'approach' || phase === 'final') && !this.apprArmed && !missed) {
       this.apprArmed = true;
       if (!fcu.appr) ap.pushAppr();
       c.autobrake = 'med';
@@ -333,7 +244,7 @@ export class Crew {
     } else c.speedbrake = 0;
     // established on the localizer but above the glide slope: down at 1,500 fpm to meet it from above
     const ils = sim.nav.ils(s);
-    if (!this.fromAbove && ils?.valid && fcu.ap && (fcu.fma.lateral === 'LOC' || fcu.fma.lateral === 'LOC*') && fcu.fma.armedVertical === 'G/S' && ils.gsFt > 80) {
+    if (own && !this.fromAbove && ils?.valid && fcu.ap && (fcu.fma.lateral === 'LOC' || fcu.fma.lateral === 'LOC*') && fcu.fma.armedVertical === 'G/S' && ils.gsFt > 80) {
       this.fromAbove = true;
       ap.setAlt(1000);
       ap.setVs(-1500);
@@ -384,38 +295,7 @@ export class Crew {
       } else if (fcu.athr && c.throttle < A320.detents.toga) c.throttle = A320.detents.cl;
     }
     if (!this.log.touchdown || !s.onGround) return;
-    // the rollout: stick neutral, idle reverse, the autobrake to taxi speed; steer for the centreline
-    c.throttle = 0;
-    c.pitch = 0;
-    c.roll = 0;
-    c.reverse = s.gs > 60 ? 0.1 : 0;
-    const exitName = sim.atc.clearance.vacate;
-    const exit = exitName ? rw.exits.find((e) => e.name === exitName) : null;
-    if (!this.disarmedAutobrake && s.gs < 40) {
-      // pedals: the autobrake lets go, and the crew brakes to the exit's speed
-      this.disarmedAutobrake = true;
-      c.autobrake = 'off';
-      c.brakeL = c.brakeR = 0.7;
-      return;
-    }
-    if (exit && !this.exitPath) {
-      const node = sim.arr.nodes[exit.node];
-      const along = runwayFrame(rw, node.x, node.z).along;
-      const ahead = along - fr.along;
-      if (ahead < 30 + s.gs * KT * 2) {
-        const r = taxiRoute(sim.arr, exit.node, sim.arr.playerStand);
-        if (r) this.exitPath = new TaxiPath(sim.arr, r.nodes.slice(0, Math.min(r.nodes.length, 3)));
-      }
-    }
-    if (this.exitPath) {
-      this.follow(this.exitPath, 12);
-      return;
-    }
-    if (this.disarmedAutobrake) {
-      const target = 18;
-      c.brakeL = c.brakeR = s.gs > target ? clamp((s.gs - target) * 0.05, 0.1, 0.6) : 0;
-    }
-    c.tiller = 0;
-    c.yaw = clamp(angleDiff(rw.heading - clamp(fr.right * 0.4, -3, 3), s.heading) * 0.15 - s.r * 0.3, -1, 1);
+    // the rollout, unless the first officer has it (the autoland's ROLL OUT, or the auto taxi below 40 kt)
+    if (!sim.fo.driving) this.ground.rollout();
   }
 }

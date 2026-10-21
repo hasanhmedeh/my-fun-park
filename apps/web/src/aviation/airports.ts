@@ -452,20 +452,29 @@ const PLAN_TAXI_OUT_MS = 6;
 const PLAN_TAXI_IN_MS = 9;
 
 /**
+ * The plan's time from the pushback to lined up on the departure runway (s): the pushback and
+ * engine start, the taxi out along the route ATC gives (the stand's taxilane to the runway entry it
+ * hands out) and lining up. A skipped departure is credited this much (FlightScorer.skipped).
+ */
+export function planLineUpS(from: Region, dep: RunwayEnd) {
+  const depAp = AIRFIELDS[from];
+  const entry = dep.entries[0];
+  const stand = depAp.stands.find((s) => s.id === depAp.playerStand);
+  const outM = (stand && entry ? taxiRoute(depAp, stand.lane, entry.hold)?.lengthM : 0) || 1800;
+  return 80 + outM / PLAN_TAXI_OUT_MS + 10;
+}
+
+/**
  * Gate to gate (s), the way an airline plans it: the pushback and engine start, the taxi out along
  * the route ATC gives (the stand's taxilane to the runway entry it hands out), lining up and the
  * takeoff run, the airborne part at an average 96 m/s (the 250 kt climb and cruise, the slower
  * approach), the landing roll to the first exit, and the taxi in to the stand.
  */
 function blockTime(from: Region, to: Region, dep: RunwayEnd, arr: RunwayEnd, airM: number) {
-  const depAp = AIRFIELDS[from];
   const arrAp = AIRFIELDS[to];
-  const entry = dep.entries[0];
-  const stand = depAp.stands.find((s) => s.id === depAp.playerStand);
-  const outM = (stand && entry ? taxiRoute(depAp, stand.lane, entry.hold)?.lengthM : 0) || 1800;
   const exit = arr.exits[0];
   const inM = (exit ? taxiRoute(arrAp, exit.node, arrAp.playerStand, true)?.lengthM : 0) || 700;
-  const taxiOutS = 80 + outM / PLAN_TAXI_OUT_MS + 30;
+  const taxiOutS = planLineUpS(from, dep) + 20;
   const flyingS = 35 + airM / 96 + 45;
   const taxiInS = inM / PLAN_TAXI_IN_MS + 10;
   return Math.round(taxiOutS + flyingS + taxiInS);

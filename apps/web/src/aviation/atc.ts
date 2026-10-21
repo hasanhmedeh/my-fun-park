@@ -514,9 +514,39 @@ export class Atc {
     this.say(this.crew(`Tower ${f}, ${this.cs}.`, `Tower ${freqWords(f)}, ${this.csSay}.`), 0.5, () => this.setStation('tower', this.dep));
   }
 
+  /**
+   * The departure skipped to the runway (the visitor's skip): the IFR clearance, the pushback and
+   * the taxi are taken as given and done, the crew are on Tower, and they call ready for departure
+   * at once. `lined` is whether the aircraft was put lined up on the runway (it was free) or at the
+   * holding point (it wasn't): the tower then clears it for takeoff, or holds it for the traffic.
+   */
+  skipToRunway(lined: boolean) {
+    this.convo = [];
+    this.inFlight = null;
+    this.pending = [];
+    const ap = this.dep;
+    const pe = this.depStand().pushEnd[this.pushFace];
+    const start = nodeAhead(ap, pe.x, pe.z, pe.heading);
+    const hold = this.entry.hold;
+    const route = taxiRoute(ap, start.id, hold) ?? { nodes: [start.id, hold], via: [this.entry.name], lengthM: 0 };
+    this.clearance.altitudeFt = this.nav.plan.cruiseFt;
+    this.clearance.pushback = true;
+    this.clearance.taxi = { route: route.nodes, via: route.via.filter((v, i) => !(i === route.via.length - 1 && v === this.entry.name)), holdShort: hold };
+    this.clearance.lineUp = lined;
+    this.asked.add('pushback');
+    this.asked.add('taxi');
+    // (skipped while holding short, ready already called: called again from where it is now)
+    this.asked.delete('takeoff');
+    this.setStation('tower', this.dep);
+    this.stage = 'tower';
+    this.request('takeoff');
+  }
+
   private readyForDeparture() {
     const t = this.station.name;
-    this.say(this.crew(`${t}, ${this.cs}, holding point ${this.entry.name}, ready for departure.`, `${t}, ${this.csSay}, holding point ${taxiwayWords(this.entry.name)}, ready for departure.`), 0.2, () => {
+    // (lined up already: a departure skipped onto the runway while it was free)
+    const where = this.clearance.lineUp ? { text: `lined up runway ${this.depRw.ident}`, say: `lined up runway ${runwayWords(this.depRw.ident)}` } : { text: `holding point ${this.entry.name}`, say: `holding point ${taxiwayWords(this.entry.name)}` };
+    this.say(this.crew(`${t}, ${this.cs}, ${where.text}, ready for departure.`, `${t}, ${this.csSay}, ${where.say}, ready for departure.`), 0.2, () => {
       this.stage = 'holding';
       this.departureSlot(true);
     });

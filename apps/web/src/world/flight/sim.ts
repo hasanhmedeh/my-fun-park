@@ -10,7 +10,7 @@
 // it a scripted crew, flight/crew.ts), so the whole flight can be checked without a browser.
 
 import { A320 } from '../../aviation/a320';
-import { AIRFIELDS, onRunway, runwayFrame, type Airport, type RunwayEnd, type Stand } from '../../aviation/airports';
+import { AIRFIELDS, onRunway, planLineUpS, runwayFrame, type Airport, type RunwayEnd, type Stand } from '../../aviation/airports';
 import { Atc, type RunwayStatus } from '../../aviation/atc';
 import { Autopilot, type ApEvent } from '../../aviation/autopilot';
 import { Cabin } from '../../aviation/cabin';
@@ -22,9 +22,10 @@ import { Speech } from '../../aviation/speech';
 import { Air } from '../../aviation/weather';
 import { neutralControls, type AircraftState, type Controls, type FdmEvent, type GroundQuery, type ScoreItem, type Utterance } from '../../aviation/types';
 import { Path, stopSpeed, type Pose2 } from '../airport/airside-path';
-import { headingVec, regionAt, type Region } from '../geo';
+import { headingVec, regionAt, vecHeading, type Region } from '../geo';
 import type { Sfx } from '../audio';
 import type { FlightInfo } from './booking';
+import { FirstOfficer } from './first-officer';
 import { TaxiPath, emptyGuide, type TaxiGuideInfo } from './taxi';
 
 /** Where the flight is, beyond the navigator's phase: what the crew are doing on the ground. */
@@ -98,6 +99,12 @@ export class FlightSim {
   readonly pilot: Controls = neutralControls();
   /** What the flight model got this frame (the pilot's controls with the automatics in place). */
   readonly controls: Controls = neutralControls();
+  /** The first officer's auto taxi and autoland duties (the visitor's switches). */
+  readonly fo: FirstOfficer;
+  /** The visitor touched a steering, thrust or brake control this frame (flight/controls.ts): the first officer's auto taxi lets go. */
+  handsOn = false;
+  /** The departure was skipped to the runway. */
+  skippedToRunway = false;
 
   stage: Stage = 'boarding';
   /** Seconds in the current stage (simulated). */
@@ -212,6 +219,7 @@ export class FlightSim {
     this.atc.onViolation = (label, pts, fatal) => this.scorer.violation(label, pts, undefined, fatal);
     this.atc.onClearance = (k) => this.clearance(k);
     this.ap.onEvent = (e) => this.apEvent(e);
+    this.fo = new FirstOfficer(this);
   }
 
   get state(): AircraftState {
@@ -259,6 +267,70 @@ export class FlightSim {
     if (this.stage !== 'boarding') return;
     this.cabin.boarding(Math.min(1, progress));
     if (progress >= 1) this.setStage('stand');
+  }
+
+  /** Whether the departure can still be skipped to the runway: any time on the ground before the line-up clearance. */
+  get canSkip() {
+    const st = this.stage;
+    const c = this.atc.clearance;
+    return (st === 'boarding' || st === 'stand' || st === 'push' || st === 'taxi') && !this.failed && !this.skippedToRunway && !c.lineUp && !c.takeoff && phaseIndex(this.nav.phase) < phaseIndex('takeoff');
+  }
+
+  /**
+   * Skip the boarding, the pushback and the taxi out: engines running, CONF 1+F, the ground spoilers
+   * armed and the autobrake MAX, on Tower and calling ready for departure. Lined up on the runway
+   * when it's free; if traffic has it, 25 m short of the holding point instead (lining up then
+   * could put the aircraft in front of a landing), and the first officer lines up once the tower
+   * clears it. The plan's time for what was skipped counts as spent, so it's neither late nor early.
+   * The screen puts the passengers aboard and the tug away. False if it's too late to skip.
+   */
+  skipToRunway(): boolean {
+    if (!this.canSkip) return false;
+    const lined = !(this.traffic?.runwayBusy(this.from).busy ?? false);
+    this.skippedToRunway = true;
+    this.speech.cancel();
+    this.cabin.skipToRunway();
+    this.atc.skipToRunway(lined);
+    const e = this.atc.entry;
+    let x: number;
+    let z: number;
+    let heading: number;
+    if (lined) {
+      const rn = this.dep.nodes[e.runway];
+      const f = headingVec(this.depRw.heading);
+      x = rn.x + f.x * 50;
+      z = rn.z + f.z * 50;
+      heading = this.depRw.heading;
+    } else {
+      // on the cleared route's last leg, facing the stop bar
+      const route = this.atc.clearance.taxi?.route ?? [];
+      const hold = this.dep.nodes[e.hold];
+      const prev = this.dep.nodes[route[route.length - 2]] ?? this.dep.nodes[e.runway];
+      const sign = prev === this.dep.nodes[e.runway] ? -1 : 1;
+      const dx = (hold.x - prev.x) * sign;
+      const dz = (hold.z - prev.z) * sign;
+      const d = Math.hypot(dx, dz) || 1;
+      x = hold.x - (dx / d) * 25;
+      z = hold.z - (dz / d) * 25;
+      heading = vecHeading(dx, dz);
+    }
+    this.towing = false;
+    this.pushPath = null;
+    this.pushS = 0;
+    this.fm.placeOnGround(x, z, heading, { enginesRunning: true });
+    this.engineStarts = 2;
+    Object.assign(this.pilot, { throttle: 0, reverse: 0, brakeL: 0, brakeR: 0, parkingBrake: true, flapLever: 1, speedbrake: 0, spoilersArmed: true, autobrake: 'max', gearDown: true, pitch: 0, roll: 0, yaw: 0, tiller: 0 });
+    this.nav.phase = 'taxi-out';
+    this.route = null;
+    this.routeKind = null;
+    this.holdRed = !lined;
+    this.scorer.skipped(planLineUpS(this.from, this.depRw));
+    this.fo.lineUpAfterSkip = !lined;
+    this.setStage('taxi');
+    // (the ground crew's goodbye is long over)
+    this.stageT = DISCONNECT_S;
+    this.onNote?.(lined ? `Lined up on runway ${this.depRw.ident}` : `Holding short of runway ${this.depRw.ident}: traffic on the runway`);
+    return true;
   }
 
   /** Cycle the time warp (×1 → ×2 → ×4), where it's allowed. */
@@ -324,6 +396,7 @@ export class FlightSim {
     this.nav.update(dt, s);
     this.beforeControls(dt);
     pilotInput?.(dt);
+    this.fo.frame(dt);
     this.assist();
     const ctl = this.ap.update(dt, s, this.pilot, this.controls);
     // The model deploys armed ground spoilers whenever the levers are at idle on the ground, which on the
@@ -450,7 +523,11 @@ export class FlightSim {
 
     // the score's new items, for the toasts
     const items = this.scorer.items;
-    while (this.scoreSeen < items.length) this.onScore?.(items[this.scoreSeen++]);
+    // (not onScore?.(items[i++]): without a hook the optional call skips its argument, and the count never moves)
+    while (this.scoreSeen < items.length) {
+      const it = items[this.scoreSeen++];
+      this.onScore?.(it);
+    }
 
     // failure: the flight model's crash, or ATC's runway incursion with traffic
     if (this.stage !== 'failed' && this.stage !== 'done') {
@@ -522,6 +599,8 @@ export class FlightSim {
       if (approaching) this.nav.goAround();
     }
     this.wasToga = toga;
+    // the autoland's ROLL OUT: the landing was the autopilot's
+    if (this.ap.fcu.fma.vertical === 'ROLL OUT') this.scorer.autolanded();
     if (this.nav.goArounds > this.gaModes && this.stage === 'flight') this.goAroundModes();
     if (this.nav.goArounds > this.lastGoArounds) {
       this.lastGoArounds = this.nav.goArounds;
@@ -609,7 +688,8 @@ export class FlightSim {
     this.onStage?.(st, prev);
   }
 
-  private say(speaker: 'fo' | 'captain', text: string) {
+  /** A line from the flight deck (the first officer's calls, the captain's). */
+  say(speaker: 'fo' | 'captain', text: string) {
     this.speech.say({ speaker, from: speaker === 'fo' ? 'First Officer' : 'Captain', text, priority: 0 });
   }
 
@@ -679,6 +759,7 @@ export class FlightSim {
           this.holdArr = false;
           this.traffic?.holdForPlayer(this.to, false);
         }
+        this.fo.goAroundOrdered();
         break;
       case 'direct':
         // round again after a go-around: from the runway heading onto the plan (NAV) to the fix
@@ -704,7 +785,8 @@ export class FlightSim {
   private apEvent(e: ApEvent) {
     const s = this.fm.state;
     if (e === 'ap-on') this.apEngagedOnce = true;
-    if (e === 'ap-off' && this.apEngagedOnce && !s.onGround) this.onNote?.(s.radioAltFt < 400 ? 'Autopilot off: you have control. Land it!' : 'Autopilot off');
+    // (the autoland's own approach: the first officer says it)
+    if (e === 'ap-off' && this.apEngagedOnce && !s.onGround && !this.fo.landing) this.onNote?.(s.radioAltFt < 400 ? 'Autopilot off: you have control. Land it!' : 'Autopilot off');
     if (e === 'a-floor') this.onNote?.('Alpha floor: TOGA thrust');
   }
 
@@ -721,12 +803,20 @@ export class FlightSim {
       case 'boarding':
         return { text: 'Passengers boarding · skip', keys: 'E' };
       case 'stand':
+        if (next === 'pushback' && this.fo.autoTaxi) return { text: 'Auto taxi: the first officer asks for the pushback' };
         return next === 'pushback' ? { text: 'Request pushback and start-up', keys: 'E' } : { text: 'Listening to the ATIS and the IFR clearance…' };
       case 'push':
         return { text: this.towing ? `Pushing back · engines starting (${this.fm.sys.engineRunning.filter(Boolean).length}/2)` : 'The tug is connecting…', keys: this.warp === 1 ? 'T' : undefined };
       case 'taxi': {
         if (!this.fm.sys.engineRunning[0] || !this.fm.sys.engineRunning[1]) return { text: 'Starting engines…' };
         const c = this.atc.clearance;
+        if (this.fo.readyForTakeoff) return { text: 'Lined up and cleared for takeoff: thrust levers TOGA', keys: 'Y' };
+        if (this.fo.driving) {
+          const where = this.routeKind === 'lineup' ? `lining up on runway ${this.depRw.ident}` : c.taxi ? `taxiing to holding point ${c.taxi.holdShort.replace(/^H/, '')}` : 'waiting for Ground';
+          return { text: `${this.fo.autoTaxi ? 'Auto taxi' : 'First officer'}: ${where} · steer, thrust or brake to take over` };
+        }
+        if (this.fo.lineUpAfterSkip && !c.lineUp) return { text: 'Holding short for the traffic: the first officer lines up once the tower clears it' };
+        if (this.skippedToRunway && c.lineUp && !c.takeoff) return { text: 'Lined up: waiting for the takeoff clearance' };
         if (!c.taxi) return next === 'taxi' ? { text: 'Request taxi', keys: 'E' } : { text: 'Waiting for Ground…' };
         if (c.takeoff) {
           if (this.routeKind === 'lineup' && this.route && this.route.along < this.route.lengthM - 260) return { text: 'Line up on the centreline', keys: 'A D' };
@@ -776,6 +866,7 @@ export class FlightSim {
           return { text: phase === 'cruise' ? `Cruising at ${Math.round(this.info.plan.cruiseFt).toLocaleString('en-GB')} ft to ${this.arr.geo.name}` : 'Climbing on the flight plan' };
         }
         if (phase === 'descent') return fcu.ap ? { text: 'Descending: the autopilot follows the plan' } : { text: 'Descend to 3,000 ft' };
+        if ((phase === 'approach' || phase === 'final') && this.fo.landing) return { text: s.radioAltFt < 1000 ? 'Autoland: LAND, FLARE, ROLL OUT on the autopilot · the stick takes over' : 'Autoland: the first officer configures, the autopilot lands' };
         if (phase === 'approach' || phase === 'final') {
           if (!fcu.appr && !fcu.loc && fcu.fma.lateral !== 'LOC' && fcu.fma.vertical !== 'G/S') return { text: 'Arm the ILS approach (APPR)', keys: 'K' };
           const want = s.ias < s.speeds.greenDot + 10 ? 1 : 0;
@@ -788,6 +879,11 @@ export class FlightSim {
           if (!fcu.ap && s.radioAltFt < 250) return { text: 'Flare at 30 ft: ease back, thrust idle', keys: 'S J' };
           return { text: fcu.ap ? 'Established: the autopilot hands over at 200 ft' : 'Follow the flight director to the runway' };
         }
+        if ((phase === 'landing' || phase === 'rollout') && this.fo.driving) {
+          if (fcu.fma.vertical === 'ROLL OUT') return { text: 'Autoland: ROLL OUT on the centreline' };
+          const v = this.atc.clearance.vacate;
+          return { text: this.fo.autoTaxi ? `Auto taxi: vacating${v ? ` via ${v}` : ''} · or skip the taxi-in` : 'Autoland: slowing to taxi speed', keys: this.fo.autoTaxi ? 'E' : undefined };
+        }
         if (phase === 'landing') return s.onGround ? { text: 'Reverse thrust and brakes', keys: 'R B' } : { text: 'Flare: ease back, thrust idle', keys: 'S J' };
         if (phase === 'rollout') {
           if (s.gs > 40) return { text: 'Reverse thrust and brakes', keys: 'R B' };
@@ -797,6 +893,7 @@ export class FlightSim {
         return null;
       }
       case 'taxi-in':
+        if (this.fo.driving) return { text: `Auto taxi to stand ${this.arrStand.gate} · steer, thrust or brake to take over · or skip`, keys: 'E' };
         if (!this.atc.clearance.taxiIn) return { text: 'Vacate the runway · or skip the taxi-in', keys: 'E' };
         return { text: `Taxi to stand ${this.arrStand.gate}: follow the greens · or skip`, keys: 'E' };
       case 'parking':

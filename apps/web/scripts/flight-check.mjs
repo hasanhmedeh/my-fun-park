@@ -6,9 +6,12 @@
 // the rollout, the taxi-in to the stand and the deplaning. The ground is the real airfields'
 // pavement, the terrain and the sea; the traffic is the real AI traffic on stub models.
 // A third flight (FA101 again) goes around from 500 ft on the first approach and must come round,
-// land and park. On every flight the load factor must read what a passenger feels (1 g level,
+// land and park. Then the visitor's shortcuts: FA101 skipped to the runway from the boarding with
+// the auto taxi and the autoland (the first officer taxis in), FA102 on the auto taxi from the
+// stand (a hand-flown landing, the first officer vacating), and FA102 skipped mid-taxi with the
+// autoland alone (handed back at taxi speed, the crew vacating). On every flight the load factor must read what a passenger feels (1 g level,
 // 1 / cos bank in a level turn), so the comfort score means something.
-//   node scripts/flight-check.mjs [tod=day] [skip] [verbose] [trace=s] [YYYY-MM-DD] [leg=0|1|2] [flare]
+//   node scripts/flight-check.mjs [tod=day] [skip] [verbose] [trace=s] [YYYY-MM-DD] [leg=0..5] [flare]
 // tod: dawn | day | dusk | night; skip: skip the taxi-in; verbose: print the radio; leg: fly only that one;
 // flare: trace the last 150 ft of each landing.
 import { createServer } from 'vite';
@@ -47,13 +50,21 @@ try {
   const createPlane = (o) => ({ group: new THREE.Group(), livery: o.livery, setVisual() {}, setCockpitView() {}, setNight() {}, dispose() {} });
   const sfx = new Sfx();
 
-  const legs = [{ from: 'home' }, { from: 'island' }, { from: 'home', goAroundFt: 500 }];
+  const legs = [
+    { from: 'home' },
+    { from: 'island' },
+    { from: 'home', goAroundFt: 500 },
+    { from: 'home', skipAt: 'boarding', autoTaxi: true, autoland: true },
+    { from: 'island', autoTaxi: true },
+    { from: 'island', skipAt: 'taxi', autoland: true },
+  ];
   for (const [li, leg] of legs.entries()) {
     if (onlyLeg && Number(onlyLeg.slice(4)) !== li) continue;
-    const { from, goAroundFt = 0 } = leg;
+    const { from, goAroundFt = 0, skipAt = null, autoTaxi = false, autoland = false } = leg;
     const info = bookFlight(from, tod, date);
     const m = metars(info);
-    const name = `${info.flightNo}${goAroundFt ? ' (go-around)' : ''}`;
+    const extras = [goAroundFt && 'go-around', skipAt && `skipped from ${skipAt}`, autoTaxi && 'auto taxi', autoland && 'autoland'].filter(Boolean);
+    const name = `${info.flightNo}${extras.length ? ` (${extras.join(', ')})` : ''}`;
     console.log(`\n=== ${name} ${AIRFIELDS[from].geo.name} → ${AIRFIELDS[info.to].geo.name}, ${tod} (${info.hour}h), ${info.passengers} pax, runway ${info.depRunway} → ${info.arrRunway}`);
     console.log(`    ${m.dep}`);
     const traffic = new Traffic(ctx, { createPlane, seed: info.seed });
@@ -62,7 +73,10 @@ try {
     for (let i = 0; i < 600; i++) traffic.update(0.5, i * 0.5, null, from);
     const sim = new FlightSim({ info, ground, sfx, traffic });
     traffic.onRadioAt = (u, region, station) => sim.hear(u, region, station);
-    const crew = new Crew(sim, { skipTaxiIn: skip, goAroundFt });
+    const crew = new Crew(sim, { skipTaxiIn: skip, goAroundFt, autoTaxi, autoland });
+    sim.fo.autoTaxi = autoTaxi;
+    sim.fo.autoland = autoland;
+    let skippedAt = '';
     const stages = [];
     sim.onStage = (st) => stages.push(`${st}@${mmss(sim.t)}`);
     const notes = [];
@@ -108,6 +122,10 @@ try {
       const s = sim.state;
       traffic.update(dt * sim.warp, t, s, regionAt(s.pos.x, s.pos.z));
       t += dt * sim.warp;
+      // the skip: from the boarding, or once taxiing on ATC's route
+      if (skipAt && !skippedAt && sim.stage === skipAt && (skipAt !== 'taxi' || sim.route)) {
+        skippedAt = `${mmss(sim.t)} ${sim.skipToRunway() ? (sim.fo.lineUpAfterSkip ? 'at the holding point' : 'lined up') : 'refused'}`;
+      }
       sim.step(dt, crew.frame);
       if (trace && i % Math.round(trace * 30) === 0) {
         const c = sim.pilot;
@@ -116,7 +134,7 @@ try {
       }
       if (flare && sim.stage === 'flight' && !crew.log.touchdown && !s.onGround && s.radioAltFt < 150 && ['final', 'landing'].includes(sim.nav.phase) && i % 3 === 0) {
         const c = sim.pilot;
-        console.log(`  ${mmss(sim.t)} ra ${s.radioAltFt.toFixed(1)} vs ${s.vs.toFixed(0)} ias ${s.ias.toFixed(0)} pitch ${s.pitch.toFixed(1)} q ${s.q.toFixed(3)} stick ${c.pitch.toFixed(2)} thr ${c.throttle.toFixed(2)} n1 ${(s.n1[0] * 100).toFixed(0)} ${sim.ap.fcu.fma.vertical} ap ${sim.ap.fcu.ap} bank ${s.bank.toFixed(1)} roll ${c.roll.toFixed(2)} wind ${sim.air?.surfaceWind?.().kt.toFixed(0) ?? ''}`);
+        console.log(`  ${mmss(sim.t)} ra ${s.radioAltFt.toFixed(1)} vs ${s.vs.toFixed(0)} ias ${s.ias.toFixed(0)} pitch ${s.pitch.toFixed(1)} q ${s.q.toFixed(3)} stick ${c.pitch.toFixed(2)}/${sim.controls.pitch.toFixed(2)} thr ${c.throttle.toFixed(2)} n1 ${(s.n1[0] * 100).toFixed(0)} ${sim.ap.fcu.fma.vertical} ap ${sim.ap.fcu.ap} bank ${s.bank.toFixed(1)} roll ${c.roll.toFixed(2)} wind ${sim.air?.surfaceWind?.().kt.toFixed(0) ?? ''}`);
       }
       if (!s.onGround) maxBank = Math.max(maxBank, Math.abs(s.bank));
       if (!s.onGround && s.radioAltFt > 1500 && Math.abs(s.pitch) < 12 && lastT >= 0 && sim.t > lastT) {
@@ -136,7 +154,7 @@ try {
     const st = sc.stats();
     const l = sc.landing;
     const td = crew.log.touchdown;
-    console.log(`    stages: ${stages.join(' → ')}`);
+    console.log(`    stages: ${stages.join(' → ')}${skippedAt ? ` (skipped ${skippedAt})` : ''}`);
     console.log(`    block ${mmss(sc.blockTimeS)} (schedule ${mmss(sc.scheduleS)}, plan ${mmss(info.plan.blockTimeS)}), ${mmss(sim.t)} simulated, ${mmss(sim.realT)} real (${mmss(warpS)} warped), waited ${Math.round(crew.log.waitedAtHoldS)} s at the hold`);
     console.log(`    score ${st.score} ★${st.stars} comfort ${st.comfort}; landing ${l ? `${Math.round(l.fpm)} fpm ${l.g.toFixed(2)} g, ${Math.round(l.touchdownM)} m in, ${l.centrelineM.toFixed(1)} m off, crab ${l.crabDeg.toFixed(1)}°` : 'none'}`);
     console.log(`    stats ${JSON.stringify(st)}`);
@@ -163,7 +181,12 @@ try {
     check(!!td && td.vsFpm <= maxFpm && !!l && l.touchdownM >= sim.arrRw.tdz.from && l.touchdownM <= sim.arrRw.tdz.to, `${name}: touchdown in the TDZ ≤ ${maxFpm} fpm (${td ? Math.round(td.vsFpm) : 'none'})`);
     check(Math.hypot(s.pos.x - parkedAt.x, s.pos.z - parkedAt.z) < 1 && Math.abs(((s.heading - parkedAt.heading + 540) % 360) - 180) < 2, `${name}: parked on stand ${parkedAt.id}`);
     check(!redCross, `${name}: never crossed a red stop bar`);
-    check(radioCabin === 0 && paLines >= 10, `${name}: the cabin on its own channel (${paLines} cabin lines, ${radioCabin} in the radio log)`);
+    if (skipAt) check(sim.skippedToRunway && toasts.includes(' Skipped to the runway') && !!crew.log.touchdown, `${name}: skipped to the runway (${skippedAt}) and flew`);
+    if (autoland) check(sc.autoland && st.stars <= 4 && !!l && l.centrelineM < 6, `${name}: autolanded (ROLL OUT), ≤ 4 stars (★${st.stars}), ${l ? l.centrelineM.toFixed(1) : '?'} m off the centreline`);
+    if (autoland && !autoTaxi) check(notes.some((n) => n.includes('Autoland complete')), `${name}: the autoland handed over at taxi speed`);
+    // (the first officer's takeover note; the autopilot's own "you have control" at 200 ft is the hand-flown landing's)
+    if (autoTaxi) check(!notes.some((n) => /Auto taxi off/.test(n)), `${name}: the auto taxi kept the aircraft, out and in`);
+    check(radioCabin === 0 && paLines >= (skipAt ? 5 : 10), `${name}: the cabin on its own channel (${paLines} cabin lines, ${radioCabin} in the radio log)`);
     check(st.score >= minScore, `${name}: score ≥ ${minScore} (${st.score})`);
     check(maxBank < 30, `${name}: bank < 30° (${maxBank.toFixed(1)}°)`);
     check(Math.abs(crew.log.maxAltFt - info.plan.cruiseFt) < 200, `${name}: cruise ${info.plan.cruiseFt} ft (max ${Math.round(crew.log.maxAltFt)})`);

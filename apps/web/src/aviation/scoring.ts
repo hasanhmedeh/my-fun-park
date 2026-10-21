@@ -101,6 +101,8 @@ export class FlightScorer {
   readonly items: ScoreItem[] = [];
   /** The landing, once the main gear has touched down after the takeoff. */
   landing: LandingReport | null = null;
+  /** The autopilot made the landing (an autoland): the flight earns four stars at most. */
+  autoland = false;
   private failure: FailReason | null = null;
   private t = 0;
   private finished = false;
@@ -304,6 +306,23 @@ export class FlightScorer {
     if (fatal) this.fail(fatal, t);
   }
 
+  /**
+   * The pushback and the taxi out were skipped (the aircraft put on the runway): the plan's time for
+   * them (`planS`, from the pushback) counts as spent, so the skip makes the flight neither late nor early.
+   */
+  skipped(planS: number) {
+    if (this.failure || this.finished) return;
+    this.blockS = Math.max(this.blockS, planS);
+    this.items.push({ label: 'Skipped to the runway', points: 0, at: this.t });
+  }
+
+  /** The autopilot landed the aircraft (its ROLL OUT): noted on the list, and the stars stop at four. */
+  autolanded() {
+    if (this.autoland || this.failure) return;
+    this.autoland = true;
+    this.items.push({ label: 'Autoland: four stars at most', points: 0, at: this.t });
+  }
+
   /** End the flight as failed. */
   fail(reason: FailReason, t: number = this.t) {
     if (this.failure) return;
@@ -352,10 +371,11 @@ export class FlightScorer {
 
   /**
    * The most stars the itemised list allows: the landing's band (heavy 4, hard 3, very hard 2), a
-   * bounce 4, and a strike (tail, pod or wingtip) 3, so the stars never contradict the debrief.
+   * bounce 4, a strike (tail, pod or wingtip) 3, so the stars never contradict the debrief, and an
+   * autoland 4 (five stars take a landing flown by hand).
    */
   private starCap(): number {
-    let cap = 5;
+    let cap = this.autoland ? 4 : 5;
     const l = this.landing;
     if (l) {
       const band = LANDING_BANDS.findIndex((b) => l.fpm < b.below);

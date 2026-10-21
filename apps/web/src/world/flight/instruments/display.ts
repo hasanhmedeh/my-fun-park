@@ -183,8 +183,9 @@ export const blink = (t: number, hz = 1) => (t * hz) % 1 < 0.6;
 // ------------------------------------------------------------------------------------------------
 
 
-/** The lateral guidance is managed (NAV, the localizer, or NAV armed for takeoff): the FCU shows dashes and the displays no selected heading. */
-export const lateralManaged = (fma: FcuState['fma']) => fma.lateral === 'NAV' || fma.lateral === 'LOC' || fma.lateral === 'LOC*' || (fma.lateral !== 'HDG' && fma.armedLateral === 'NAV');
+/** The lateral guidance is managed (NAV, the localizer, the autoland, or NAV armed for takeoff): the FCU shows dashes and the displays no selected heading. */
+export const lateralManaged = (fma: FcuState['fma']) =>
+  fma.lateral === 'NAV' || fma.lateral === 'LOC' || fma.lateral === 'LOC*' || fma.lateral === 'LAND' || fma.lateral === 'FLARE' || fma.lateral === 'ROLL OUT' || (fma.lateral !== 'HDG' && fma.armedLateral === 'NAV');
 
 /** The arrival ILS on the PFD and ND: once it has a signal, with LOC or APPR armed, or on the approach (not merely tuned on the departure runway). */
 export function ilsShown(d: CockpitData): IlsReading | null {

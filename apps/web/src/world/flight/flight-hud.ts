@@ -2,8 +2,9 @@
 // radio log (the last three lines, coloured by who's talking, fading once they're old), the cabin
 // card (the PA and the passengers: their own channel, apart from the radio), the next step ("Request pushback and start-up · E"), the taxi guide (the next turn, the distance to it,
 // the speed to taxi at), the toasts (penalties and bonuses as they happen, and notes such as
-// "Autopilot off"), the camera's name, the desktop key help and the two toggles (the ILS guide and
-// the voices). It's plain DOM inside #hud, before #panel, so the cards still sit on top of it.
+// "Autopilot off"), the camera's name, the desktop key help, the toggles (the ILS guide, the voices,
+// and the first officer's auto taxi and autoland) and the skip to the runway while it's allowed. It's
+// plain DOM inside #hud, before #panel, so the cards still sit on top of it.
 
 import type { ScoreItem, Utterance } from '../../aviation/types';
 import type { Hint } from './sim';
@@ -42,6 +43,7 @@ const KEY_HELP: [string, string][] = [
   ['E', 'radio: the next request'],
   ['T', 'time warp'],
   ['C', 'camera'],
+  ['N', 'skip to the runway'],
 ];
 
 interface Line {
@@ -59,6 +61,9 @@ export class FlightHud {
   /** The toggles: the screen flips them (and remembers them). */
   onIlsGuide: (() => void) | null = null;
   onVoices: (() => void) | null = null;
+  onAutoTaxi: (() => void) | null = null;
+  onAutoland: (() => void) | null = null;
+  onSkip: (() => void) | null = null;
   onKeyHelp: (() => void) | null = null;
   private readonly radio: HTMLOListElement;
   private readonly hintEl: HTMLDivElement;
@@ -79,6 +84,9 @@ export class FlightHud {
   private readonly keysEl: HTMLDetailsElement;
   private readonly ilsBtn: HTMLButtonElement;
   private readonly voiceBtn: HTMLButtonElement;
+  private readonly taxiBtn: HTMLButtonElement;
+  private readonly landBtn: HTMLButtonElement;
+  private readonly skipBtn: HTMLButtonElement;
   private readonly fadeEl: HTMLDivElement;
   private readonly lines: Line[] = [];
   private readonly toastList: Toast[] = [];
@@ -108,6 +116,11 @@ export class FlightHud {
           <button type="button" class="fl-tool" data-fl-voice aria-pressed="false" title="Hear the radio and the cabin (spoken aloud)">Voices</button>
           <button type="button" class="fl-tool fl-sound" data-fl-sound aria-pressed="true" aria-label="Mute sound" title="Sound">🔊</button>
         </div>
+        <div class="fl-tools">
+          <button type="button" class="fl-tool" data-fl-autotaxi aria-pressed="false" title="The first officer taxis: out to the runway, and in to the stand after landing. Steer, thrust or brake to take over">Auto taxi</button>
+          <button type="button" class="fl-tool" data-fl-autoland aria-pressed="false" title="The autopilot lands (LAND, FLARE, ROLL OUT) and the first officer sets the flaps and the gear. The stick takes over">Autoland</button>
+        </div>
+        <button type="button" class="fl-tool fl-skip" data-fl-skip hidden title="Skip the boarding, the pushback and the taxi: lined up on the runway, engines running">⏩ Skip to the runway${mobile ? '' : '<kbd>N</kbd>'}</button>
         <details class="fl-keys"${mobile ? ' hidden' : ''}><summary>Keys</summary><dl>${KEY_HELP.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl></details>
       </div>
       <div class="fl-fade"></div>`;
@@ -131,9 +144,15 @@ export class FlightHud {
     this.keysEl = q('.fl-keys');
     this.ilsBtn = q('[data-fl-ils]');
     this.voiceBtn = q('[data-fl-voice]');
+    this.taxiBtn = q('[data-fl-autotaxi]');
+    this.landBtn = q('[data-fl-autoland]');
+    this.skipBtn = q('[data-fl-skip]');
     this.fadeEl = q('.fl-fade');
     this.ilsBtn.addEventListener('click', () => this.onIlsGuide?.());
     this.voiceBtn.addEventListener('click', () => this.onVoices?.());
+    this.taxiBtn.addEventListener('click', () => this.onAutoTaxi?.());
+    this.landBtn.addEventListener('click', () => this.onAutoland?.());
+    this.skipBtn.addEventListener('click', () => this.onSkip?.());
     // the park's sound button: its corner is the thrust lever's while flying (the park's tools are
     // hidden then), so the flight's own toggle drives it, and follows it
     const soundBtn = q<HTMLButtonElement>('[data-fl-sound]');
@@ -170,6 +189,7 @@ export class FlightHud {
     this.progressEl.hidden = true;
     this.cabin(null);
     this.fade(false);
+    this.skipShown(false);
   }
 
   /** A line of radio or cabin talk, as it starts. */
@@ -298,6 +318,18 @@ export class FlightHud {
   toggles(ils: boolean, voices: boolean) {
     this.ilsBtn.setAttribute('aria-pressed', String(ils));
     this.voiceBtn.setAttribute('aria-pressed', String(voices));
+  }
+
+  /** The first officer's switches: the auto taxi and the autoland. */
+  assists(autoTaxi: boolean, autoland: boolean) {
+    this.taxiBtn.setAttribute('aria-pressed', String(autoTaxi));
+    this.landBtn.setAttribute('aria-pressed', String(autoland));
+  }
+
+  /** The skip to the runway, while the departure can still be skipped. */
+  skipShown(on: boolean) {
+    if (this.skipBtn.hidden !== on) return;
+    this.skipBtn.hidden = !on;
   }
 
   /** The key help card's open state (remembered by the screen). */
