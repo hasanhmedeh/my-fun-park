@@ -601,12 +601,16 @@ export class Environment {
         // only between neighbours (not across a gap where a lamp was left out); none out past the Promenade
         if (Math.hypot(bx - ax, bz - az) < 18 && parkDistance(ax, az) < 75) lines.push([new THREE.Vector3(ax, 4.1, az), new THREE.Vector3(bx, 4.1, bz)]);
       }
-    // a garland round the north side of the entrance plaza, pole to pole
+    // a garland round the north side of the entrance plaza, pole to pole; where Main Street leaves
+    // the plaza it spans the avenue between a pole on either side (one in the middle would stand in
+    // everyone's way, and cut the crowd's paths off from the rest of the park)
     const [ex, ez, er] = PLAZAS[0];
     const ring: [number, number][] = [];
+    const gr = er + 1.6;
+    const gap = Math.asin(4.3 / gr); // Main Street is 7 m wide: the poles stand 0.8 m clear of it
     for (let i = 0; i <= 6; i++) {
       const a = Math.PI * (0.92 + (i / 6) * 1.16);
-      ring.push([ex + Math.cos(a) * (er + 1.6), ez + Math.sin(a) * (er + 1.6)]);
+      for (const b of i === 3 ? [a - gap, a + gap] : [a]) ring.push([ex + Math.cos(b) * gr, ez + Math.sin(b) * gr]);
     }
     for (let i = 0; i < ring.length - 1; i++) lines.push([new THREE.Vector3(ring[i][0], 4.1, ring[i][1]), new THREE.Vector3(ring[i + 1][0], 4.1, ring[i + 1][1])]);
     const iron = std('#2c2433', { metalness: 0.75, roughness: 0.35 });

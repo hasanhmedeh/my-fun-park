@@ -208,7 +208,8 @@ const bodyUniforms = () => ({
   uInflate: { value: 0.012 },
   // (both off by default, so every everyday outfit is drawn exactly as before)
   uTopFrom: { value: 0 },
-  uTrim: { value: new THREE.Vector4() }, // colour, kind (0 none, 1 hi-vis bands, 2 tie)
+  // (w must start at 0: a bare Vector4 is (0, 0, 0, 1), which paints black hi-vis bands on everyone)
+  uTrim: { value: new THREE.Vector4(0, 0, 0, 0) }, // colour, kind (0 none, 1 hi-vis bands, 2 tie)
 });
 type BodyUniforms = ReturnType<typeof bodyUniforms>;
 
@@ -679,6 +680,8 @@ export class PeopleFactory {
         const m = o as THREE.SkinnedMesh;
         if (!m.isSkinnedMesh) return;
         m.castShadow = true;
+        // (shade under roofs, trees and each other, rather than glowing as if pasted in)
+        m.receiveShadow = true;
         m.frustumCulled = false;
         if ((m.material as THREE.Material).name.includes('Superhero')) main = m;
       });
@@ -835,6 +838,7 @@ export class PeopleFactory {
       hm.bind(new THREE.Skeleton(bones, src.skeleton.boneInverses), src.bindMatrix);
       hm.material = hairMat(src.material as THREE.Material);
       hm.castShadow = true;
+      hm.receiveShadow = true;
       hm.frustumCulled = false;
       body.parent!.add(hm);
       extras.push(hm);
@@ -847,6 +851,7 @@ export class PeopleFactory {
     shoes.scale.copy(body.scale);
     shoes.bind(body.skeleton, body.bindMatrix);
     shoes.castShadow = true;
+    shoes.receiveShadow = true;
     shoes.frustumCulled = false;
     body.parent!.add(shoes);
     extras.push(shoes);
@@ -1022,10 +1027,8 @@ export class PersonRig {
 
   /** Show or hide the small face meshes (eyes, brows) — they cost a draw each, far away. */
   setDetail(near: boolean) {
-    for (const m of this.meshes) {
-      const n = (m.material as THREE.Material).name;
-      if (n === 'MI_Eyes' || (n.startsWith('MI_Hair') && m.geometry.getAttribute('position').count < 1000)) m.visible = near;
-    }
+    // (by name: short hairstyles and beards are as small as the brows, and must stay)
+    for (const m of this.meshes) if ((m.material as THREE.Material).name === 'MI_Eyes' || m.name.startsWith('Eyebrows')) m.visible = near;
   }
 
   setShadows(on: boolean) {

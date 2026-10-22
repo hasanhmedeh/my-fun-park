@@ -131,12 +131,14 @@ export class NavGraph {
       for (const l of [...a.links]) {
         const b = this.nodes[l];
         if (obs.clear(a.x, a.z, b.x, b.z, 0.4)) continue;
+        const blockers = new Set<Obstacle>();
         for (let t = 0; t <= 1; t += 0.05) {
           const o = obs.inside(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t, 0.4);
-          if (o) ringFor(o);
+          if (o) ringFor(o), blockers.add(o);
         }
         this.unlink(a.id, b.id);
-        loose.add(a.id).add(b.id);
+        // a lamp post or a sign standing in the path: step round it
+        if (!this.detour(obs, a, b, blockers)) loose.add(a.id).add(b.id);
       }
     }
     // tie the loose ends back in: to the nearest visible ring nodes, else to visible neighbours
@@ -163,6 +165,38 @@ export class NavGraph {
     const stack = [start.id];
     while (stack.length) for (const l of this.nodes[stack.pop()!].links) if (!seen.has(l)) seen.add(l), stack.push(l);
     for (const n of this.nodes) n.live = n.live && seen.has(n.id);
+    // something new standing across a path can cut most of the park off, leaving everyone to
+    // spawn and wander in the few metres still connected to the entrance
+    const live = this.nodes.filter((n) => n.live).length;
+    if (import.meta.env.DEV && live < this.nodes.length * 0.85) console.warn(`crowd: only ${live} of ${this.nodes.length} path nodes connect to the entrance`);
+  }
+
+  /**
+   * Re-link a → b round a single small obstacle (a post, a sign, a bin) standing across the link:
+   * through a waypoint beside it, on whichever side is clear. False if there's no way round.
+   */
+  private detour(obs: Obstacles, a: NavNode, b: NavNode, blockers: Set<Obstacle>) {
+    if (blockers.size !== 1) return false;
+    const [o] = blockers;
+    const size = o.kind === 'circle' ? o.r : Math.hypot(o.hx, o.hz);
+    if (size > 1.5) return false;
+    const dx = b.x - a.x;
+    const dz = b.z - a.z;
+    const len = Math.hypot(dx, dz);
+    const nx = -dz / len;
+    const nz = dx / len;
+    // round the side with more room first: away from the link, past the obstacle's middle
+    const s = Math.sign((o.x - a.x) * nx + (o.z - a.z) * nz) || 1;
+    for (const side of [-s, s]) {
+      const p = { x: o.x + nx * side * (size + 0.9), z: o.z + nz * side * (size + 0.9) };
+      if (obs.inside(p.x, p.z, 0.4) || !obs.clear(a.x, a.z, p.x, p.z, 0.4) || !obs.clear(p.x, p.z, b.x, b.z, 0.4)) continue;
+      const id = this.nodes.length;
+      this.nodes.push({ id, x: p.x, z: p.z, half: 1.2, links: [], live: true });
+      this.link(a.id, id);
+      this.link(id, b.id);
+      return true;
+    }
+    return false;
   }
 
   private link(a: number, b: number) {
