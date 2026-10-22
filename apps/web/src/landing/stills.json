@@ -1,0 +1,266 @@
+{
+  "hero": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "distant",
+    "where": "Across the park at dusk: the Giant Wheel, the Sky Flip, Thunder Loop, the Sky Falcon and the Rocket Ride climbing on its smoke"
+  },
+  "coaster": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "distant",
+    "where": "Thunder Loop: the train in its vertical loop, the Giant Wheel and the Sky Flip behind"
+  },
+  "falcon": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "none",
+    "where": "Sky Falcon: the train cresting a hill on its tall white supports, the cliff and the sea beyond"
+  },
+  "rocket": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "none",
+    "where": "The Rocket Ride lifting off from its pad on a column of smoke, the Giant Wheel and the Sky Falcon behind"
+  },
+  "ferris": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "distant",
+    "where": "The Giant Wheel over the midway tents, Thunder Loop and the Sky Falcon beside it"
+  },
+  "flip": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "none",
+    "where": "The Sky Flip swinging over the top, the Giant Wheel and Thunder Loop round it"
+  },
+  "ship": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "distant",
+    "where": "Nebula 360 swinging in front of the Sky Falcon, its riders far off"
+  },
+  "speedway": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "distant",
+    "where": "Turbo Speedway: karts racing through a bend, the park behind"
+  },
+  "trail": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "none",
+    "where": "Rally Trail: the buggy kicking up dust by the splash, the park behind"
+  },
+  "crates": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "distant",
+    "where": "Crate Smash on the midway, the Giant Wheel and the Sky Falcon behind"
+  },
+  "striker": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "none",
+    "where": "The High Striker on the midway, the Giant Wheel and the Sky Falcon behind"
+  },
+  "ducks": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "none",
+    "where": "The Duck Shoot stall with its lights on"
+  },
+  "drone": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "none",
+    "where": "A drone flight over the park: the Rocket Ride, Nebula 360, the Sky Falcon and the airport far off"
+  },
+  "workshop": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "none",
+    "where": "The Coaster Workshop's Builder's Yard: a visitor's coaster with a lift hill and a loop on its plot"
+  },
+  "museum": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "none",
+    "where": "The Career Museum at the end of its path, the Sky Falcon behind"
+  },
+  "skylink": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "none",
+    "where": "A SkyLink train on its viaduct over the Rally Trail, heading for the park"
+  },
+  "airport": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "none",
+    "where": "Funfair International: the terminal, its gates with A320s, the tower and the Sky Falcon far off"
+  },
+  "a320": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "none",
+    "where": "A Funfair Air A320 lined up on the runway at dusk, engines running"
+  },
+  "palmcay": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "none",
+    "where": "Palm Cay's lagoon: the jet-ski dock, the beach and its umbrellas"
+  },
+  "jetski": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "distant",
+    "where": "The Palm Cay Jet-Ski Race: riders jumping a ramp in the lagoon, the race arch behind"
+  },
+  "slides": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "none",
+    "where": "Palm Cay's Splash Tower: three slides into the pool"
+  },
+  "cannons": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "none",
+    "where": "Pirate Cannons: the fort's guns facing the pirate ships in Palm Cay's lagoon"
+  },
+  "volley": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "distant",
+    "where": "Beach Volley on Palm Cay: players on the court, the Coconut Shy beside it"
+  },
+  "night": {
+    "width": 1920,
+    "height": 1080,
+    "widths": [
+      640,
+      1280,
+      1920
+    ],
+    "people": "distant",
+    "where": "The park at night: the midway tents and the carousel lit, the Sky Flip and the Giant Wheel in lights"
+  }
+}

@@ -1,0 +1,359 @@
+{
+  "trailer": {
+    "title": "The Funfair : la bande-annonce officielle",
+    "description": "Montagnes russes, jeux de fête foraine, karts, création de coasters et vol vers une île tropicale : The Funfair, un parc 3D gratuit dans votre navigateur.",
+    "longDescription": "The Funfair est un jeu de parc d’attractions en 3D, gratuit, qui tourne dans votre navigateur web : rien à télécharger.\n\nPilotez vous-même les montagnes russes Thunder Loop, foncez à 250 km/h sur le Sky Falcon, faites la course en kart sur le Turbo Speedway, construisez votre grand huit dans le Coaster Workshop, puis prenez le SkyLink jusqu’à l’aéroport et pilotez un A320neo 40 km plus au sud, jusqu’à l’île de Palm Cay.\n\nTout ce que montre la bande-annonce est du vrai gameplay, filmé dans le parc.",
+    "chapters": {
+      "park": "Bienvenue à The Funfair",
+      "rides": "Montagnes russes et sensations fortes",
+      "games": "Courses et jeux",
+      "build-and-fly": "Construire, voler, l’île"
+    },
+    "captions": {
+      "music": "♪ Musique entraînante ♪",
+      "park": "The Funfair : un parc d’attractions 3D\ndans votre navigateur",
+      "free": "Jeu gratuit, rien à télécharger",
+      "drive": "Pilotez vous-même le Thunder Loop",
+      "falcon": "Foncez à 250 km/h sur le Sky Falcon",
+      "thrills": "Faites le grand tour\nsur le Sky Flip et le Nebula 360",
+      "race": "Faites la course en kart sur le Turbo Speedway",
+      "trail": "Battez votre record sur le Rally Trail",
+      "games": "Tentez votre chance aux stands",
+      "drone": "Survolez tout le parc en drone",
+      "build": "Créez vos propres montagnes russes",
+      "skylink": "Prenez le SkyLink jusqu’à l’aéroport",
+      "fly": "Pilotez un A320neo 40 km plus au sud…",
+      "island": "…jusqu’à l’île de Palm Cay",
+      "end": "Jouez gratuitement dans votre navigateur"
+    },
+    "tags": [
+      "The Funfair",
+      "jeu gratuit",
+      "montagnes russes",
+      "jeu navigateur",
+      "jeu de parc d'attractions",
+      "jeu de montagnes russes",
+      "jeu en ligne",
+      "sans téléchargement",
+      "fête foraine",
+      "jeu 3D"
+    ]
+  },
+  "getting-started": {
+    "title": "Premiers pas : marchez, explorez et lancez votre premier manège",
+    "description": "Entrez en invité, apprenez à marcher, courir et faire des roulades, repérez-vous avec la carte et le voyage rapide, puis lancez votre premier manège.",
+    "longDescription": "Vous découvrez The Funfair ? Ce tutoriel vous emmène des grilles du parc jusqu’à votre premier manège.\n\nVous entrerez en invité, vous vous déplacerez au clavier ou en tactile, vous tournerez la caméra, vous ouvrirez la carte pour voyager rapidement, puis vous entrerez dans l’anneau lumineux d’une attraction pour jouer.",
+    "steps": [
+      "Ouvrez The Funfair dans votre navigateur et entrez en invité.",
+      "Marchez avec W A S D (Z Q S D sur un clavier AZERTY) ou les flèches, courez avec Maj (Shift) et faites une roulade avec Espace. En tactile, utilisez le joystick.",
+      "Faites glisser la souris pour tourner la caméra, et zoomez avec la molette.",
+      "Appuyez sur M (la virgule sur un clavier AZERTY) pour ouvrir la carte, choisissez un lieu et utilisez le voyage rapide. Appuyez sur R pour revenir à l’entrée.",
+      "Entrez dans l’anneau lumineux d’une attraction et appuyez sur E pour jouer."
+    ],
+    "chapters": {
+      "start": "Bienvenue",
+      "moving": "Marcher, courir et regarder autour",
+      "map": "La carte et le voyage rapide",
+      "rides": "Votre premier manège"
+    },
+    "captions": {
+      "intro": "Ouvrez The Funfair dans votre navigateur et entrez en invité : aucun compte requis.",
+      "guide": "Le guide liste manèges et jeux, avec leur prix en tickets.",
+      "guide-close": "Échap le ferme. I pour le rouvrir.",
+      "walk": "Marchez : W A S D ou flèches\n(ZQSD en AZERTY).",
+      "run": "Maintenez Maj pour courir.",
+      "roll": "Appuyez sur Espace pour faire une roulade.",
+      "kick": "F pour shooter :\nles lettres géantes valsent !",
+      "wave": "H pour saluer de la main.",
+      "look": "Faites glisser la souris pour tourner la caméra autour de vous.",
+      "zoom": "La molette de la souris zoome et dézoome.",
+      "touch": "Sur écran tactile, marchez avec le joystick.",
+      "touch-run": "Poussez-le à fond pour courir.",
+      "touch-look": "Faites glisser l’écran pour regarder autour.",
+      "map": "M ouvre la carte (la virgule en AZERTY).",
+      "pick": "Choisissez un lieu dans la liste\nou sur la carte…",
+      "travel": "…et Fast travel vous y emmène aussitôt.",
+      "arrive": "Dans l’anneau lumineux d’un manège, appuyez sur E.",
+      "members": "Manèges et jeux coûtent des tickets, offerts avec un compte gratuit.",
+      "reset": "Appuyez sur R pour revenir à l’entrée.",
+      "play": "Avec un compte, E lance le manège pour 1 ticket.",
+      "drive": "Vous pilotez le Thunder Loop :\nW accélère, S freine, Maj pour le turbo.",
+      "more": "Chaque attraction a ses touches : les autres tutoriels les montrent."
+    },
+    "tags": [
+      "The Funfair",
+      "tutoriel",
+      "jeu gratuit",
+      "jeu navigateur",
+      "jeu de parc d'attractions",
+      "tuto"
+    ]
+  },
+  "tickets-and-account": {
+    "title": "Tickets et compte : tickets gratuits, friandises et souvenirs",
+    "description": "Inscrivez-vous gratuitement, recevez 20 tickets toutes les 5 heures, dépensez-les en manèges et en jeux, et offrez-vous friandises et souvenirs chez Rosa.",
+    "longDescription": "Se promener dans The Funfair est gratuit pour tout le monde. Les manèges et les jeux utilisent des tickets, offerts avec un compte gratuit.\n\nCe tutoriel montre comment vous inscrire avec Google ou par e-mail, récupérer votre lot gratuit de 20 tickets toutes les 5 heures, dépenser vos tickets dans les manèges, et passer au guichet de Rosa pour des friandises à bonus et des souvenirs à porter. Rien dans le parc ne coûte d’argent réel aujourd’hui ; les options payantes arrivent bientôt.",
+    "steps": [
+      "Choisissez Sign up (s’inscrire) sur la carte d’accueil, avec Google ou avec un e-mail, un pseudo et un mot de passe.",
+      "Récupérez votre lot gratuit de 20 tickets au guichet de Rosa, le Ticket Booth. Un nouveau lot est prêt toutes les 5 heures.",
+      "Entrez dans l’anneau d’une attraction et appuyez sur E : la plupart des manèges et des jeux coûtent 1 ticket.",
+      "Passez au guichet de Rosa pour des friandises à bonus et des souvenirs à porter.",
+      "Ouvrez votre compte pour voir vos tickets, vos parties et vos souvenirs."
+    ],
+    "chapters": {
+      "start": "Inscription gratuite",
+      "tickets": "Vos tickets gratuits",
+      "shop": "Friandises et souvenirs",
+      "rides": "Dépenser vos tickets",
+      "account": "Votre compte"
+    },
+    "captions": {
+      "free": "Flâner est gratuit ;\nmanèges et jeux coûtent des tickets.",
+      "signup": "Tickets offerts avec un compte gratuit :\nchoisissez Sign up.",
+      "google": "Avec Google, ou par e-mail.",
+      "details": "Choisissez un pseudo (3 à 20 caractères)\net un mot de passe.",
+      "terms": "Cochez : vous avez 15 ans ou plus\n(ou l’accord d’un parent).",
+      "joined": "Et voilà. Le compte est gratuit.",
+      "walk-in": "Compte ouvert : entrez et filez\nau guichet de Rosa, le Ticket Booth.",
+      "booth": "Il est près de l’entrée :\nentrez dans son anneau et appuyez sur E.",
+      "pack": "Prenez votre lot gratuit : 20 tickets, toutes les 5 heures.",
+      "carry": "Les tickets non dépensés s’ajoutent au lot suivant.",
+      "treats": "Les friandises coûtent quelques tickets,\net la plupart ont un bonus.",
+      "perk": "Popcorn (2 tickets) : vos coups de pied vont deux fois plus loin pendant 3 min.",
+      "souvenirs": "Les souvenirs restent à vous :\ncasquette, lunettes, ballon et plus encore.",
+      "wear": "Portez-les sur votre visiteur, partout dans le parc.",
+      "leave": "Échap pour quitter le comptoir.",
+      "price": "Chaque anneau affiche son prix :\n1 ticket pour la plupart.",
+      "spend": "Appuyez sur E : le ticket est dépensé au départ du manège.",
+      "big": "Le Sky Falcon et la Giant Wheel coûtent 5, le vol 10.",
+      "account": "Votre compte affiche vos tickets, vos parties et vos souvenirs.",
+      "coming": "Aucun paiement en argent réel aujourd’hui : les options payantes arrivent bientôt."
+    },
+    "tags": [
+      "The Funfair",
+      "tutoriel",
+      "tickets gratuits",
+      "jeu gratuit",
+      "jeu navigateur"
+    ]
+  },
+  "thrill-rides": {
+    "title": "Sensations fortes : pilotez le Thunder Loop, osez le Sky Falcon",
+    "description": "Comment piloter le Thunder Loop, dévaler le Sky Falcon à 250 km/h, et affronter la Giant Wheel, le Sky Flip, le Nebula 360 et le Rocket Ride.",
+    "longDescription": "Les manèges à sensations de The Funfair, et les touches pour en prendre les commandes.\n\nPilotez le Thunder Loop en accélérant, en freinant et avec le turbo, à travers son looping et son zero-g roll. Grimpez au sommet de la falaise avec le Sky Falcon pour une chute de 158 m à 90° et un lancement à 250 km/h. Puis montez dans la Giant Wheel de 250 m, passez par-dessus le sommet sur le Sky Flip, restez la tête en bas sur le Nebula 360 et allumez les six étages du Rocket Ride.",
+    "steps": [
+      "Thunder Loop : maintenez W pour accélérer, S pour freiner, Maj pour le turbo, et C pour changer de caméra.",
+      "Sky Falcon : détendez-vous pendant la montée, puis changez de caméra avec E ou C pour la chute.",
+      "Giant Wheel : maintenez W pour accélérer la rotation, et regardez autour de vous avec A et D.",
+      "Sky Flip et Nebula 360 : changez de caméra avec E ou C, et appuyez sur Échap pour descendre.",
+      "Rocket Ride : appuyez sur E pour allumer chaque étage."
+    ],
+    "chapters": {
+      "start": "Thunder Loop",
+      "falcon": "Sky Falcon",
+      "wheel": "Giant Wheel",
+      "swings": "Sky Flip et Nebula 360",
+      "rocket": "Rocket Ride"
+    },
+    "captions": {
+      "coaster": "Thunder Loop :\nappuyez sur E dans son anneau.",
+      "power": "C’est vous qui pilotez : W accélère, S freine.",
+      "turbo": "Maj, c’est le turbo.\nLe lancement part tout seul.",
+      "camera": "C change de caméra.",
+      "falcon": "Sky Falcon (5 tickets) : 4,25 km le long de la falaise.",
+      "climb": "Détendez-vous pendant\nla longue montée vers le sommet.",
+      "views": "Pendant le tour, E ou C passe d’une caméra à l’autre.",
+      "speed": "Il atteint 250 km/h, avec une chute de 158 m à 90°.",
+      "wheel": "La Giant Wheel : 250 m de haut, 5 tickets.",
+      "fast": "Maintenez W pour accélérer la rotation.",
+      "look": "A et D pour regarder autour.",
+      "flip": "Le Sky Flip vous balance à 125 m,\net par-dessus le sommet.",
+      "switch": "E ou C change de caméra. Échap pour descendre.",
+      "ship": "Le Nebula 360 fait des tours complets\net vous laisse la tête en bas.",
+      "off": "Mêmes touches : E ou C pour la caméra,\nÉchap pour descendre.",
+      "rocket": "Le Rocket Ride :\nentrez dans son anneau et appuyez sur E.",
+      "stages": "E allume chaque étage, ou attendez : le suivant part tout seul.",
+      "orbit": "Six étages, jusqu’en orbite."
+    },
+    "tags": [
+      "The Funfair",
+      "montagnes russes",
+      "jeu de montagnes russes",
+      "simulateur de montagnes russes",
+      "tutoriel"
+    ]
+  },
+  "games-and-races": {
+    "title": "Jeux et courses : du Duck Shoot à la Jet-Ski Race",
+    "description": "Gagnez au Duck Shoot, au High Striker et au Crate Smash, faites la course en kart et en buggy, et jouez aux quatre jeux de Palm Cay.",
+    "longDescription": "Tous les jeux de The Funfair, et comment marquer des points.\n\nEntre les stands : le Duck Shoot (le tir aux canards), le High Striker et le Crate Smash. Sur les circuits : trois tours du Turbo Speedway et le contre-la-montre du Rally Trail, avec votre fantôme et le top 10 du jour. Sur Palm Cay : la Jet-Ski Race, la Splash Tower, Pirate Cannons et le Beach Volley.",
+    "steps": [
+      "Duck Shoot : visez avec W A S D ou la souris, et tirez avec E, Espace ou un clic. Guettez le canard doré.",
+      "High Striker : appuyez sur E ou Espace au bon moment sur la jauge.",
+      "Turbo Speedway : conduisez avec W A S D, Maj pour la nitro et Espace pour déraper.",
+      "Rally Trail : battez votre fantôme sur trois checkpoints et grimpez dans le top 10 du jour.",
+      "Sur Palm Cay : faites la course en jet-ski, choisissez un toboggan, tirez au canon et servez au Beach Volley."
+    ],
+    "chapters": {
+      "start": "Entre les stands",
+      "tracks": "Turbo Speedway et Rally Trail",
+      "island": "Les jeux de Palm Cay"
+    },
+    "captions": {
+      "ducks": "Duck Shoot : 30 secondes pour dégommer les canards.",
+      "aim": "Visez à la souris ou avec W A S D.\nClic, E ou Espace pour tirer.",
+      "golden": "Guettez le canard doré : il vaut 50 points.",
+      "striker": "High Striker : trois coups pour sonner la cloche.",
+      "meter": "Appuyez sur E ou Espace\nau bon moment sur la jauge.",
+      "crates": "Crate Smash : 45 secondes, à pied.",
+      "smash": "Courez, roulez et shootez dans les caisses : les rangées du haut rapportent plus.",
+      "speedway": "Turbo Speedway :\ntrois tours contre trois rivaux.",
+      "drive": "Conduisez avec W A S D.",
+      "nitro": "Maj pour la nitro, Espace pour déraper,\nR pour revenir sur la piste.",
+      "trail": "Rally Trail : contre-la-montre\nen buggy, avec sauts, boue et caisses.",
+      "ghost": "Battez le fantôme de votre\nmeilleur temps, sur trois checkpoints.",
+      "top": "Les meilleurs temps entrent dans le top 10 du jour.",
+      "island": "Sur Palm Cay, quatre autres jeux\nà 1 ticket chacun.",
+      "jetski": "La Jet-Ski Race : trois tours de bouées. Maj pour le boost, Espace pour sauter.",
+      "slides": "La Splash Tower : choisissez un toboggan avec 1, 2 ou 3, puis E pour partir.",
+      "cannons": "Pirate Cannons : cliquez sur la mer\npour tirer, et coulez les navires pirates.",
+      "volley": "Beach Volley : E ou Espace pour lancer, puis pour frapper. Dix services."
+    },
+    "tags": [
+      "The Funfair",
+      "jeu de karting",
+      "jeu de course",
+      "jeu navigateur",
+      "fête foraine",
+      "tutoriel"
+    ]
+  },
+  "coaster-workshop": {
+    "title": "Créez vos propres montagnes russes dans le Coaster Workshop",
+    "description": "Assemblez des montagnes russes pièce par pièce, testez-les gratuitement et envoyez-les à l’équipe. Les créations validées ouvrent dans Creators’ Valley.",
+    "longDescription": "Avec le Coaster Workshop, vous concevez vos propres montagnes russes dans The Funfair.\n\nPartez de votre kit de départ gratuit, posez des lignes droites, des virages, des pentes, des hélices, des loopings et des tire-bouchons, et vérifiez que le circuit est constructible. Testez-le gratuitement, puis envoyez-le à l’équipe du parc. Les montagnes russes validées ouvrent sur un terrain de Creators’ Valley, et vous gagnez des tickets chaque fois que quelqu’un monte dans les vôtres.",
+    "steps": [
+      "Rendez-vous au Coaster Workshop avec un compte gratuit et ouvrez votre kit de départ gratuit.",
+      "Ajoutez des pièces : lignes droites, virages, pentes, hélices, loopings et tire-bouchons.",
+      "Corrigez les problèmes jusqu’à ce que le circuit soit constructible.",
+      "Testez vos montagnes russes gratuitement.",
+      "Envoyez-les à l’équipe. Si elles sont validées, elles ouvrent dans Creators’ Valley."
+    ],
+    "chapters": {
+      "start": "L’atelier et votre kit",
+      "build": "Construire le circuit",
+      "test": "Le tour d’essai",
+      "save": "Enregistrer et envoyer"
+    },
+    "captions": {
+      "enter": "Le Coaster Workshop est à Creators’ Valley.\nLes membres entrent avec E.",
+      "kit": "Ouvrez votre kit de départ gratuit : de quoi bâtir un premier grand huit.",
+      "add": "Ajoutez des pièces depuis la palette, et réglez chacune avec ses curseurs.",
+      "circuit": "Lignes droites, virages, pentes, hélices, loopings et tire-bouchons.",
+      "home": "Le chemin du retour referme le circuit jusqu’à la gare.",
+      "piece": "Sélectionnez une pièce pour la modifier,\ncomme la taille de ce looping.",
+      "check": "Corrigez les problèmes\njusqu’à ce que le circuit soit constructible.",
+      "test": "Les tours d’essai sont gratuits : roulez autant que vous voulez.",
+      "physics": "La physique est réelle :\nun train sans assez de vitesse cale.",
+      "back": "Puis retour à votre création.",
+      "parts": "Les pièces se paient en tickets.",
+      "needs": "L’onglet Parts montre ce qu’il manque\nà votre création, comme un kit de looping.",
+      "save": "Enregistrez-la dans l’un de vos\n3 emplacements gratuits.",
+      "slots": "Un emplacement de plus coûte 4,99 $. Paiements bientôt disponibles.",
+      "send": "Envoyez-la à l’équipe : jusqu’à 3 créations par jour.",
+      "valley": "Validée, elle ouvre dans Creators’ Valley et vous rapporte des tickets."
+    },
+    "tags": [
+      "The Funfair",
+      "créer des montagnes russes",
+      "jeu de montagnes russes",
+      "construire des montagnes russes",
+      "tutoriel"
+    ]
+  },
+  "fly-to-palm-cay": {
+    "title": "Pilotez l’A320neo jusqu’à l’île de Palm Cay",
+    "description": "Prenez le SkyLink jusqu’à l’aéroport, réservez à la porte 3, puis faites le push-back, décollez et posez vous-même l’A320neo sur l’île de Palm Cay.",
+    "longDescription": "The Funfair ne s’arrête pas aux grilles du parc.\n\nPrenez le SkyLink jusqu’à Funfair International, réservez un vol à la porte 3 (Gate 3) et choisissez l’aube, le jour, le crépuscule ou la nuit. Installez-vous ensuite dans le siège du commandant de bord de l’A320neo : push-back, roulage, décollage, croisière à 5 000 pieds et atterrissage 40 km plus au sud, sur Palm Cay. Le contrôle aérien, le pilote automatique et votre copilote vous aident tout du long, et des assistances facultatives peuvent rouler et atterrir à votre place.",
+    "steps": [
+      "Prenez le SkyLink depuis la porte sud du parc jusqu’à l’aéroport.",
+      "Rendez-vous à la porte 3 (Gate 3) et réservez le vol pour 10 tickets. Choisissez un moment de la journée et vos assistances.",
+      "Faites le push-back et roulez jusqu’à la piste, ou laissez votre copilote rouler pour vous.",
+      "Décollez pleins gaz (Y), tirez avec S, puis rentrez le train avec G.",
+      "Croisez à 5 000 pieds, accélérez le temps avec T, et posez-vous sur Palm Cay."
+    ],
+    "chapters": {
+      "start": "Le SkyLink jusqu’à l’aéroport",
+      "booking": "Réservation à la porte 3",
+      "takeoff": "Décollage",
+      "cruise": "Croisière",
+      "landing": "Atterrissage sur Palm Cay",
+      "island": "Palm Cay"
+    },
+    "captions": {
+      "skylink": "Le SkyLink part de la porte sud du parc.\nIl est gratuit.",
+      "guideway": "Il file sur une voie surélevée\njusqu’à l’aéroport.",
+      "skip": "E ou Échap pour passer le trajet.",
+      "gate": "Porte 3 (Gate 3) : E pour réserver le vol FA101 vers Palm Cay.",
+      "time": "Choisissez : aube, jour, crépuscule ou nuit.",
+      "assists": "Votre copilote peut aider : assistances facultatives.",
+      "board": "Puis embarquez. Le vol coûte 10 tickets.",
+      "lined-up": "Avec Skip to the runway, l’avion part aligné.",
+      "toga": "Y pour la pleine poussée.",
+      "yours": "Le décollage, c’est toujours vous.",
+      "rotate": "À la vitesse de rotation, tirez doucement avec S.",
+      "gear": "En montée, G rentre le train.",
+      "cruise": "Le pilote auto (P) peut gérer montée et croisière à 5 000 pieds.",
+      "warp": "Au-dessus de 2 000 pieds,\nT accélère le temps : ×2 ou ×4.",
+      "approach": "Palm Cay est à 40 km au sud.\nLe contrôle vous autorise jusqu’à la piste.",
+      "land": "Posez-le vous-même, ou activez Autoland avant de réserver.",
+      "stars": "Confort, atterrissage et respect des règles : de 1 à 5 étoiles.",
+      "island": "Bienvenue à Palm Cay : plages, palmiers et quatre jeux.",
+      "home": "Rentrez avec le vol FA102,\nau comptoir de l’île, pour 10 tickets."
+    },
+    "tags": [
+      "The Funfair",
+      "simulateur de vol",
+      "A320neo",
+      "jeu d'avion",
+      "piloter un avion",
+      "tutoriel"
+    ]
+  },
+  "your-look": {
+    "title": "Changez de look dans la cabine d’essayage",
+    "description": "Choisissez qui vous êtes, teignez vos vêtements et vos cheveux, et ajustez taille et carrure dans la cabine d’essayage, à côté du guichet de Rosa.",
+    "longDescription": "Dans The Funfair, c’est vous qui choisissez qui visite le parc.\n\nÀ votre première visite, puis à tout moment dans la cabine d’essayage à côté du guichet de Rosa, choisissez un personnage, teignez votre haut, votre bas, vos chaussures et vos cheveux, et ajustez votre taille et votre carrure. C’est gratuit et sans compte : le look des invités est enregistré dans le navigateur, celui des membres sur leur compte.",
+    "steps": [
+      "À votre première visite, choisissez qui vient au parc aujourd’hui. Plus tard, entrez dans la cabine d’essayage à côté du guichet de Rosa.",
+      "Choisissez un personnage.",
+      "Teignez votre haut, votre bas, vos chaussures et vos cheveux, avec la palette ou une couleur de votre choix.",
+      "Ajustez votre taille et votre carrure, ou appuyez sur Random pour une surprise.",
+      "Appuyez sur Done pour retourner dans le parc."
+    ],
+    "chapters": {
+      "start": "Choisissez qui vous êtes",
+      "colours": "Teignez vêtements et cheveux",
+      "body": "Taille et carrure",
+      "done": "Direction le parc"
+    },
+    "captions": {
+      "first": "À votre première visite, choisissez qui vient au parc aujourd’hui.",
+      "pick": "Choisissez n’importe qui dans la galerie :\nle changement est immédiat.",
+      "filter": "Affichez tout le monde, ou seulement les femmes ou les hommes.",
+      "dye": "Teignez haut, bas, chaussures et cheveux avec la palette, ou créez votre couleur.",
+      "undo": "Le panneau signale ce qui ne se teint pas.\nUndo annule la dernière étape.",
+      "size": "Changez taille et carrure, pour le look :\nles manèges sont les mêmes pour tous.",
+      "random": "Ou appuyez sur Random pour une surprise.",
+      "done": "Appuyez sur Let’s go et entrez dans le parc.",
+      "saved": "Invités : look dans le navigateur. Membres : sur leur compte.",
+      "room": "Changez encore quand vous voulez, dans la cabine près de Rosa."
+    },
+    "tags": [
+      "The Funfair",
+      "personnalisation de personnage",
+      "personnalisation",
+      "tutoriel"
+    ]
+  }
+}

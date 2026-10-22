@@ -1,5 +1,7 @@
-import { fileURLToPath } from 'node:url';
-import { defineConfig, loadEnv, type Plugin } from 'vite';
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { fileURLToPath } from "node:url";
+import { defineConfig, type Plugin } from "vite";
+import { landingPages, seo } from "./src/landing/plugin.ts";
 
 const page = (file: string) => fileURLToPath(new URL(file, import.meta.url));
 
@@ -7,105 +9,87 @@ const page = (file: string) => fileURLToPath(new URL(file, import.meta.url));
 // attach a custom domain. Falls back to the Vercel production URL, then a default.
 const SITE_URL = (
   process.env.SITE_URL ??
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : 'https://hasanhmedeh.vercel.app')
-).replace(/\/$/, '');
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : "https://hasanhmedeh.vercel.app")
+).replace(/\/$/, "");
 
-function seo(): Plugin {
-  return {
-    name: 'seo',
-    transformIndexHtml(html) {
-      return html.replaceAll('__SITE_URL__', SITE_URL);
-    },
-    generateBundle() {
-      const today = new Date().toISOString().slice(0, 10);
-      this.emitFile({
-        type: 'asset',
-        fileName: 'sitemap.xml',
-        source: `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>${SITE_URL}/</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>${SITE_URL}/terms</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.3</priority>
-  </url>
-  <url>
-    <loc>${SITE_URL}/privacy</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.3</priority>
-  </url>
-</urlset>
-`,
-      });
-      this.emitFile({
-        type: 'asset',
-        fileName: 'robots.txt',
-        source: `User-agent: *\nAllow: /\nDisallow: /ringmaster\n\nSitemap: ${SITE_URL}/sitemap.xml\n`,
-      });
-    },
-  };
-}
+/** The pages with a clean URL: on Vercel, cleanUrls in vercel.json serves park.html at /park, and so on. */
+const CLEAN_PAGES = ["park", "terms", "privacy", "ringmaster"];
+
+/** A link from before the game moved from / to /park: back from Google (?google=), or a test ride (?coaster=). */
+const OLD_GAME_LINK = /^\/\?(?:[^#]*&)?(?:google|coaster)=/;
 
 /**
- * /ads.txt, which AdSense checks before it serves ads here: it names the publisher id (from
- * VITE_ADSENSE_CLIENT, ca-pub-…) as the site's seller. Left out without one.
- */
-function adsTxt(client: string): Plugin {
-  const publisher = client.trim().replace(/^ca-/, '');
-  return {
-    name: 'ads-txt',
-    generateBundle() {
-      if (!/^pub-\d+$/.test(publisher)) return;
-      this.emitFile({ type: 'asset', fileName: 'ads.txt', source: `google.com, ${publisher}, DIRECT, f08c47fec0942fa0\n` });
-    },
-  };
-}
-
-/**
- * The Ringmaster's Office answers at /ringmaster in dev too, as it does on Vercel (where cleanUrls
- * in vercel.json serves ringmaster.html).
+ * Clean URLs in dev and preview too, as on Vercel: the game at /park, the legal pages at /terms and
+ * /privacy, The Ringmaster's Office at /ringmaster. The query string stays (?google=… back from
+ * Google, ?coaster=…, ?hour=…, ?cam=…). Old links to the game at / go on to /park, as the matching
+ * redirects in vercel.json do.
  */
 function cleanUrls(): Plugin {
-  const rewrite = (req: { url?: string }, _res: unknown, next: () => void) => {
-    if (req.url && /^\/ringmaster\/?(?=[?#]|$)/.test(req.url)) req.url = req.url.replace(/^\/ringmaster\/?/, '/ringmaster.html');
+  const clean = new RegExp(`^/(${CLEAN_PAGES.join("|")})/?(?=[?#]|$)`);
+  const route = (
+    req: IncomingMessage,
+    res: ServerResponse,
+    next: () => void,
+  ) => {
+    const url = req.url ?? "/";
+    if (OLD_GAME_LINK.test(url)) {
+      res.writeHead(307, { Location: `/park${url.slice(1)}` });
+      res.end();
+      return;
+    }
+    req.url = url.replace(clean, "/$1.html");
     next();
   };
   return {
-    name: 'clean-urls',
-    configureServer: (server) => void server.middlewares.use(rewrite),
-    configurePreviewServer: (server) => void server.middlewares.use(rewrite),
+    name: "clean-urls",
+    configureServer: (server) => void server.middlewares.use(route),
+    configurePreviewServer: (server) => void server.middlewares.use(route),
   };
 }
 
 // Let ngrok tunnels reach the dev/preview server (a leading dot allows every subdomain,
 // so new random tunnel URLs keep working without editing this file).
-const tunnelHosts = ['.ngrok-free.app', '.ngrok-free.dev', '.ngrok.app', '.ngrok.io'];
+const tunnelHosts = [
+  ".ngrok-free.app",
+  ".ngrok-free.dev",
+  ".ngrok.app",
+  ".ngrok.io",
+];
 
 // The accounts API (apps/api) runs beside the dev server; proxying it keeps the browser on one
 // origin, so the session cookie just works. `xfwd` passes the browser's host along (X-Forwarded-Host),
 // so "Continue with Google" sends people back here rather than to the API's own port.
 const proxy = {
-  '/api': { target: 'http://localhost:3000', changeOrigin: true, xfwd: true },
+  "/api": { target: "http://localhost:3000", changeOrigin: true, xfwd: true },
 };
 
-export default defineConfig(({ mode }) => ({
-  // VITE_ADSENSE_CLIENT from apps/web/.env* or the environment (Vercel's project settings)
-  plugins: [seo(), cleanUrls(), adsTxt(loadEnv(mode, process.cwd(), 'VITE_').VITE_ADSENSE_CLIENT ?? '')],
+export default defineConfig({
+  // cleanUrls first, so an old link to the game (/?google=…) goes on to /park before the landing
+  // pages answer /; seo() fills in __SITE_URL__ and serves sitemap.xml, robots.txt and the llms files
+  plugins: [
+    cleanUrls(),
+    seo({ site: SITE_URL }),
+    landingPages({ site: SITE_URL }),
+  ],
   // `open` launches the browser on `pnpm dev` (BROWSER=none skips it)
   server: { allowedHosts: tunnelHosts, open: true, proxy },
   preview: { allowedHosts: tunnelHosts, proxy },
   build: {
-    target: 'es2020',
+    target: "es2020",
     chunkSizeWarningLimit: 1300,
-    // The game, the legal pages and The Ringmaster's Office (served as /terms, /privacy and
-    // /ringmaster thanks to cleanUrls in vercel.json)
+    // The landing page, the game, the legal pages and The Ringmaster's Office (served as /park,
+    // /terms, /privacy and /ringmaster thanks to cleanUrls in vercel.json). index.html is the English
+    // landing page; the landing plugin writes the French, Arabic, video and 404 pages beside it.
     rolldownOptions: {
-      input: { index: page('./index.html'), terms: page('./terms.html'), privacy: page('./privacy.html'), ringmaster: page('./ringmaster.html') },
+      input: {
+        index: page("./index.html"),
+        park: page("./park.html"),
+        terms: page("./terms.html"),
+        privacy: page("./privacy.html"),
+        ringmaster: page("./ringmaster.html"),
+      },
     },
   },
-}));
+});

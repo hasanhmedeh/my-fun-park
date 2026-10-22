@@ -1,0 +1,331 @@
+{
+  "meta": {
+    "title": "The Funfair : jeu de parc d’attractions 3D gratuit en ligne",
+    "description": "Pilotez des montagnes russes, foncez en kart, créez votre grand huit, volez en A320neo vers une île tropicale. Gratuit, en ligne, sans téléchargement.",
+    "updated": "2026-10-22"
+  },
+  "og": {
+    "headline": "The Funfair",
+    "tagline": "Le parc d’attractions 3D gratuit qui se joue dans votre navigateur",
+    "alt": "The Funfair : un parc d’attractions 3D avec une grande roue, des montagnes russes et une fusée, gratuit dans votre navigateur"
+  },
+  "ui": {
+    "skip": "Aller au contenu",
+    "menu": "Menu",
+    "language": "Langue",
+    "home": "Accueil de The Funfair",
+    "play": "Jouer",
+    "nav": {
+      "trailer": "Bande-annonce",
+      "attractions": "Attractions",
+      "howToPlay": "Comment jouer",
+      "tutorials": "Tutoriels",
+      "faq": "FAQ"
+    },
+    "comingSoon": "Bientôt disponible",
+    "watch": "Regarder",
+    "playVideo": "Lire la vidéo",
+    "pauseLoop": "Mettre en pause la vidéo d’arrière-plan",
+    "playLoop": "Lire la vidéo d’arrière-plan",
+    "youtube": "Regarder sur YouTube",
+    "download": "Télécharger la vidéo (MP4)",
+    "updated": "Mis à jour le",
+    "scrollHint": "Faites glisser pour en voir plus",
+    "minutes": "min",
+    "seconds": "s"
+  },
+  "hero": {
+    "kicker": "Entrée libre · Jeu gratuit",
+    "brand": "The Funfair",
+    "what": "Le parc d’attractions 3D gratuit qui se joue dans votre navigateur, sans téléchargement",
+    "lead": "Pilotez vous-même un grand huit à looping, filez à 250 km/h sur des montagnes russes à flanc de falaise, faites la course en kart, construisez vos propres montagnes russes, puis prenez les commandes d’un A320neo jusqu’à une île tropicale, 40 km plus au sud.",
+    "cta": "Jouer gratuitement",
+    "secondary": "Voir la bande-annonce",
+    "badges": ["Sans téléchargement", "Tickets gratuits", "Ordinateur, tablette et téléphone"]
+  },
+  "summary": {
+    "heading": "Qu’est-ce que The Funfair ?",
+    "paragraphs": [
+      "The Funfair est un jeu de parc d’attractions en 3D, gratuit, qui tourne dans votre navigateur web : rien à télécharger. Vous vous promenez dans le parc, montez dans les montagnes russes et les manèges à sensations, jouez aux jeux de fête foraine et aux courses, construisez votre propre grand huit dans le Coaster Workshop, et pilotez un Airbus A320neo jusqu’à l’île de Palm Cay, 40 km plus au sud.",
+      "Tout le monde peut entrer et flâner en invité. Les manèges et les jeux fonctionnent avec des tickets, offerts avec un compte gratuit : 20 toutes les 5 heures. The Funfair est l’œuvre de Hasan Hmedeh, développeur logiciel full-stack, et le Career Museum du parc est son CV interactif."
+    ]
+  },
+  "facts": {
+    "heading": "En bref",
+    "rows": [
+      { "label": "Genre", "value": "Jeu de parc d’attractions en 3D : montagnes russes et manèges à sensations, jeux de fête foraine, courses, création de montagnes russes et simulateur de vol" },
+      { "label": "Plateforme", "value": "Tout navigateur récent compatible WebGL 2, sur ordinateur, tablette ou téléphone" },
+      { "label": "Prix", "value": "Gratuit. Les manèges et les jeux utilisent des tickets gratuits : 20 toutes les 5 heures avec un compte gratuit" },
+      { "label": "Téléchargement", "value": "Aucun : le jeu tourne dans votre navigateur" },
+      { "label": "Commandes", "value": "Clavier et souris (l’idéal) ou écran tactile. Manettes non prises en charge" },
+      { "label": "Joueurs", "value": "Solo, dans un parc partagé et en direct" },
+      { "label": "Langue du jeu", "value": "Anglais uniquement" },
+      { "label": "Développeur", "value": "Hasan Hmedeh" }
+    ]
+  },
+  "trailer": {
+    "heading": "Regardez la bande-annonce",
+    "lead": "Du vrai gameplay, filmé dans le parc : les montagnes russes, les jeux, le Coaster Workshop et le vol vers Palm Cay.",
+    "comingSoon": "Bande-annonce à venir",
+    "comingSoonNote": "Le tournage est en cours dans le parc. En attendant, les portes sont ouvertes : venez voir par vous-même.",
+    "chapters": "Chapitres"
+  },
+  "attractions": {
+    "heading": "Ce qui vous attend dans le parc",
+    "lead": "Des montagnes russes que vous pilotez vous-même, des jeux de fête foraine, des karts et un buggy, un atelier pour créer vos montagnes russes, et tout un monde au-delà des grilles. Entrez dans l’anneau lumineux d’une attraction et appuyez sur E pour jouer.",
+    "groups": [
+      {
+        "id": "thrills",
+        "icon": "loop",
+        "heading": "Montagnes russes et sensations fortes",
+        "lead": "Deux montagnes russes, une grande roue et trois attractions qui vous mettent la tête à l’envers.",
+        "cards": [
+          { "still": "coaster", "name": "Thunder Loop", "text": "Pilotez vous-même ce grand huit : accélérez avec W, freinez avec S et lancez le turbo avec Maj, à travers un lancement, un looping, un zero-g roll et une hélice.", "facts": ["Jusqu’à 83 km/h", "De −1 à 5,5 G"] },
+          { "still": "falcon", "name": "Sky Falcon", "text": "Des montagnes russes de 4,25 km à flanc de falaise : grimpez jusqu’au sommet, plongez de 158 m à 90°, puis catapultez-vous à 250 km/h.", "facts": ["250 km/h", "Chute de 158 m à 90°"] },
+          { "still": "rocket", "name": "Rocket Ride", "text": "Allumez six étages, du décollage à la traversée des nuages, jusqu’à une orbite stylisée à 500 m au-dessus de la fête.", "facts": ["6 étages", "Mise à feu avec E"] },
+          { "still": "ferris", "name": "Giant Wheel", "text": "Une grande roue de 250 m et 48 cabines qui domine tout le parc. Maintenez W pour faire défiler le tour en accéléré.", "facts": ["250 m de haut", "48 cabines"] },
+          { "still": "flip", "name": "Sky Flip", "text": "Balancez-vous jusqu’à 125 m de haut et passez par-dessus, la tête à l’envers, à environ 200 km/h.", "facts": ["125 m de haut", "12 places"] },
+          { "still": "ship", "name": "Nebula 360", "text": "Un bateau pendulaire qui fait trois tours complets, puis vous laisse suspendu la tête en bas, à 30 m du sol.", "facts": ["3 loopings", "4,5 s la tête en bas"] }
+        ]
+      },
+      {
+        "id": "games",
+        "icon": "target",
+        "heading": "Jeux de fête foraine",
+        "lead": "Des parties express entre les stands, et vos records personnels gardés sur votre compte.",
+        "cards": [
+          { "still": "ducks", "name": "Duck Shoot", "text": "Le tir aux canards : 30 secondes avec un pistolet à bouchon pour faire tomber les canards en fer-blanc, sans oublier le canard doré, qui vaut 50 points.", "facts": ["Manches de 30 s", "Canard doré : 50"] },
+          { "still": "striker", "name": "High Striker", "text": "Trois coups de marteau pour faire sonner la cloche au sommet d’une tour de 9 m : tout est dans le timing de la jauge.", "facts": ["3 coups", "Tour de 9 m"] },
+          { "still": "crates", "name": "Crate Smash", "text": "Un chamboule-tout grandeur nature : 45 secondes pour courir, rouler et shooter dans 22 caisses empilées en rangées.", "facts": ["45 s", "22 caisses"] }
+        ]
+      },
+      {
+        "id": "racing",
+        "icon": "flag",
+        "heading": "Au volant et dans les airs",
+        "lead": "Des karts, un buggy de rallye et un drone caméra, chacun avec ses propres caméras.",
+        "cards": [
+          { "still": "speedway", "name": "Turbo Speedway", "text": "Affrontez trois rivaux sur trois tours d’un circuit de karting de 472 m, semé de plots, de taches d’huile et de zones de boost.", "facts": ["3 tours", "3 s de nitro"] },
+          { "still": "trail", "name": "Rally Trail", "text": "Un contre-la-montre en buggy, avec sauts, boue et caisses. Battez le fantôme de votre meilleur temps et visez le top 10 du jour.", "facts": ["Top 10 du jour", "Parcours de 547 m"] },
+          { "still": "drone", "name": "Drone Flights", "text": "Louez un drone caméra pour 120 secondes et montez jusqu’à 320 m, assez haut pour voir la Giant Wheel d’en haut.", "facts": ["Plafond à 320 m", "3 caméras"] }
+        ]
+      },
+      {
+        "id": "workshop",
+        "icon": "wrench",
+        "heading": "Créez vos propres montagnes russes",
+        "lead": "",
+        "feature": true,
+        "cards": [
+          { "still": "workshop", "name": "Coaster Workshop", "text": "Assemblez vos montagnes russes avec des lignes droites, des virages, des pentes, des hélices, des loopings et des tire-bouchons, testez-les gratuitement et envoyez-les à l’équipe du parc. Les créations validées ouvrent sur un terrain de Creators’ Valley, et vous gagnez des tickets chaque fois que quelqu’un monte dans la vôtre.", "facts": ["Jusqu’à 80 pièces", "Jusqu’à 35 m de haut", "Kit de départ offert", "Compte gratuit"] }
+        ]
+      },
+      {
+        "id": "travel",
+        "icon": "plane",
+        "heading": "Envolez-vous pour Palm Cay",
+        "lead": "Le monde continue au-delà des grilles : prenez le SkyLink jusqu’à l’aéroport, pilotez vous-même 40 km vers le sud et amusez-vous sur une île tropicale.",
+        "journey": true,
+        "cards": [
+          { "still": "skylink", "name": "SkyLink", "text": "Le train sans conducteur qui relie la porte sud du parc à l’aéroport, sur une voie surélevée à 11 m. Gratuit, et sans compte.", "facts": ["Trajet gratuit"] },
+          { "still": "airport", "name": "Funfair International", "text": "Passez l’enregistrement, la sécurité et le duty free jusqu’à la porte 3, devant les A320 à quai et une piste de 3 500 m.", "facts": ["6 portes"] },
+          { "still": "a320", "name": "Pilotez l’A320neo", "text": "Prenez le siège du commandant de bord : push-back, roulage, décollage, croisière à 5 000 pieds au-dessus de la mer, et atterrissage aux commandes. Le contrôle aérien, le pilote automatique et votre copilote vous aident, et chaque atterrissage reçoit de 1 à 5 étoiles.", "facts": ["Aube, jour, crépuscule ou nuit", "10 tickets"] },
+          { "still": "palmcay", "name": "Palm Cay", "text": "L’île tropicale au bout du vol : une promenade bordée de palmiers, des plages, un lagon et quatre jeux bien à elle.", "facts": ["Accessible en avion"] }
+        ],
+        "extraHeading": "Les jeux de Palm Cay",
+        "extra": [
+          { "still": "jetski", "name": "Jet-Ski Race", "text": "Trois tours d’un parcours de bouées dans le lagon, contre les pilotes de l’île. Une bouée manquée coûte 3 secondes.", "facts": ["3 tours"] },
+          { "still": "slides", "name": "Splash Tower", "text": "Grimpez en haut de la tour de 24 m et choisissez votre toboggan : la chute du Kamikaze, le tube Typhoon ou le Lazy Loop.", "facts": ["3 toboggans"] },
+          { "still": "cannons", "name": "Pirate Cannons", "text": "Prenez les trois canons de Fort Cutlass et coulez les navires pirates avant la fin des 60 secondes.", "facts": ["Manches de 60 s"] },
+          { "still": "volley", "name": "Beach Volley", "text": "Dix services avec un coéquipier de l’île contre deux habitants, et des noix de coco à toucher pour des points bonus.", "facts": ["10 services"] }
+        ]
+      },
+      {
+        "id": "museum",
+        "icon": "frame",
+        "heading": "Le musée du créateur",
+        "lead": "",
+        "feature": true,
+        "cards": [
+          { "still": "museum", "name": "Career Museum", "text": "Suivez la visite guidée du parcours de Hasan Hmedeh, de 2019 à aujourd’hui, cadre après cadre. C’est le CV du créateur, intégré au parc.", "facts": ["12 pièces exposées", "Gratuit, sans ticket"] }
+        ]
+      },
+      {
+        "id": "look",
+        "icon": "shirt",
+        "heading": "Votre look, et un parc plein de monde",
+        "lead": "",
+        "feature": true,
+        "cards": [
+          { "still": "", "name": "Cabine d’essayage", "text": "Choisissez qui vous êtes parmi une galerie de personnages réalistes, teignez votre haut, votre bas, vos chaussures et vos cheveux, et ajustez votre taille et votre carrure. Changez de look quand vous voulez dans la cabine d’essayage, à côté du guichet de Rosa.", "facts": ["Gratuit, sans ticket", "Sans compte"], "more": "Vous n’êtes jamais seul dans le parc : les visiteurs arrivent en couple, entre amis ou en famille, font la queue aux manèges, s’assoient sur les bancs et tentent leur chance au High Striker. Voyageurs et équipages animent l’aéroport, et les vacanciers se prélassent sur les plages de Palm Cay." }
+        ]
+      }
+    ]
+  },
+  "howToPlay": {
+    "heading": "Comment jouer",
+    "lead": "The Funfair se joue de préférence au clavier et à la souris, et le tactile fonctionne aussi. Les touches suivent leur position sur le clavier : en AZERTY, jouez avec [Z] [Q] [S] [D] au lieu de [W] [A] [S] [D], et ouvrez la carte avec la touche [,] au lieu de [M].",
+    "keyboard": {
+      "heading": "Clavier et souris",
+      "rows": [
+        { "keys": "[W] [A] [S] [D] ou flèches", "action": "Marcher" },
+        { "keys": "[Maj]", "action": "Courir" },
+        { "keys": "[Espace]", "action": "Faire une roulade" },
+        { "keys": "[E]", "action": "Jouer, dans l’anneau lumineux d’une attraction" },
+        { "keys": "[F] · [H]", "action": "Coup de pied · saluer" },
+        { "keys": "[M]", "action": "Carte et voyage rapide (touche [,] en AZERTY)" },
+        { "keys": "[R]", "action": "Retour à l’entrée" },
+        { "keys": "Glisser · molette", "action": "Tourner la caméra · zoomer" }
+      ]
+    },
+    "touch": {
+      "heading": "Écran tactile",
+      "rows": [
+        { "keys": "Joystick", "action": "Marcher ; poussez-le à fond pour courir" },
+        { "keys": "Bouton [E]", "action": "Jouer" },
+        { "keys": "Glisser", "action": "Regarder autour de soi" },
+        { "keys": "Toucher la minicarte", "action": "Ouvrir la carte" },
+        { "keys": "Boutons à l’écran", "action": "Les commandes de chaque attraction, dont un cockpit complet pour le vol" }
+      ]
+    },
+    "rides": {
+      "heading": "Aux commandes",
+      "rows": [
+        { "keys": "[W] [S] [Maj] [C]", "action": "Thunder Loop : accélérer, freiner, turbo, caméra" },
+        { "keys": "[E] ou [C] · [A] [D] · [Échap]", "action": "Sky Falcon, Giant Wheel, Sky Flip, Nebula 360 : caméra · regarder autour · descendre" },
+        { "keys": "[W] [A] [S] [D] [Maj] [Espace] [R]", "action": "Karts et buggy : conduire, nitro, dérapage, retour sur la piste" },
+        { "keys": "[W] [S] [A] [D] [Espace] [X] [H]", "action": "Drone : avancer, tourner, monter, descendre, rentrer à la base" },
+        { "keys": "[W] [S] [A] [D] [Y] [G] [P] [T]", "action": "A320neo : tangage, roulis, poussée de décollage, train, pilote automatique, accélération du temps, et bien d’autres" }
+      ]
+    },
+    "notes": [
+      "Les manettes ne sont pas prises en charge.",
+      "Dans le jeu, choisissez la qualité graphique : Auto, High, Medium, Low ou Very low. Les téléphones passent d’eux-mêmes en réglages plus légers."
+    ]
+  },
+  "tickets": {
+    "heading": "Tickets et comptes",
+    "lead": "L’entrée est libre pour tout le monde. Avec un compte gratuit, vous recevez en plus des tickets offerts pour chaque manège et chaque jeu.",
+    "cards": [
+      { "tag": "Gratuit", "title": "Entrez en invité", "text": "Pas besoin de compte pour explorer : parcourez tout le parc, shootez dans les lettres géantes FUNFAIR, passez au guichet de Rosa, visitez le Career Museum, prenez le SkyLink, arpentez l’aéroport et changez de look." },
+      { "tag": "Gratuit", "title": "Compte gratuit, tickets offerts", "text": "Inscrivez-vous avec Google ou par e-mail pour recevoir 20 tickets toutes les 5 heures. La plupart des manèges et des jeux coûtent 1 ticket, le Sky Falcon et la Giant Wheel 5, et le vol vers Palm Cay 10. Les tickets non utilisés sont conservés." },
+      { "tag": "Tickets", "title": "Friandises et souvenirs", "text": "Au guichet de Rosa, dépensez vos tickets en friandises à bonus, comme la Cotton Candy (une barbe à papa qui fait courir 40 % plus vite pendant 3 minutes), et en souvenirs à porter, des Star Shades au Ringmaster’s Top Hat, le haut-de-forme de Monsieur Loyal." },
+      { "tag": "Bientôt", "soon": true, "title": "Options payantes", "text": "Il n’y a aucun paiement en argent réel dans le parc aujourd’hui. Des options payantes, comme un emplacement de création supplémentaire dans le Coaster Workshop, arrivent bientôt." }
+    ],
+    "note": "Les comptes sont réservés aux 15 ans et plus, ou aux plus jeunes avec l’accord d’un parent ou d’un tuteur légal. Vos parties, vos commandes et vos souvenirs sont enregistrés sur votre compte, et vous pouvez le supprimer depuis le jeu à tout moment."
+  },
+  "tutorials": {
+    "heading": "Tutoriels",
+    "lead": "De courtes vidéos pour vous faire visiter : de vos premiers pas dans le parc jusqu’à l’atterrissage de l’A320neo sur Palm Cay."
+  },
+  "faq": {
+    "heading": "Questions fréquentes",
+    "items": [
+      { "q": "The Funfair est-il gratuit ?", "a": "Oui. Le jeu est gratuit et se joue dans votre navigateur. Se promener est gratuit pour tout le monde, et les manèges et les jeux utilisent des tickets offerts avec un compte gratuit : actuellement 20 toutes les 5 heures." },
+      { "q": "Faut-il télécharger ou installer quelque chose ?", "a": "Non. The Funfair tourne dans votre navigateur web : il n’y a rien à télécharger ni à installer. Il faut une connexion internet, et le jeu ne fonctionne pas hors ligne." },
+      { "q": "Le jeu fonctionne-t-il sur téléphone et tablette ?", "a": "Oui. Sur écran tactile, vous avez un joystick et des boutons à l’écran pour chaque attraction, dont un cockpit complet pour le vol, et les téléphones passent automatiquement en graphismes plus légers. Le jeu reste plus agréable au clavier." },
+      { "q": "Avec quels navigateurs fonctionne-t-il ?", "a": "Tout navigateur récent compatible WebGL 2, comme Chrome, Edge, Firefox ou Safari. Si votre navigateur ne peut pas le faire tourner, le jeu vous le signale." },
+      { "q": "Faut-il un compte ?", "a": "Pas pour visiter : en invité, vous pouvez parcourir tout le parc, passer au guichet, visiter le musée, prendre le SkyLink et changer de look. Les manèges et les jeux demandent un compte gratuit, qui vous donne des tickets gratuits." },
+      { "q": "À quoi servent les tickets ?", "a": "Les tickets sont des objets virtuels gratuits que vous dépensez dans les manèges et les jeux : 1 pour la plupart, 5 pour le Sky Falcon et la Giant Wheel, et 10 pour le vol vers Palm Cay. Ils n’ont aucune valeur monétaire, et il n’y a rien à acheter avec de l’argent réel aujourd’hui." },
+      { "q": "The Funfair est-il multijoueur ?", "a": "Non. The Funfair est un jeu solo, et les autres joueurs n’apparaissent pas dans votre monde. Le parc est pourtant partagé et vivant : l’équipe ouvre et ferme les attractions en temps réel, le Rally Trail a son top 10 du jour, et des montagnes russes créées par d’autres joueurs ouvrent dans Creators’ Valley." },
+      { "q": "Le jeu convient-il aux enfants ?", "a": "L’action est douce, façon dessin animé : un pistolet à bouchon contre des canards en fer-blanc, des canons contre des navires pirates, et des coups de pied qui font s’écarter les visiteurs d’un bond. Il n’y a pas de tchat. Les comptes sont réservés aux 15 ans et plus, ou aux plus jeunes avec l’accord d’un parent ou d’un tuteur légal, et certaines attractions comportent des lumières clignotantes et des mouvements intenses." },
+      { "q": "En quelle langue est le jeu ?", "a": "L’interface du jeu est uniquement en anglais : menus, consignes à l’écran et voix du contrôle aérien. Ce site, lui, existe aussi en français et en arabe." },
+      { "q": "Peut-on jouer avec une manette ?", "a": "Pas pour le moment. The Funfair se joue au clavier et à la souris, ou en tactile." },
+      { "q": "Quel est le poids du téléchargement, et combien de données le jeu consomme-t-il ?", "a": "La première visite télécharge un parc 3D entier (modèles, textures et code), ce qui est beaucoup pour une page web : passez en Wi-Fi si votre forfait est limité. L’aéroport et l’île ne se chargent que lorsque vous vous y rendez." },
+      { "q": "Comment signaler un bug ou proposer une idée ?", "a": "Utilisez l’Idea Box, la boîte à idées du parc : choisissez un sujet, comme « Something’s wrong » pour un problème, écrivez jusqu’à 500 caractères, puis suivez son statut, de « Waiting » (en attente) à « Done » (terminé). Il faut un compte gratuit. Vous pouvez aussi écrire à [hassanhmedeh@gmail.com](mailto:hassanhmedeh@gmail.com)." },
+      { "q": "Qui a créé The Funfair ?", "a": "Hasan Hmedeh, développeur logiciel full-stack. Le Career Museum du parc est son CV interactif, et la visite est gratuite." }
+    ]
+  },
+  "creator": {
+    "kicker": "Le créateur",
+    "heading": "Créé par Hasan Hmedeh",
+    "paragraphs": [
+      "The Funfair est l’œuvre de Hasan Hmedeh, développeur logiciel full-stack qui code depuis 2019. Il a construit le parc avec three.js, directement dans le navigateur, et le serveur des comptes et des tickets avec NestJS et PostgreSQL.",
+      "Dans le parc, le Career Museum retrace son parcours de 2019 à aujourd’hui, cadre après cadre. C’est son CV, devenu un lieu que l’on visite."
+    ],
+    "links": [
+      { "label": "GitHub", "href": "https://github.com/hasanhmedeh", "icon": "github" },
+      { "label": "LinkedIn", "href": "https://www.linkedin.com/in/hasanhmedeh", "icon": "linkedin" }
+    ],
+    "cta": "Visiter le musée dans le parc",
+    "plaque": { "since": "Code depuis 2019", "role": "Développeur logiciel full-stack" }
+  },
+  "cta": {
+    "heading": "Votre ticket est prêt",
+    "text": "Les portes sont ouvertes. Entrez gratuitement, montez dans les montagnes russes et envolez-vous pour Palm Cay, directement dans votre navigateur.",
+    "button": "Jouer gratuitement",
+    "note": "Sans téléchargement · Tickets offerts avec un compte gratuit"
+  },
+  "share": {
+    "heading": "Partager The Funfair",
+    "text": "The Funfair : un parc d’attractions 3D gratuit, à jouer dans votre navigateur",
+    "native": "Partager",
+    "copy": "Copier le lien",
+    "copied": "Lien copié"
+  },
+  "footer": {
+    "tagline": "Le parc d’attractions 3D gratuit qui se joue dans votre navigateur.",
+    "explore": "Explorer",
+    "legal": "Informations légales",
+    "languages": "Langues",
+    "terms": "Conditions d’utilisation",
+    "privacy": "Politique de confidentialité",
+    "credits": "Crédits",
+    "contact": "Contact",
+    "madeBy": "Créé par Hasan Hmedeh"
+  },
+  "banner": {
+    "text": "Cette page existe aussi en français.",
+    "go": "Lire en français",
+    "dismiss": "Non merci"
+  },
+  "watch": {
+    "videos": "Vidéos",
+    "inThisVideo": "Dans cette vidéo",
+    "steps": "Étapes",
+    "transcript": "Transcription",
+    "more": "Autres vidéos",
+    "breadcrumb": "Fil d’Ariane",
+    "duration": "Durée"
+  },
+  "hub": {
+    "title": "Vidéos : bande-annonce et tutoriels · The Funfair",
+    "description": "La bande-annonce et les tutoriels de The Funfair : du vrai gameplay du parc d’attractions 3D gratuit qui se joue dans votre navigateur.",
+    "heading": "Bande-annonce et tutoriels",
+    "lead": "Du vrai gameplay filmé dans le parc, avec sous-titres et chapitres."
+  },
+  "notFound": {
+    "title": "Page introuvable · The Funfair",
+    "kicker": "Objets trouvés",
+    "heading": "Cette attraction n’est pas sur le plan",
+    "text": "Vous avez quitté les allées. La page que vous cherchez n’existe pas, ou elle a déménagé. L’entrée du parc, c’est par ici :",
+    "home": "Retour à l’accueil",
+    "play": "Jouer à The Funfair"
+  },
+  "stills": {
+    "hero": "The Funfair à l’heure dorée : la Giant Wheel, la tour du Sky Flip, le looping vertical du Thunder Loop, les hauts piliers du Sky Falcon et le Rocket Ride qui décolle sur une colonne de fumée",
+    "coaster": "Le train du Thunder Loop dans son looping vertical, avec la Giant Wheel et le Sky Flip en arrière-plan",
+    "falcon": "Le Sky Falcon au sommet d’une bosse sur ses hauts piliers blancs, avec la falaise et la mer au loin",
+    "rocket": "Le Rocket Ride qui décolle de son pas de tir sur une colonne de fumée",
+    "ferris": "La Giant Wheel de 250 m au-dessus des chapiteaux de la fête foraine, avec le Thunder Loop à côté",
+    "flip": "Le Sky Flip qui fait passer sa nacelle par-dessus le sommet de sa tour",
+    "ship": "Le bateau pendulaire Nebula 360 en pleine oscillation devant le Sky Falcon",
+    "speedway": "Des karts dans un virage du Turbo Speedway",
+    "trail": "Le buggy du Rally Trail qui soulève la poussière à côté d’une gerbe d’eau",
+    "crates": "Le Crate Smash au milieu des stands, avec la Giant Wheel derrière",
+    "striker": "La tour du High Striker au milieu des stands",
+    "ducks": "Le stand du Duck Shoot, lumières allumées",
+    "drone": "Le parc vu depuis un drone de location, avec l’aéroport au loin",
+    "workshop": "Des montagnes russes de visiteur, avec une montée et un looping, construites dans le Coaster Workshop",
+    "museum": "Le Career Museum au bout de son allée, avec le Sky Falcon derrière",
+    "skylink": "Un train du SkyLink sur son viaduc, en route vers le parc",
+    "airport": "Funfair International : le terminal, des A320 aux portes et la tour de contrôle",
+    "a320": "Un A320neo de Funfair Air aligné sur la piste, moteurs en marche",
+    "palmcay": "Le lagon de Palm Cay, avec le ponton des jet-skis, la plage et ses parasols",
+    "jetski": "Des jet-skis qui sautent un tremplin dans le lagon de Palm Cay",
+    "slides": "Les trois toboggans de la Splash Tower qui descendent jusqu’au bassin",
+    "cannons": "Les canons de Fort Cutlass face aux navires pirates dans le lagon",
+    "volley": "Des joueurs sur le terrain de Beach Volley de Palm Cay",
+    "night": "Le parc de nuit, avec les chapiteaux de la fête foraine et la Giant Wheel illuminés"
+  }
+}

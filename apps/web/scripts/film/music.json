@@ -1,0 +1,54 @@
+{
+  "$comment": "The films' music: CC0 tracks from OpenGameArt.org (credits below go in the YouTube descriptions and on /credits). The files aren't in the repo yet: `root` is where they're looked for (relative to this file; the FILM_MUSIC environment variable overrides it), and each `file` is found by its name anywhere under it. `bpm` and `firstBeat` (seconds) put the trailer's cuts on the beat.",
+  "root": "music",
+  "tracks": {
+    "flags": {
+      "file": "Alexander Ehlers - Flags.mp3",
+      "title": "Flags",
+      "author": "Alexander Ehlers (tricksntraps)",
+      "licence": "CC0 1.0",
+      "source": "https://opengameart.org/content/free-music-pack",
+      "bpm": 168,
+      "firstBeat": 0.025
+    },
+    "great-mission": {
+      "file": "Alexander Ehlers - Great mission.mp3",
+      "title": "Great mission",
+      "author": "Alexander Ehlers (tricksntraps)",
+      "licence": "CC0 1.0",
+      "source": "https://opengameart.org/content/free-music-pack"
+    },
+    "childrens-march": {
+      "file": "Children's March Theme.ogg",
+      "title": "Children's March Theme",
+      "author": "Cleyton Kauffman",
+      "licence": "CC0 1.0",
+      "source": "https://opengameart.org/content/childrens-march-theme",
+      "loop": true
+    },
+    "carnival-rides": {
+      "file": "carnivalrides.ogg",
+      "title": "Carnival Rides",
+      "author": "Écrivain",
+      "licence": "CC0 1.0",
+      "source": "https://opengameart.org/content/carnival-rides",
+      "loop": true
+    },
+    "feel-good-island": {
+      "file": "island_0.ogg",
+      "title": "Feel good island",
+      "author": "Brandon75689",
+      "licence": "CC0 1.0 (also offered as OGA-BY 3.0)",
+      "source": "https://opengameart.org/content/feel-good-island",
+      "loop": true
+    },
+    "hyper-ultra-racing": {
+      "file": "AugustUltraAmbience.wav",
+      "title": "Hyper Ultra-Racing",
+      "author": "cynicmusic",
+      "licence": "CC0 1.0",
+      "source": "https://opengameart.org/content/hyper-ultra-racing",
+      "loop": true
+    }
+  }
+}

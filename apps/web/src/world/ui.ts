@@ -1,4 +1,4 @@
-// Thin wrapper over the HUD DOM declared in index.html.
+// Thin wrapper over the HUD DOM declared in park.html.
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 /** Where this browser remembers which info cards it has already shown by themselves. */
