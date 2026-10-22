@@ -101,7 +101,7 @@ const preview: PreviewScene = async (p) => {
     camera.lookAt(s.x, s.y + 0.9, s.z);
   };
   for (const r of (js as any).rigs) { if (!r.body) continue; if (q.get("novest")) r.body.vest.visible = false; if (q.get("vestshadow") === "0") { r.body.vest.castShadow = false; r.body.vest.receiveShadow = false; r.body.setShadows = () => {}; } if (q.get("vestbasic")) r.body.vest.material = new THREE.MeshBasicMaterial({ vertexColors: true }); if (q.get("nobody")) for (const m of r.body.rig.skinnedMeshes) m.visible = false; }
-  console.warn("DEBUG vests", JSON.stringify((js as any).rigs.map((r: any) => { if (!r.body) return null; const g = r.body.vest.geometry; const out: Record<string, number> = {}; for (const k of ["position","normal","color"]) { const arr = g.attributes[k].array; let n = 0; for (let i = 0; i < arr.length; i++) if (!Number.isFinite(arr[i])) n++; out[k] = n; } out.count = g.attributes.position.count; return out; })));
+  console.warn("DEBUG vests", JSON.stringify((js as any).rigs.map((r: any) => { if (!r.body) return null; const g = r.body.vest.geometry; const out: Record<string, number> = {}; for (const k of ["position","normal","color"]) { const arr = g.attributes[k].array; let n = 0; for (let i = 0; i < arr.length; i++) if (!Number.isFinite(arr[i])) n++; out[k] = n; } out.count = g.attributes.position.count; const nn = g.attributes.normal.array; let z = 0; for (let i = 0; i < nn.length; i += 3) if (Math.hypot(nn[i], nn[i+1], nn[i+2]) < 0.5) z++; out.zeroN = z; return out; })));
   p.onFrame((dt, ft) => {
     park.update(dt, ft, camera);
     if (!freeze) step(dt);
