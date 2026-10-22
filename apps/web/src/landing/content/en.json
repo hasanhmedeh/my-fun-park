@@ -1,0 +1,331 @@
+{
+  "meta": {
+    "title": "The Funfair: free 3D theme park game in your browser",
+    "description": "Ride coasters, race karts, build your own rollercoaster and fly an A320neo to a tropical island. A free 3D theme park in your browser, no download.",
+    "updated": "2026-10-22"
+  },
+  "og": {
+    "headline": "The Funfair",
+    "tagline": "A free 3D theme park you play in your browser",
+    "alt": "The Funfair: a 3D theme park with a giant wheel, coasters and a rocket ride, free to play in your browser"
+  },
+  "ui": {
+    "skip": "Skip to the content",
+    "menu": "Menu",
+    "language": "Language",
+    "home": "The Funfair home",
+    "play": "Play free",
+    "nav": {
+      "trailer": "Trailer",
+      "attractions": "Attractions",
+      "howToPlay": "How to play",
+      "tutorials": "Tutorials",
+      "faq": "FAQ"
+    },
+    "comingSoon": "Coming soon",
+    "watch": "Watch",
+    "playVideo": "Play the video",
+    "pauseLoop": "Pause the background video",
+    "playLoop": "Play the background video",
+    "youtube": "Watch on YouTube",
+    "download": "Download the video (MP4)",
+    "updated": "Updated",
+    "scrollHint": "Swipe for more",
+    "minutes": "min",
+    "seconds": "s"
+  },
+  "hero": {
+    "kicker": "Admit one · Free to play",
+    "brand": "The Funfair",
+    "what": "A free 3D theme park you play in your browser, no download",
+    "lead": "Drive a looping coaster yourself, ride a 250 km/h cliff coaster, race karts, build your own rollercoaster, then fly an A320neo 40 km south to a tropical island.",
+    "cta": "Play free now",
+    "secondary": "Watch the trailer",
+    "badges": ["No download", "Free tickets", "Desktop, tablet and phone"]
+  },
+  "summary": {
+    "heading": "What is The Funfair?",
+    "paragraphs": [
+      "The Funfair is a free 3D theme park game that runs in your web browser, with nothing to download. You walk around the park, ride coasters and thrill rides, play carnival games and races, build your own coaster in the Coaster Workshop, and fly an Airbus A320neo 40 km south to the island of Palm Cay.",
+      "Anyone can walk in and look around as a guest. Rides and games use tickets that come free with an account: 20 every 5 hours. The Funfair is made by Hasan Hmedeh, a full-stack software developer, and the park's Career Museum is his interactive CV."
+    ]
+  },
+  "facts": {
+    "heading": "At a glance",
+    "rows": [
+      { "label": "Genre", "value": "3D theme park game: coasters and thrill rides, carnival games, racing, a coaster builder and a flight simulator" },
+      { "label": "Platform", "value": "Any modern browser with WebGL 2, on desktop, tablet or phone" },
+      { "label": "Price", "value": "Free. Rides and games use free tickets: 20 every 5 hours with a free account" },
+      { "label": "Download", "value": "None: it runs in your browser" },
+      { "label": "Controls", "value": "Keyboard and mouse (best), or touch. No gamepad support" },
+      { "label": "Players", "value": "Single-player, in a shared live park" },
+      { "label": "Game language", "value": "English" },
+      { "label": "Developer", "value": "Hasan Hmedeh" }
+    ]
+  },
+  "trailer": {
+    "heading": "Watch the trailer",
+    "lead": "Real gameplay, filmed in the park: the coasters, the games, the Coaster Workshop and the flight to Palm Cay.",
+    "comingSoon": "Trailer coming soon",
+    "comingSoonNote": "We're filming it in the park right now. Until then, the gates are open: go and see for yourself.",
+    "chapters": "Chapters"
+  },
+  "attractions": {
+    "heading": "What's in the park",
+    "lead": "Coasters you drive yourself, carnival games, karts and a buggy, a coaster builder, and a whole world past the park gates. Walk into any ride's glowing ring and press E to play.",
+    "groups": [
+      {
+        "id": "thrills",
+        "icon": "loop",
+        "heading": "Thrill rides and coasters",
+        "lead": "Two rollercoasters, a giant wheel and three rides that turn you upside down.",
+        "cards": [
+          { "still": "coaster", "name": "Thunder Loop", "text": "Drive the coaster yourself: power with W, brake with S and hit turbo with Shift through a launch, a loop, a zero-g roll and a helix.", "facts": ["Up to 83 km/h", "−1 to 5.5 G"] },
+          { "still": "falcon", "name": "Sky Falcon", "text": "A 4.25 km cliff coaster: climb to the clifftop, drop 158 m at 90°, then launch to 250 km/h.", "facts": ["250 km/h", "158 m drop at 90°"] },
+          { "still": "rocket", "name": "Rocket Ride", "text": "Fire six stages, from lift-off through the clouds to a stylised orbit 500 m above the fair.", "facts": ["6 stages", "Press E to fire"] },
+          { "still": "ferris", "name": "Giant Wheel", "text": "Ride a 250 m wheel with 48 capsules over the park, and hold W to fast-forward the turn.", "facts": ["250 m up", "48 capsules"] },
+          { "still": "flip", "name": "Sky Flip", "text": "Swing 125 m up and right over the top, head over heels, at about 200 km/h.", "facts": ["125 m up", "12 seats"] },
+          { "still": "ship", "name": "Nebula 360", "text": "A pendulum ship that loops right round three times, then hangs you upside down 30 m up.", "facts": ["3 loops", "4.5 s upside down"] }
+        ]
+      },
+      {
+        "id": "games",
+        "icon": "target",
+        "heading": "Carnival games",
+        "lead": "Quick rounds on the midway, with your personal bests kept on your account.",
+        "cards": [
+          { "still": "ducks", "name": "Duck Shoot", "text": "30 seconds with a cork gun to knock down the tin ducks, and the golden one worth 50 points.", "facts": ["30 s rounds", "Golden duck: 50"] },
+          { "still": "striker", "name": "High Striker", "text": "Three swings to ring the bell at the top of a 9 m tower: time the meter just right.", "facts": ["3 swings", "9 m tower"] },
+          { "still": "crates", "name": "Crate Smash", "text": "45 seconds to run, roll and kick your way through 22 crates stacked in rows.", "facts": ["45 s", "22 crates"] }
+        ]
+      },
+      {
+        "id": "racing",
+        "icon": "flag",
+        "heading": "Driving, racing and flying",
+        "lead": "Karts, a rally buggy and a camera drone, each with its own cameras.",
+        "cards": [
+          { "still": "speedway", "name": "Turbo Speedway", "text": "Race three rivals for three laps round a 472 m kart circuit full of cones, oil and boost pads.", "facts": ["3 laps", "3 s nitro"] },
+          { "still": "trail", "name": "Rally Trail", "text": "A buggy time trial with jumps, mud and crates. Race the ghost of your best run and chase today's top ten.", "facts": ["Daily top ten", "547 m trail"] },
+          { "still": "drone", "name": "Drone Flights", "text": "Rent a camera drone for 120 seconds and climb to 320 m, high enough to look down on the Giant Wheel.", "facts": ["320 m ceiling", "3 cameras"] }
+        ]
+      },
+      {
+        "id": "workshop",
+        "icon": "wrench",
+        "heading": "Build your own coaster",
+        "lead": "",
+        "feature": true,
+        "cards": [
+          { "still": "workshop", "name": "Coaster Workshop", "text": "Build a coaster from straights, curves, slopes, helixes, loops and corkscrews, test-ride it for free and send it to the staff. Released coasters open on a plot in Creators' Valley, and you earn tickets each time someone rides yours.", "facts": ["Up to 80 pieces", "Up to 35 m high", "Free starter kit", "Free account"] }
+        ]
+      },
+      {
+        "id": "travel",
+        "icon": "plane",
+        "heading": "Fly to Palm Cay",
+        "lead": "The world goes on past the gates: take the SkyLink to the airport, fly yourself 40 km south, and play on a tropical island.",
+        "journey": true,
+        "cards": [
+          { "still": "skylink", "name": "SkyLink", "text": "The driverless train from the park's south gate to the airport, on a guideway 11 m up. Free, and no account needed.", "facts": ["Free ride"] },
+          { "still": "airport", "name": "Funfair International", "text": "Walk through check-in, security and duty free to Gate 3, past A320s at the gates and a 3,500 m runway.", "facts": ["6 gates"] },
+          { "still": "a320", "name": "Fly the A320neo", "text": "Take the captain's seat: push back, taxi, take off, cruise at 5,000 ft over the sea and land it yourself. ATC, the autopilot and your first officer help, and every landing gets 1 to 5 stars.", "facts": ["Dawn, day, dusk or night", "10 tickets"] },
+          { "still": "palmcay", "name": "Palm Cay", "text": "The tropical island at the end of the flight: a palm promenade, beaches, a lagoon and four games of its own.", "facts": ["Reached by air"] }
+        ],
+        "extraHeading": "Games on Palm Cay",
+        "extra": [
+          { "still": "jetski", "name": "Jet-Ski Race", "text": "Three laps of a buoy course in the lagoon against the island's riders. A missed buoy costs 3 seconds.", "facts": ["3 laps"] },
+          { "still": "slides", "name": "Splash Tower", "text": "Climb the 24 m tower and pick your slide: the Kamikaze drop, the Typhoon tube or the Lazy Loop.", "facts": ["3 slides"] },
+          { "still": "cannons", "name": "Pirate Cannons", "text": "Man the three guns of Fort Cutlass and sink the pirate ships before the 60 seconds run out.", "facts": ["60 s rounds"] },
+          { "still": "volley", "name": "Beach Volley", "text": "Ten serves with an island partner against two locals, with coconuts to hit for bonus points.", "facts": ["10 serves"] }
+        ]
+      },
+      {
+        "id": "museum",
+        "icon": "frame",
+        "heading": "The Career Museum",
+        "lead": "",
+        "feature": true,
+        "cards": [
+          { "still": "museum", "name": "Career Museum", "text": "Take the guided tour of Hasan Hmedeh's work, from 2019 to today, one framed exhibit at a time. It's the creator's CV, built into the park.", "facts": ["12 exhibits", "Free, no ticket"] }
+        ]
+      },
+      {
+        "id": "look",
+        "icon": "shirt",
+        "heading": "Your look, and a park full of people",
+        "lead": "",
+        "feature": true,
+        "cards": [
+          { "still": "", "name": "Changing room","text": "Pick who you are from a cast of realistic people, dye your top, bottoms, shoes and hair, and adjust your height and build. Change again whenever you like in the changing room beside Rosa's booth.", "facts": ["Free, no ticket", "No account needed"], "more": "You're never alone in the park: guests arrive as couples, friends and families, queue for the rides, sit on the benches and try the High Striker. Travellers and crew fill the airport, and holidaymakers lounge on Palm Cay's beaches." }
+        ]
+      }
+    ]
+  },
+  "howToPlay": {
+    "heading": "How to play",
+    "lead": "The Funfair plays best with a keyboard and mouse, and touch works too. Keys follow their position on the keyboard, so ZQSD works on AZERTY.",
+    "keyboard": {
+      "heading": "Keyboard and mouse",
+      "rows": [
+        { "keys": "[W] [A] [S] [D] or arrows", "action": "Walk" },
+        { "keys": "[Shift]", "action": "Run" },
+        { "keys": "[Space]", "action": "Roll" },
+        { "keys": "[E]", "action": "Play, in a ride's glowing ring" },
+        { "keys": "[F] · [H]", "action": "Kick · wave" },
+        { "keys": "[M]", "action": "Map and fast travel" },
+        { "keys": "[R]", "action": "Back to the entrance" },
+        { "keys": "Drag · wheel", "action": "Turn the camera · zoom" }
+      ]
+    },
+    "touch": {
+      "heading": "Touch",
+      "rows": [
+        { "keys": "Joystick", "action": "Walk; push it all the way to run" },
+        { "keys": "[E] button", "action": "Play" },
+        { "keys": "Drag", "action": "Look around" },
+        { "keys": "Tap the minimap", "action": "Open the map" },
+        { "keys": "On-screen buttons", "action": "Every ride's controls, including a full cockpit for the flight" }
+      ]
+    },
+    "rides": {
+      "heading": "At the controls",
+      "rows": [
+        { "keys": "[W] [S] [Shift] [C]", "action": "Thunder Loop: power, brake, turbo, camera" },
+        { "keys": "[E] or [C] · [A] [D] · [Esc]", "action": "Sky Falcon, Giant Wheel, Sky Flip, Nebula 360: camera · look around · get off" },
+        { "keys": "[W] [A] [S] [D] [Shift] [Space] [R]", "action": "Karts and buggy: drive, nitro, drift, rescue" },
+        { "keys": "[W] [S] [A] [D] [Space] [X] [H]", "action": "Drone: fly, turn, climb, descend, fly home" },
+        { "keys": "[W] [S] [A] [D] [Y] [G] [P] [T]", "action": "A320neo: pitch, roll, take-off thrust, gear, autopilot, time warp, and many more" }
+      ]
+    },
+    "notes": [
+      "Gamepads aren't supported.",
+      "Choose Auto, High, Medium, Low or Very low graphics in the game. Phones get lighter settings automatically."
+    ]
+  },
+  "tickets": {
+    "heading": "Tickets and accounts",
+    "lead": "Walking in is free for everyone. A free account adds free tickets for every ride and game.",
+    "cards": [
+      { "tag": "Free", "title": "Walk in as a guest", "text": "No account needed to explore: walk the whole park, kick the giant FUNFAIR letters, visit Rosa's booth, tour the Career Museum, ride the SkyLink, walk the airport and change your look." },
+      { "tag": "Free", "title": "Free account, free tickets", "text": "Sign up with Google or email to collect 20 tickets every 5 hours. Most rides and games cost 1 ticket, the Sky Falcon and the Giant Wheel 5, and the flight to Palm Cay 10. Leftover tickets carry over." },
+      { "tag": "Tickets", "title": "Treats and souvenirs", "text": "Spend tickets at Rosa's booth on treats with perks, like Cotton Candy (run 40% faster for 3 minutes), and on souvenirs you wear, from Star Shades to the Ringmaster's Top Hat." },
+      { "tag": "Coming soon", "soon": true, "title": "Paid extras", "text": "There are no real-money payments in the park today. Paid extras, such as an extra Coaster Workshop design slot, are coming soon." }
+    ],
+    "note": "Accounts are for ages 15 and up, or younger with a parent's or guardian's permission. Your rounds, orders and souvenirs are kept on your account, and you can delete it from the game at any time."
+  },
+  "tutorials": {
+    "heading": "Tutorials",
+    "lead": "Short videos that show you around: from your first steps in the park to landing the A320neo on Palm Cay."
+  },
+  "faq": {
+    "heading": "Questions and answers",
+    "items": [
+      { "q": "Is The Funfair free?", "a": "Yes. The game is free to play in your browser. Walking around is free for everyone, and rides and games use tickets that come free with an account: currently 20 every 5 hours." },
+      { "q": "Do I need to download or install anything?", "a": "No. The Funfair runs in your web browser, so there is nothing to download or install. It needs an internet connection, and it doesn't work offline." },
+      { "q": "Does it work on phones and tablets?", "a": "Yes. On a touch screen you get a joystick and on-screen buttons for every ride, including a full cockpit for the flight, and phones get lighter graphics automatically. It plays best with a keyboard." },
+      { "q": "Which browsers does it work in?", "a": "Any recent browser with WebGL 2, such as Chrome, Edge, Firefox or Safari. If your browser can't run it, the game tells you so." },
+      { "q": "Do I need an account?", "a": "Not to look around: guests can walk the whole park, visit the booth, tour the museum, ride the SkyLink and change their look. Rides and games need a free account, which comes with free tickets." },
+      { "q": "What are tickets?", "a": "Tickets are free virtual items you spend on rides and games: 1 for most, 5 for the Sky Falcon and the Giant Wheel, and 10 for the flight to Palm Cay. They have no cash value, and there is nothing to buy with real money today." },
+      { "q": "Is The Funfair multiplayer?", "a": "No. The Funfair is single-player, and other players don't appear in your world. The park is shared and live, though: staff open and close rides in real time, the Rally Trail has a daily top ten, and coasters built by other players open in Creators' Valley." },
+      { "q": "Is it suitable for kids?", "a": "The action is mild and cartoon-like: a cork gun at tin ducks, cannons at pirate ships, and kicks that make guests hop out of the way. There is no chat. Accounts are for ages 15 and up, or younger with a parent's or guardian's permission, and some rides have flashing lights and intense motion." },
+      { "q": "What language is the game in?", "a": "The game's interface is in English. This website is also in French and Arabic." },
+      { "q": "Can I play with a gamepad?", "a": "Not at the moment. The Funfair plays with a keyboard and mouse, or with touch." },
+      { "q": "How big is the download, and how much data does it use?", "a": "The first visit downloads a whole 3D park (models, textures and code), which is a lot for a web page, so use Wi-Fi if your data is limited. The airport and the island load only when you travel there." },
+      { "q": "How do I report a bug or suggest an idea?", "a": "Use the Idea Box in the park: pick a topic such as \"Something's wrong\", write up to 500 characters, and follow its status from Waiting to Done. It needs a free account. You can also email [hassanhmedeh@gmail.com](mailto:hassanhmedeh@gmail.com)." },
+      { "q": "Who made The Funfair?", "a": "Hasan Hmedeh, a full-stack software developer. The park's Career Museum is his interactive CV, and it's free to visit." }
+    ]
+  },
+  "creator": {
+    "kicker": "The maker",
+    "heading": "Made by Hasan Hmedeh",
+    "paragraphs": [
+      "The Funfair is built by Hasan Hmedeh, a full-stack software developer who has been writing code since 2019. He made the park with three.js in the browser, and the accounts and tickets server with NestJS and PostgreSQL.",
+      "Inside the park, the Career Museum walks you through his work from 2019 to today, one framed exhibit at a time. It's his CV, turned into a place you can visit."
+    ],
+    "links": [
+      { "label": "GitHub", "href": "https://github.com/hasanhmedeh", "icon": "github" },
+      { "label": "LinkedIn", "href": "https://www.linkedin.com/in/hasanhmedeh", "icon": "linkedin" }
+    ],
+    "cta": "Visit the museum in the park",
+    "plaque": { "since": "Coding since 2019", "role": "Full-stack software developer" }
+  },
+  "cta": {
+    "heading": "Your ticket's ready",
+    "text": "The gates are open. Walk in free, ride the coasters and fly to Palm Cay, right in your browser.",
+    "button": "Play free now",
+    "note": "No download · Free tickets with a free account"
+  },
+  "share": {
+    "heading": "Share The Funfair",
+    "text": "The Funfair: a free 3D theme park you play in your browser",
+    "native": "Share",
+    "copy": "Copy link",
+    "copied": "Link copied"
+  },
+  "footer": {
+    "tagline": "A free 3D theme park you play in your browser.",
+    "explore": "Explore",
+    "legal": "Legal",
+    "languages": "Languages",
+    "terms": "Terms of Service",
+    "privacy": "Privacy Policy",
+    "credits": "Credits",
+    "contact": "Contact",
+    "madeBy": "Made by Hasan Hmedeh"
+  },
+  "banner": {
+    "text": "This page is also available in English.",
+    "go": "Read it in English",
+    "dismiss": "No thanks"
+  },
+  "watch": {
+    "videos": "Videos",
+    "inThisVideo": "In this video",
+    "steps": "Steps",
+    "transcript": "Transcript",
+    "more": "More videos",
+    "breadcrumb": "Breadcrumb",
+    "duration": "Duration"
+  },
+  "hub": {
+    "title": "Videos: trailer and tutorials · The Funfair",
+    "description": "Watch The Funfair's trailer and tutorials: real gameplay from the free 3D theme park you play in your browser.",
+    "heading": "Trailer and tutorials",
+    "lead": "Real gameplay from the park, with captions and chapters."
+  },
+  "notFound": {
+    "title": "Page not found · The Funfair",
+    "kicker": "Lost and found",
+    "heading": "This ride isn't on the map",
+    "text": "You've wandered off the paths. The page you're after doesn't exist, or it moved. The gates are this way:",
+    "home": "Back to the home page",
+    "play": "Play The Funfair"
+  },
+  "stills": {
+    "hero": "The Funfair at golden hour: the Giant Wheel, the Sky Flip tower, the Thunder Loop's vertical loop, the Sky Falcon's tall supports and the Rocket Ride lifting off on a column of smoke",
+    "coaster": "The Thunder Loop train in its vertical loop, with the Giant Wheel and the Sky Flip behind",
+    "falcon": "The Sky Falcon cresting a hill on its tall white supports, with the cliff and the sea beyond",
+    "rocket": "The Rocket Ride lifting off from its pad on a column of smoke",
+    "ferris": "The 250 m Giant Wheel over the midway tents, with the Thunder Loop beside it",
+    "flip": "The Sky Flip swinging its gondola over the top of its tower",
+    "ship": "The Nebula 360 pendulum ship swinging in front of the Sky Falcon",
+    "speedway": "Karts racing through a bend of the Turbo Speedway",
+    "trail": "The Rally Trail buggy kicking up dust beside a splash",
+    "crates": "Crate Smash on the midway, with the Giant Wheel behind",
+    "striker": "The High Striker tower on the midway",
+    "ducks": "The Duck Shoot stall with its lights on",
+    "drone": "The park seen from a rented drone, with the airport far off",
+    "workshop": "A visitor's coaster with a lift hill and a loop, built in the Coaster Workshop",
+    "museum": "The Career Museum at the end of its path, with the Sky Falcon behind",
+    "skylink": "A SkyLink train on its viaduct, heading for the park",
+    "airport": "Funfair International: the terminal, A320s at the gates and the control tower",
+    "a320": "A Funfair Air A320neo lined up on the runway, engines running",
+    "palmcay": "Palm Cay's lagoon, with the jet-ski dock, the beach and its umbrellas",
+    "jetski": "Jet-skis jumping a ramp in the Palm Cay lagoon",
+    "slides": "The Splash Tower's three slides running down into the pool",
+    "cannons": "The guns of Fort Cutlass facing pirate ships in the lagoon",
+    "volley": "Players on the Beach Volley court on Palm Cay",
+    "night": "The park at night, with the midway tents and the Giant Wheel in lights"
+  }
+}

@@ -1,0 +1,347 @@
+{
+  "trailer": {
+    "title": "The Funfair: official trailer",
+    "description": "Coasters, carnival games, karts, a coaster builder and a flight to a tropical island: The Funfair, a free 3D theme park in your browser.",
+    "longDescription": "The Funfair is a free 3D theme park game that runs in your web browser, with nothing to download.\n\nDrive the Thunder Loop coaster yourself, ride the 250 km/h Sky Falcon, race karts on the Turbo Speedway, build a coaster in the Coaster Workshop, then take the SkyLink to the airport and fly an A320neo 40 km south to the island of Palm Cay.\n\nEverything in the trailer is real gameplay, filmed in the park.",
+    "chapters": {
+      "park": "Welcome to The Funfair",
+      "rides": "Coasters and thrill rides",
+      "games": "Races and games",
+      "build-and-fly": "Build, fly and the island"
+    },
+    "captions": {
+      "music": "♪ Upbeat music ♪",
+      "park": "The Funfair: a 3D theme park in your browser",
+      "free": "Free to play, with nothing to download",
+      "drive": "Drive the Thunder Loop coaster yourself",
+      "falcon": "Ride the Sky Falcon at 250 km/h",
+      "thrills": "Swing over the top on the Sky Flip and Nebula 360",
+      "race": "Race karts on the Turbo Speedway",
+      "trail": "Chase your best time on the Rally Trail",
+      "games": "Play the midway games",
+      "drone": "Fly a drone over the whole park",
+      "build": "Build your own coaster",
+      "skylink": "Take the SkyLink to the airport",
+      "fly": "Fly an A320neo 40 km south…",
+      "island": "…to the island of Palm Cay",
+      "end": "Play free in your browser"
+    },
+    "tags": [
+      "The Funfair",
+      "theme park game",
+      "rollercoaster game",
+      "browser game",
+      "free online game",
+      "three.js",
+      "WebGL"
+    ]
+  },
+  "getting-started": {
+    "title": "Getting started: walk, explore and start your first ride",
+    "description": "Walk in as a guest, learn to walk, run and roll, find your way with the map and fast travel, and start your first ride.",
+    "longDescription": "New to The Funfair? This tutorial takes you from the gates to your first ride.\n\nYou'll walk in as a guest, move around with the keyboard or touch, turn the camera, open the map to fast travel, and step into a ride's glowing ring to play.",
+    "steps": [
+      "Open The Funfair in your browser and walk in as a guest.",
+      "Walk with W A S D or the arrow keys, run with Shift and roll with Space. On touch, use the joystick.",
+      "Drag to turn the camera, and use the mouse wheel to zoom.",
+      "Press M to open the map, pick a place and fast travel there. Press R to go back to the entrance.",
+      "Walk into a ride's glowing ring and press E to play."
+    ],
+    "chapters": {
+      "start": "Welcome",
+      "moving": "Walk, run and look around",
+      "map": "The map and fast travel",
+      "rides": "Your first ride"
+    },
+    "captions": {
+      "intro": "Open The Funfair in your browser and walk in as a guest: no account needed.",
+      "guide": "The guide shows every ride and game, and its price in tickets.",
+      "guide-close": "Esc closes it. Press I to open it again.",
+      "walk": "Walk with W A S D or the arrow keys.",
+      "run": "Hold Shift to run.",
+      "roll": "Press Space to roll.",
+      "kick": "Press F to kick. The giant letters go flying!",
+      "wave": "Press H to wave.",
+      "look": "Drag with the mouse to turn the camera around you.",
+      "zoom": "Scroll the mouse wheel to zoom in and out.",
+      "touch": "On a touch screen, walk with the joystick.",
+      "touch-run": "Push it all the way to run.",
+      "touch-look": "Drag the screen to look around.",
+      "map": "Press M to open the park map.",
+      "pick": "Pick a place on the list or on the map…",
+      "travel": "…and Fast travel takes you straight there.",
+      "arrive": "Each ride has a glowing ring: step in and press E.",
+      "members": "Rides and games cost tickets, and tickets come with a free account.",
+      "reset": "Press R to go back to the entrance.",
+      "play": "With an account, E starts the ride for 1 ticket.",
+      "drive": "On Thunder Loop you drive: W for power, S to brake, Shift for turbo.",
+      "more": "Each ride has its own keys: the other tutorials show them."
+    },
+    "tags": [
+      "The Funfair",
+      "tutorial",
+      "browser game",
+      "theme park game"
+    ]
+  },
+  "tickets-and-account": {
+    "title": "Tickets and your account: free tickets, treats and souvenirs",
+    "description": "Sign up free, collect 20 tickets every 5 hours, spend them on rides and games, and shop for treats and souvenirs at Rosa's booth.",
+    "longDescription": "Walking around The Funfair is free for everyone. Rides and games use tickets, and tickets come free with an account.\n\nThis tutorial shows how to sign up with Google or email, collect your free pack of 20 tickets every 5 hours, spend tickets on rides, and visit Rosa's booth for treats with perks and souvenirs you can wear. Nothing in the park costs real money today; paid extras are coming soon.",
+    "steps": [
+      "Choose Sign up on the welcome card, with Google or with an email, a username and a password.",
+      "Collect your free pack of 20 tickets at the Ticket Booth. A new pack is ready every 5 hours.",
+      "Walk into a ride's ring and press E: most rides and games cost 1 ticket.",
+      "Visit Rosa's booth for treats with perks and souvenirs to wear.",
+      "Open your account to see your tickets, your rounds and your souvenirs."
+    ],
+    "chapters": {
+      "start": "Sign up for free",
+      "tickets": "Your free tickets",
+      "shop": "Treats and souvenirs",
+      "rides": "Spending tickets on rides",
+      "account": "Your account"
+    },
+    "captions": {
+      "free": "Walking round is free. Rides and games use tickets.",
+      "signup": "Tickets come free with an account: choose Sign up.",
+      "google": "Use Google, or your email.",
+      "details": "Choose a username (3 to 20 characters) and a password.",
+      "terms": "Tick the box: you're 15 or older (or have a parent's permission).",
+      "joined": "That's it. The account is free.",
+      "walk-in": "Signed in: walk in and head for Rosa's Ticket Booth.",
+      "booth": "Rosa's booth is by the entrance. Walk into its ring and press E.",
+      "pack": "Take your free pack: 20 tickets, every 5 hours.",
+      "carry": "Tickets you don't spend carry over to the next pack.",
+      "treats": "Treats cost a few tickets, and most come with a perk.",
+      "perk": "Popcorn, 2 tickets: your kicks fly twice as far for 3 minutes.",
+      "souvenirs": "Souvenirs are yours to keep: caps, shades, a balloon and more.",
+      "wear": "Wear them on your visitor round the park.",
+      "leave": "Esc leaves the counter.",
+      "price": "Each ring shows its price. Most rides and games cost 1 ticket.",
+      "spend": "Press E and the ticket is spent as the ride begins.",
+      "big": "The Sky Falcon and the Giant Wheel cost 5, the flight 10.",
+      "account": "Your account shows your tickets, your rounds and your souvenirs.",
+      "coming": "Nothing in the park costs real money today. Paid extras are coming soon."
+    },
+    "tags": [
+      "The Funfair",
+      "tutorial",
+      "free tickets",
+      "browser game"
+    ]
+  },
+  "thrill-rides": {
+    "title": "Thrill rides: drive the Thunder Loop and ride the Sky Falcon",
+    "description": "How to drive the Thunder Loop coaster, ride the 250 km/h Sky Falcon, and take on the Giant Wheel, Sky Flip, Nebula 360 and Rocket Ride.",
+    "longDescription": "The Funfair's thrill rides, and the keys that make them yours.\n\nDrive the Thunder Loop with power, brake and turbo through its loop and zero-g roll. Climb the Sky Falcon to the clifftop for a 158 m drop at 90° and a launch to 250 km/h. Then ride the 250 m Giant Wheel, swing over the top on the Sky Flip, hang upside down on Nebula 360 and fire the Rocket Ride's six stages.",
+    "steps": [
+      "Thunder Loop: hold W for power, S to brake, Shift for turbo, and C to change the camera.",
+      "Sky Falcon: sit back for the climb, then switch cameras with E or C for the drop.",
+      "Giant Wheel: hold W to fast-forward the turn, and look around with A and D.",
+      "Sky Flip and Nebula 360: switch cameras with E or C, and press Esc to get off.",
+      "Rocket Ride: press E to fire each stage."
+    ],
+    "chapters": {
+      "start": "Thunder Loop",
+      "falcon": "Sky Falcon",
+      "wheel": "Giant Wheel",
+      "swings": "Sky Flip and Nebula 360",
+      "rocket": "Rocket Ride"
+    },
+    "captions": {
+      "coaster": "Thunder Loop: press E in its ring.",
+      "power": "You drive: W for power, S to brake.",
+      "turbo": "Shift is turbo. The launch fires by itself.",
+      "camera": "C changes the camera.",
+      "falcon": "The Sky Falcon costs 5 tickets: a 4.25 km cliff coaster.",
+      "climb": "Sit back for the long climb to the clifftop.",
+      "views": "On the ride, E or C switches between the cameras.",
+      "speed": "It reaches 250 km/h, with a 158 m drop at 90°.",
+      "wheel": "The Giant Wheel: 250 m tall, 5 tickets.",
+      "fast": "Hold W to fast-forward the turn.",
+      "look": "A and D look around.",
+      "flip": "The Sky Flip swings 125 m up and right over the top.",
+      "switch": "E or C switches the camera. Esc gets you off.",
+      "ship": "Nebula 360 loops right round and hangs you upside down.",
+      "off": "The same keys here: E or C for the camera, Esc to get off.",
+      "rocket": "The Rocket Ride: press E in its ring to board.",
+      "stages": "Press E to fire each stage, or wait: the next fires by itself.",
+      "orbit": "Six stages, all the way to orbit."
+    },
+    "tags": [
+      "The Funfair",
+      "rollercoaster game",
+      "coaster simulator",
+      "tutorial"
+    ]
+  },
+  "games-and-races": {
+    "title": "Games and races: from the Duck Shoot to the Jet-Ski Race",
+    "description": "Win at the Duck Shoot, High Striker and Crate Smash, race the karts and the rally buggy, and play the four games on Palm Cay.",
+    "longDescription": "Every game in The Funfair, and how to score.\n\nOn the midway: the Duck Shoot, the High Striker and Crate Smash. On the tracks: three laps of the Turbo Speedway and the Rally Trail time trial, with your ghost and the daily top ten. On Palm Cay: the Jet-Ski Race, the Splash Tower, Pirate Cannons and Beach Volley.",
+    "steps": [
+      "Duck Shoot: aim with W A S D or the mouse, and fire with E, Space or a click. Look out for the golden duck.",
+      "High Striker: press E or Space at the right moment on the meter.",
+      "Turbo Speedway: drive with W A S D, use Shift for nitro and Space to drift.",
+      "Rally Trail: beat your ghost through three checkpoints and climb the daily top ten.",
+      "On Palm Cay: race the jet-skis, pick a water slide, fire the cannons and serve at Beach Volley."
+    ],
+    "chapters": {
+      "start": "On the midway",
+      "tracks": "Turbo Speedway and Rally Trail",
+      "island": "The Palm Cay games"
+    },
+    "captions": {
+      "ducks": "Duck Shoot: 30 seconds to knock down the tin ducks.",
+      "aim": "Aim with the mouse or W A S D. Click, E or Space fires.",
+      "golden": "Look out for the golden duck: it's worth 50.",
+      "striker": "High Striker: three swings to ring the bell.",
+      "meter": "Press E or Space at the right moment on the meter.",
+      "crates": "Crate Smash: 45 seconds, on foot.",
+      "smash": "Run, roll and kick into the crates: the higher rows score more.",
+      "speedway": "Turbo Speedway: three laps against three rivals.",
+      "drive": "Drive with W A S D.",
+      "nitro": "Shift fires the nitro, Space drifts, R puts you back on track.",
+      "trail": "Rally Trail: a buggy time trial with jumps, mud and crates.",
+      "ghost": "Race the ghost of your own best run, through three checkpoints.",
+      "top": "The fastest times make the daily top ten.",
+      "island": "On Palm Cay, four more games are 1 ticket each.",
+      "jetski": "The Jet-Ski Race: three laps of the buoys. Shift boosts, Space hops.",
+      "slides": "The Splash Tower: pick a slide with 1, 2 or 3, then press E to go.",
+      "cannons": "Pirate Cannons: click the sea to fire, and sink the pirate ships.",
+      "volley": "Beach Volley: E or Space tosses, then strikes. Ten serves."
+    },
+    "tags": [
+      "The Funfair",
+      "kart racing game",
+      "browser game",
+      "tutorial"
+    ]
+  },
+  "coaster-workshop": {
+    "title": "Build your own coaster in the Coaster Workshop",
+    "description": "Build a coaster from parts, test-ride it for free and send it to the staff. Released coasters open in Creators' Valley.",
+    "longDescription": "The Coaster Workshop lets you design your own rollercoaster in The Funfair.\n\nStart with your free starter kit, lay straights, curves, slopes, helixes, loops and corkscrews, and check that the circuit can be built. Test-ride it for free, then send it to the staff. Released coasters open on a plot in Creators' Valley, and you earn tickets each time someone rides yours.",
+    "steps": [
+      "Go to the Coaster Workshop with a free account and open your free starter kit.",
+      "Add pieces: straights, curves, slopes, helixes, loops and corkscrews.",
+      "Fix any issues until the circuit can be built.",
+      "Test-ride your coaster for free.",
+      "Send it to the staff. If they release it, it opens in Creators' Valley."
+    ],
+    "chapters": {
+      "start": "The workshop and your kit",
+      "build": "Building the circuit",
+      "test": "Test ride",
+      "save": "Save and send"
+    },
+    "captions": {
+      "enter": "The Coaster Workshop is in Creators' Valley. Members press E to go in.",
+      "kit": "Open your free starter kit: enough parts for a first coaster.",
+      "add": "Add pieces from the palette, and change each one with its sliders.",
+      "circuit": "Straights, curves, slopes, helixes, loops and corkscrews.",
+      "home": "The way home closes the circuit back to the station.",
+      "piece": "Pick a piece to change it, like this loop's size.",
+      "check": "Fix any issues until it says the circuit can be built.",
+      "test": "Test rides are free: ride it as often as you like.",
+      "physics": "It runs on real physics: a train without enough speed stalls.",
+      "back": "Then back to your design.",
+      "parts": "Parts are paid in tickets.",
+      "needs": "The Parts tab shows what your design still needs, like a loop kit.",
+      "save": "Save it in one of your 3 free design slots.",
+      "slots": "An extra slot is $4.99. Payments are coming soon.",
+      "send": "Send it to staff: up to 3 coasters a day.",
+      "valley": "If they release it, it opens in Creators' Valley and earns you tickets."
+    },
+    "tags": [
+      "The Funfair",
+      "build your own rollercoaster",
+      "coaster builder",
+      "tutorial"
+    ]
+  },
+  "fly-to-palm-cay": {
+    "title": "Fly the A320neo to Palm Cay",
+    "description": "Take the SkyLink to the airport, book Gate 3, then push back, take off and land the A320neo yourself on the island of Palm Cay.",
+    "longDescription": "The Funfair doesn't end at the park gates.\n\nRide the SkyLink to Funfair International, book a flight at Gate 3 and choose dawn, day, dusk or night. Then take the captain's seat of the A320neo: push back, taxi, take off, cruise at 5,000 ft and land 40 km south on Palm Cay. ATC, the autopilot and your first officer help all the way, and optional assists can taxi and land for you.",
+    "steps": [
+      "Take the SkyLink from the park's south gate to the airport.",
+      "Walk to Gate 3 and book the flight for 10 tickets. Pick a time of day and any assists.",
+      "Push back and taxi out, or let your first officer taxi for you.",
+      "Take off with full thrust (Y) and pull back with S, then raise the gear with G.",
+      "Cruise at 5,000 ft, use T for time warp, and land on Palm Cay."
+    ],
+    "chapters": {
+      "start": "The SkyLink to the airport",
+      "booking": "Booking at Gate 3",
+      "takeoff": "Takeoff",
+      "cruise": "Cruise",
+      "landing": "Landing on Palm Cay",
+      "island": "Palm Cay"
+    },
+    "captions": {
+      "skylink": "The SkyLink leaves from the park's south gate. It's free.",
+      "guideway": "It runs along an elevated guideway to the airport.",
+      "skip": "Press E or Esc to skip the ride.",
+      "gate": "At Gate 3, press E to book flight FA101 to Palm Cay.",
+      "time": "Choose dawn, day, dusk or night.",
+      "assists": "Your first officer can help: these assists are optional.",
+      "board": "Then board. The flight costs 10 tickets.",
+      "lined-up": "With Skip to the runway, you start lined up.",
+      "toga": "Press Y for full thrust.",
+      "yours": "The takeoff is always yours.",
+      "rotate": "At rotation speed, pull back gently with S.",
+      "gear": "Climbing away: G raises the gear.",
+      "cruise": "The autopilot (P) can fly the climb and the cruise at 5,000 ft.",
+      "warp": "Above 2,000 ft, T speeds time up: ×2 or ×4.",
+      "approach": "Palm Cay is 40 km south. ATC clears you down to the runway.",
+      "land": "Land it yourself, or switch on Autoland before you book.",
+      "stars": "Comfort, the landing and the rules give you 1 to 5 stars.",
+      "island": "Welcome to Palm Cay: beaches, palms and four games.",
+      "home": "Fly home on FA102 from the island's desk, for 10 tickets."
+    },
+    "tags": [
+      "The Funfair",
+      "A320neo",
+      "flight simulator",
+      "fly a plane game",
+      "tutorial"
+    ]
+  },
+  "your-look": {
+    "title": "Change your look in the changing room",
+    "description": "Pick who you are, dye your clothes and hair, and adjust your height and build in the changing room beside Rosa's booth.",
+    "longDescription": "In The Funfair you choose who visits the park.\n\nOn your first visit, and any time later in the changing room beside Rosa's booth, pick a person from the cast, dye your top, bottoms, shoes and hair, and adjust your height and build. It's free and needs no account: guests' looks are saved in the browser, and members' looks are saved to their account.",
+    "steps": [
+      "On your first visit, choose who's visiting today. Later, walk into the changing room beside Rosa's booth.",
+      "Pick a person.",
+      "Dye your top, bottoms, shoes and hair, from the palette or a colour of your own.",
+      "Adjust your height and build, or press Random for a surprise.",
+      "Press Done to walk back into the park."
+    ],
+    "chapters": {
+      "start": "Choose who you are",
+      "colours": "Dye your clothes and hair",
+      "body": "Height and build",
+      "done": "Into the park"
+    },
+    "captions": {
+      "first": "On your first visit, choose who's visiting today.",
+      "pick": "Pick anyone from the cast: you change straight away.",
+      "filter": "Show everyone, or just women or men.",
+      "dye": "Dye your top, bottoms, shoes and hair from the palette, or mix your own colour.",
+      "undo": "Some clothes can't be dyed: the panel says so. Undo goes back a step.",
+      "size": "Change your height and build. It's just for looks: everyone rides the same.",
+      "random": "Or press Random for a surprise.",
+      "done": "Press Let's go and walk into the park.",
+      "saved": "Guests' looks stay in this browser, members' in their account.",
+      "room": "Change again any time in the changing room beside Rosa's booth."
+    },
+    "tags": [
+      "The Funfair",
+      "character customisation",
+      "tutorial"
+    ]
+  }
+}

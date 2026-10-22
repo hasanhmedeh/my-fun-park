@@ -6,3 +6,5 @@ dist
 .env
 .env.*
 !.env.example
+# the film pipeline's working files (renders, takes, YouTube packages)
+apps/web/scripts/film/out/

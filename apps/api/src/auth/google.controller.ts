@@ -29,6 +29,9 @@ type Outcome = { google: 'login' | 'signup' | 'cancelled' } | { google: 'error';
 /** The channel the popup tells the game on (apps/web/src/account/auth-dialog.ts listens). */
 const CHANNEL = 'funfair-google';
 
+/** Where the game lives (apps/web/park.html, served as /park): the landing page has / now. */
+const GAME_PATH = '/park';
+
 /**
  * "Continue with Google". GET /auth/google sends the visitor to Google (in a popup, or the whole
  * page), and Google sends them back to /auth/google/callback: a known Google account (or one whose
@@ -133,7 +136,7 @@ export class GoogleController {
    */
   private finish(res: Response, popup: boolean, outcome: Outcome): void {
     const query = new URLSearchParams(outcome).toString();
-    if (!popup) return res.redirect(`/?${query}`);
+    if (!popup) return res.redirect(`${GAME_PATH}?${query}`);
     // < escaped, so nothing in the message can close the script
     const data = JSON.stringify(outcome).replace(/</g, '\\u003c');
     res.type('html').send(`<!doctype html>
@@ -144,7 +147,7 @@ export class GoogleController {
 const outcome = ${data};
 try { const ch = new BroadcastChannel(${JSON.stringify(CHANNEL)}); ch.postMessage(outcome); ch.close(); } catch {}
 window.close();
-setTimeout(() => location.replace('/?' + ${JSON.stringify(query)}), 500);
+setTimeout(() => location.replace(${JSON.stringify(`${GAME_PATH}?${query}`)}), 500);
 </script>
 </body></html>`);
   }

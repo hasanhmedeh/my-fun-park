@@ -8,7 +8,11 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "film": "node scripts/film/film.mjs",
+    "film:youtube": "node scripts/film/youtube.mjs",
+    "film:og": "node scripts/film/og.mjs",
+    "film:stills": "node scripts/film/stills.mjs"
   },
   "dependencies": {
     "@funfair/api": "workspace:*",
@@ -21,6 +25,7 @@
     "@types/node": "^26.6.4",
     "@types/three": "^0.186.0",
     "opentype.js": "^2.0.0",
+    "sharp": "^0.35.5",
     "typescript": "^7.0.2",
     "vite": "^8.3.3"
   }

@@ -96,7 +96,7 @@ pnpm dev
 1. creates `apps/api/.env` from `apps/api/.env.example` on the first run, with a freshly generated `JWT_SECRET` (an existing `.env` is never touched),
 2. generates the Prisma client,
 3. applies the database migrations (creating the database if it doesn't exist yet),
-4. starts the API on **http://localhost:3000** (`nest start --watch`) and the game on **http://localhost:5173** (Vite), and opens the browser. Set `BROWSER=none` to skip that.
+4. starts the API on **http://localhost:3000** (`nest start --watch`) and the site on **http://localhost:5173** (Vite: the landing page at `/`, the game at `/park`), and opens the browser. Set `BROWSER=none` to skip that.
 
 The Vite dev server proxies `/api` to the API, so the browser stays on one origin and the session cookie just works.
 
@@ -121,7 +121,7 @@ node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 
 If something is missing or wrong, the API lists every problem at startup and exits.
 
-**Private access on Vercel.** The pages are served by the CDN, so `apps/web/middleware.js` (Vercel Routing Middleware, Node.js runtime) checks the allowlist before each one, reading `DATABASE_URL` like the API functions do. It and the API both take the visitor's address from `x-real-ip`, which Vercel sets and won't let the browser override. Elsewhere the API uses Express's `req.ip`, so set `TRUST_PROXY` to match your proxy. In local dev (Vite, no middleware) only the API is guarded: the game and the office show the private sign as soon as the API turns them away.
+**Private access on Vercel.** The pages are served by the CDN, so `apps/web/middleware.js` (Vercel Routing Middleware, Node.js runtime) checks the allowlist before the game (`/park`), the office and their files, reading `DATABASE_URL` like the API functions do. The landing pages, the watch pages, the legal and credits pages and the files crawlers and link previews read stay public whatever the switch says: they are listed in `PUBLIC` at the top of the middleware, and its `config.matcher` keeps it from even running for them. It and the API both take the visitor's address from `x-real-ip`, which Vercel sets and won't let the browser override. Elsewhere the API uses Express's `req.ip`, so set `TRUST_PROXY` to match your proxy. In local dev (Vite, no middleware) only the API is guarded: the game and the office show the private sign as soon as the API turns them away.
 
 ### Other scripts
 
@@ -329,7 +329,8 @@ On each deployment, `apps/web/vercel.json`'s build command runs from the repo ro
 All paths are under `apps/web/`:
 
 ```
-index.html              page shell + intro card + HUD markup + sign-up dialog
+index.html              the landing page (/)
+park.html               the game (/park): page shell + intro card + HUD markup + sign-up dialog
 vite.config.ts          site URL, sitemap and robots.txt, /api proxy for dev
 src/main.ts             intro card (continue as guest, or sign up / log in), lazy-loads the 3D world
 src/account/            api.ts (typed API client), session.ts (who's visiting), auth-dialog.ts, account-menu.ts (HUD chip)
