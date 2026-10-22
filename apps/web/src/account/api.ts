@@ -1,6 +1,7 @@
 // A small typed client for the fair's accounts API. The session lives in an httpOnly cookie,
 // so every request goes out with credentials and the page never sees the token.
 import type { Design, Issue, Part, Parts, RideStats as CoasterStats } from '../workshop/rules';
+import type { VisitorLook } from '../world/crowd/people-manifest';
 
 /** Creators' Valley's plots: each runs the player-built coaster staff released onto it (if any). */
 export const PLOT_IDS = ['plot1', 'plot2', 'plot3', 'plot4', 'plot5', 'plot6', 'plot7', 'plot8'] as const;
@@ -107,6 +108,11 @@ export interface User {
   google?: boolean;
   /** Null for an account that never accepted the Terms: the game asks after logging in. */
   termsAcceptedAt?: string | null;
+  /**
+   * The look saved from the customiser (world/visitor-look.ts keeps it in step with the browser's),
+   * or null for none yet. Missing from an older server, which can't keep one: the browser's is used.
+   */
+  visitorLook?: VisitorLook | null;
 }
 
 /** What the member still has to tell us (asked after logging in): nothing, once it's all there. */
@@ -916,8 +922,17 @@ export const api = {
   /** `login` is the email address or the username. */
   login: (body: { login: string; password: string }) => request<{ user: User }>('POST', '/auth/login', body),
   logout: () => request<void>('POST', '/auth/logout'),
-  /** Fills in what the account is missing (asked after logging in). */
-  updateProfile: (body: { gender?: Gender; acceptTerms?: true }) => request<{ user: User }>('PATCH', '/auth/me', body),
+  /** Fills in what the account is missing (asked after logging in), or saves the visitor's look (null forgets it). */
+  updateProfile: (body: { gender?: Gender; acceptTerms?: true; visitorLook?: VisitorLook | null }) => request<{ user: User }>('PATCH', '/auth/me', body),
+  /** Saves the visitor's look as the page closes: a keepalive request that outlives the tab, with nothing waiting for its answer. */
+  saveLookOnExit: (visitorLook: VisitorLook) =>
+    void fetch(`${BASE}/auth/me`, {
+      method: 'PATCH',
+      credentials: 'include',
+      keepalive: true,
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ visitorLook }),
+    }).catch(() => {}),
   /**
    * Deletes the account and all its purchases and rounds: with the password (a wrong one is a 401),
    * or, for an account made with Google, the username typed out (`confirm`).

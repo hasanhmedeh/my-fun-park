@@ -9,8 +9,11 @@
 //   ?scene=jetski&race=1&until=finish                just past the flag
 //   &hud=1                                           with the race HUD over it
 //   &close=x,y,z&freeze=1                            a close camera in your ski's frame (x right, y up, z back), sim held
+//   &of=1..4                                         …on a rival's ski instead (Kai, Rosa, Sami, Theo)
 //   &people=0                                        the merged stand-in riders (no people loaded)
-// A cam / look in the URL overrides the race camera.
+//   &me=Male_Adult_06                                the visitor's avatar (a playable one)
+// A cam / look in the URL overrides the race camera. The people are the game's: the park set first,
+// then the island set (on the first trip in the game), the stand-ins riding until it's in.
 import * as THREE from 'three';
 import type { PreviewScene } from '../main';
 import type { Ctx } from '../../world/context';
@@ -18,8 +21,8 @@ import type { UI } from '../../world/ui';
 import { SEA_Y } from '../../world/geo';
 import { PalmCay } from '../../world/island/island';
 import { JetSki } from '../../world/attractions/island/jetski';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { GUEST_ANIMS_URL, GUESTS_URL, PeopleFactory, VISITOR_LOOK } from '../../world/crowd/people';
+import { downloadPeople, PeopleFactory } from '../../world/crowd/people-factory';
+import { lookFromVisitor } from '../../world/crowd/looks';
 import { stage } from './island';
 
 const preview: PreviewScene = async (p) => {
@@ -43,9 +46,12 @@ const preview: PreviewScene = async (p) => {
   ctx.scene.add(park.group);
   const js = new JetSki(ctx);
   if (q.get('people') !== '0') {
-    const loader = new GLTFLoader();
-    const [guests, anims] = await Promise.all([loader.loadAsync(GUESTS_URL), loader.loadAsync(GUEST_ANIMS_URL)]);
-    js.setPeople(new PeopleFactory(guests, anims), VISITOR_LOOK);
+    const tier = ctx.quality.tier;
+    const me = q.get('me') ?? 'Male_Adult_06';
+    const people = await PeopleFactory.create(ctx.renderer, downloadPeople({ sets: ['park'], hero: [me], tier }), { tier });
+    const visitor = lookFromVisitor({ v: 1, avatar: me, top: null, bottom: null, shoes: null, hair: null, height: 1, build: 1 }, people.spec(me)!);
+    js.setPeople(people, () => visitor);
+    await people.loadSet('island');
   }
   stage(p, (k) => {
     park.setNight(k);
@@ -83,14 +89,19 @@ const preview: PreviewScene = async (p) => {
   }
   const freeze = q.get('until') === 'air' || q.get('freeze') === '1';
   const near = q.get('close')?.split(',').map(Number);
+  // (the racers are the race's own: a preview may peek)
+  const of = Number(q.get('of') ?? 0);
+  const craft = () => (of ? (js as unknown as { racers: { c: { x: number; y: number; z: number; h: number } }[] }).racers[of].c : js.ski);
   const closeUp = () => {
     if (!near) return;
-    const s = js.ski;
+    const s = craft();
     const off = new THREE.Vector3(near[0], near[1], near[2]).applyAxisAngle(new THREE.Vector3(0, 1, 0), s.h);
     camera.position.set(s.x + off.x, s.y + off.y, s.z + off.z);
     camera.up.set(0, 1, 0);
     camera.lookAt(s.x, s.y + 0.9, s.z);
   };
+  for (const r of (js as any).rigs) { if (!r.body) continue; if (q.get("novest")) r.body.vest.visible = false; if (q.get("vestshadow") === "0") { r.body.vest.castShadow = false; r.body.vest.receiveShadow = false; r.body.setShadows = () => {}; } if (q.get("vestbasic")) r.body.vest.material = new THREE.MeshBasicMaterial({ vertexColors: true }); if (q.get("nobody")) for (const m of r.body.rig.skinnedMeshes) m.visible = false; }
+  console.warn("DEBUG vests", JSON.stringify((js as any).rigs.map((r: any) => { if (!r.body) return null; const g = r.body.vest.geometry; const out: Record<string, number> = {}; for (const k of ["position","normal","color"]) { const arr = g.attributes[k].array; let n = 0; for (let i = 0; i < arr.length; i++) if (!Number.isFinite(arr[i])) n++; out[k] = n; } out.count = g.attributes.position.count; return out; })));
   p.onFrame((dt, ft) => {
     park.update(dt, ft, camera);
     if (!freeze) step(dt);

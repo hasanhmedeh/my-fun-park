@@ -18,6 +18,7 @@ import { Sea } from './sea';
 import { Clouds } from './clouds';
 import { stationHall } from './airport/terminal-plan';
 import { SKYLINK } from './geo';
+import { onChangingRoom } from './attractions/changing-room';
 
 export { mulberry };
 
@@ -302,11 +303,12 @@ export class Environment {
 
     // grass grows on the park's lawn and on the lawn along the wheel road (thinning out where it fades)
     const R = PARK.r + 1;
-    // (not up through the floor of the SkyLink's park station, which stands on the lawn)
+    // (not up through the floor of the SkyLink's park station, which stands on the lawn, nor through
+    // the changing room's deck, its worn patch and its stepping stones)
     const hall = stationHall(SKYLINK.park);
     const inHall = (x: number, z: number) => x > hall.x0 - 1 && x < hall.x1 + 1 && z > hall.z0 - 1 && z < hall.z1 + 1;
     const growth = (x: number, z: number) => {
-      if (parkDistance(x, z) < R) return ground.isSand(x, z) || onMuseum(x, z, 0.6) || inHall(x, z) ? 0 : 1;
+      if (parkDistance(x, z) < R) return ground.isSand(x, z) || onMuseum(x, z, 0.6) || onChangingRoom(x, z, 0.15) || inHall(x, z) ? 0 : 1;
       if (Math.abs(x - LAYOUT.ferris.x) > L.half || z < L.z0 || z > PARK.z || onPath(x, z, 1.2)) return 0;
       const edge = Math.min(L.half - Math.abs(x - LAYOUT.ferris.x), z - L.z0);
       return THREE.MathUtils.smoothstep(edge, L.fade * 0.25, L.fade);

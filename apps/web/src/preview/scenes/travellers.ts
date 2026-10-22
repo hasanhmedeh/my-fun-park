@@ -12,32 +12,57 @@
 //   ?scene=travellers&place=island&cam=-4,4.5,40572&look=-28,2.4,40590&run=board&at=-30&cut=-30,1.7,40625,-30,1.5,40600
 //                                    island boarding, called with the visitor at gate 2's desk, then the cut to the window
 //   ?scene=travellers&check=1                                               route checks (console)
+//   ?scene=travellers&late=1                                                the first trip: only the park's people at
+//                                    first (as the game starts), the airport's and the island's loaded a moment later; logs who
+//                                    was waiting for them and when they arrived
+//   ?scene=travellers&poses=1                                               the bench: each pose the travellers take (lying,
+//                                    swimming, treading water, kneeling, sitting on the sand, waiting, the case…) side on,
+//                                    with their bones' extents logged; ids=… avatars, bases=… poses
 //
 // Other parameters: n (passengers, default 18), pre (seconds, default 90), tier (as quality).
+// The people are the game's (world/crowd/people-factory.ts): the park set first, then the airport's
+// and the island's, as the game's first trip loads them.
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import type { PreviewScene } from '../main';
-import { AIRFIELDS } from '../../aviation/airports';
-import { HomeTerminal } from '../../world/airport/terminal';
-import { Landside } from '../../world/airport/landside';
-import { IslandTerminal } from '../../world/island/island-terminal';
-import { PalmCay } from '../../world/island/island';
-import { GUEST_ANIMS_URL, GUESTS_URL, PeopleFactory } from '../../world/crowd/people';
-import { Travellers, type Boarding } from '../../world/crowd/travellers';
+import type { PreviewApi, PreviewScene } from '../main';
+import { downloadPeople, PeopleFactory } from '../../world/crowd/people-factory';
+import type { Base, PersonRig } from '../../world/crowd/person-rig';
+import { plainLook } from '../../world/crowd/looks';
+import type { CanonicalBone } from '../../world/crowd/people-manifest';
+import type { Boarding } from '../../world/crowd/travellers';
 import type { Region } from '../../world/geo';
-import { homeStage, standIn } from './terminal';
-import { stage } from './island';
-import { JetSki } from '../../world/attractions/island/jetski';
-import { Slides } from '../../world/attractions/island/slides';
-import { Cannons } from '../../world/attractions/island/cannons';
-import { Volley } from '../../world/attractions/island/volley';
+import type { Tier } from '../../world/quality';
+
+const tierOf = (p: PreviewApi): Tier => {
+  const t = p.params.get('tier');
+  return t === 'lowest' || t === 'low' || t === 'medium' || t === 'high' ? t : p.ctx.quality.tier;
+};
 
 const preview: PreviewScene = async (p) => {
   const { ctx, params } = p;
+  if (params.get('poses')) return poses(p);
   const place: Region = params.get('place') === 'island' ? 'island' : 'home';
-  const loader = new GLTFLoader();
-  const [guests, anims] = await Promise.all([loader.loadAsync(GUESTS_URL), loader.loadAsync(GUEST_ANIMS_URL)]);
-  const factory = new PeopleFactory(guests, anims);
+  const tier = tierOf(p);
+  // the park's people first, as the game starts; the airport's and the island's as its first trip
+  // loads them (here before the day is simulated, or with late=1 once the travellers are made)
+  const dl = downloadPeople({ sets: ['park'], tier });
+  const factory = await PeopleFactory.create(ctx.renderer, dl, { tier });
+  const late = params.has('late');
+  if (!late) await Promise.all([factory.loadSet('airport'), factory.loadSet('island')]);
+  // (the world's modules are loaded here, so the pose bench needs none of them)
+  const [{ AIRFIELDS }, { HomeTerminal }, { Landside }, { IslandTerminal }, { PalmCay }, { Travellers }, { homeStage, standIn }, { stage }, { JetSki }, { Slides }, { Cannons }, { Volley }] = await Promise.all([
+    import('../../aviation/airports'),
+    import('../../world/airport/terminal'),
+    import('../../world/airport/landside'),
+    import('../../world/island/island-terminal'),
+    import('../../world/island/island'),
+    import('../../world/crowd/travellers'),
+    import('./terminal'),
+    import('./island'),
+    import('../../world/attractions/island/jetski'),
+    import('../../world/attractions/island/slides'),
+    import('../../world/attractions/island/cannons'),
+    import('../../world/attractions/island/volley'),
+  ]);
 
   // both places are built (the people are planned on both, as in the game); only one is staged
   const home = new HomeTerminal(ctx);
@@ -75,14 +100,30 @@ const preview: PreviewScene = async (p) => {
     island.update(1 / 30, i / 30);
   }
 
-  const tierParam = params.get('tier');
-  const tier = tierParam === 'lowest' || tierParam === 'low' || tierParam === 'medium' || tierParam === 'high' ? tierParam : ctx.quality.tier;
   const people = new Travellers(ctx, factory, { home, island, palmCay, shadows: ctx.quality.shadows, tier });
   // the visitor stands where the camera looks (as the game's camera follows them), or at visitor=x,z
   const vq = (params.get('visitor') ?? params.get('look') ?? '').split(',').map(Number);
   if (vq.length >= 2 && vq.every(Number.isFinite)) people.setVisitor(vq.length === 2 ? { x: vq[0], y: 0, z: vq[1] } : { x: vq[0], y: vq[1], z: vq[2] });
   // perf=1: how long the people's update takes, averaged (console)
   const perf = { on: params.has('perf'), ms: 0, n: 0 };
+
+  if (late) {
+    // the first trip: who's there with only the park's people, then the other sets loaded as the
+    // game's trip would, and how many frames until everyone waiting for them is made
+    for (let i = 0; i < 30; i++) people.update(1 / 30, i / 30, ctx.camera, place);
+    console.warn(`[late] park only: ${JSON.stringify(people.counts)} · ${JSON.stringify(people.debug())}`);
+    const t0 = performance.now();
+    await Promise.all([factory.loadSet('airport'), factory.loadSet('island')]);
+    const loadMs = performance.now() - t0;
+    let frames = 0;
+    for (; people.counts.waiting > 0 && frames < 300; frames++) {
+      const f0 = performance.now();
+      people.update(1 / 30, 1 + frames / 30, ctx.camera, place);
+      const ms = performance.now() - f0;
+      if (ms > 8) console.warn(`[late] frame ${frames}: ${ms.toFixed(1)} ms`);
+    }
+    console.warn(`[late] sets loaded in ${loadMs.toFixed(0)} ms; everyone made ${frames} frames later: ${JSON.stringify(people.counts)}`);
+  }
 
   if (params.get('check')) {
     // probe=ax,az,bx,bz;…: extra walks to try (and show the corners of)
@@ -110,7 +151,7 @@ const preview: PreviewScene = async (p) => {
   const pre = Number(params.get('pre') ?? 90);
   const at = pre + Number(params.get('at') ?? -20);
   let flight: Boarding | null = null;
-  let t = 0;
+  let t = late ? 2 : 0;
   // cut=x,y,z,lx,ly,lz: the camera there till the run starts, then cut to the view (as the game
   // cuts to the gate's window as boarding's called)
   const cutQ = (params.get('cut') ?? '').split(',').map(Number);
@@ -152,7 +193,7 @@ const preview: PreviewScene = async (p) => {
         // trace=<seconds>: what everyone's up to every so often through the day so far
         if (trace && i % Math.round(trace * 30) === 0) {
           const f = flight as Boarding | null;
-          console.warn(`[trace] t=${t.toFixed(0)}${f ? ` flight ${(f.progress * 100).toFixed(0)}% ${people.debugRun()}` : ""} ${f ? "" : JSON.stringify(people.debug(params.has("where")))}`);
+          console.warn(`[trace] t=${t.toFixed(0)}${f ? ` flight ${(f.progress * 100).toFixed(0)}% ${people.debugRun()}` : ''} ${f ? '' : JSON.stringify(people.debug(params.has('where')))}`);
         }
       }
       // follow=<what they're doing>: the camera a few paces (fd, default 4) ahead of and beside the first one doing it
@@ -160,14 +201,18 @@ const preview: PreviewScene = async (p) => {
       const who = follow ? people.whereIs(follow) : null;
       if (who) {
         const fd = Number(params.get('fd') ?? 4);
-        const a = who.heading + 0.6;
-        ctx.camera.position.set(who.x - Math.sin(a) * fd, who.y + 1.6, who.z - Math.cos(a) * fd);
+        const a = who.heading + Number(params.get('fa') ?? 0.6);
+        ctx.camera.position.set(who.x - Math.sin(a) * fd, who.y + Number(params.get('fh') ?? 1.6), who.z - Math.cos(a) * fd);
         ctx.camera.lookAt(who.x, who.y + 0.9, who.z);
         ctx.camera.updateMatrixWorld();
       } else if (follow) console.warn(`[travellers] nobody ${follow}`);
       people.setNight(p.env?.night ?? 0);
       const f = flight as Boarding | null;
       console.warn(`[travellers] ${place} t=${t.toFixed(0)}s ${JSON.stringify(people.debug())}${f ? ` · flight ${(f.progress * 100).toFixed(0)}%${f.done ? ' done' : ''}` : ''}`);
+      if (params.has('who')) {
+        const who = people.debugLooks();
+        console.warn(`[travellers] made ${who.made.join(' · ')} · waiting ${who.waiting.join(' · ') || 'nobody'}`);
+      }
       if (perf.on) {
         console.warn(`[perf] people.update ${(perf.ms / Math.max(1, perf.n)).toFixed(3)} ms avg over ${perf.n} steps · ${JSON.stringify(people.counts)}`);
         // and the whole frame drawn, waited for (a pixel read back), with and without the people
@@ -186,7 +231,7 @@ const preview: PreviewScene = async (p) => {
           return (performance.now() - t0) / 30;
         };
         const withPeople = time();
-        const shown = ctx.scene.children.filter((o) => o.visible && (o.name === 'luggage' || o.type === 'Group' && o.getObjectByProperty('type', 'SkinnedMesh')));
+        const shown = ctx.scene.children.filter((o) => o.visible && (o.name === 'luggage' || (o.type === 'Group' && o.getObjectByProperty('type', 'SkinnedMesh'))));
         for (const o of shown) o.visible = false;
         r.render(ctx.scene, ctx.camera);
         const t0 = performance.now();
@@ -211,4 +256,82 @@ const preview: PreviewScene = async (p) => {
   });
   p.view(place === 'home' ? { x: 150, y: 1.7, z: 436 } : { x: 0, y: 3, z: 41395 }, place === 'home' ? { x: 60, y: 1.7, z: 500 } : { x: 0, y: 0, z: 41440 });
 };
+
+/**
+ * The bench: one person per pose in a row, side on (facing +x), a red dot at each root, on a grey
+ * floor with a blue plane at `water` (m, default none) for the swimmers. Logs, per pose, where
+ * the bones end up in the root's frame (x right, y up, z forward: the person faces -z, so forward
+ * is reported as -z): the hips, the head, the crown, a foot, the right palm, and all bones' extent.
+ */
+async function poses(p: PreviewApi) {
+  const { ctx, params } = p;
+  const sc = ctx.scene;
+  const tier = tierOf(p);
+  const dl = downloadPeople({ sets: ['park'], tier });
+  const people = await PeopleFactory.create(ctx.renderer, dl, { tier });
+  await Promise.all([people.loadSet('airport'), people.loadSet('island')]);
+  const ids = (params.get('ids') ?? 'Male_Adult_01,Female_Adult_03,MH_Child_Girl_01').split(',');
+  const bases = (params.get('bases') ?? 'stand,crouch,sitGround,lie,swim,tread,kneel,trolley,wait,phone,text').split(',') as Base[];
+  const t = Number(params.get('t') ?? 2);
+  const turn = Number(params.get('turn') ?? 90) * (Math.PI / 180);
+
+  if (!p.env) {
+    sc.add(new THREE.HemisphereLight('#e8f0ff', '#6a6250', 1.2));
+    const sun = new THREE.DirectionalLight('#fff4e6', 2.2);
+    sun.position.set(-6, 14, 10);
+    sc.add(sun);
+  }
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 30).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#9a978f', roughness: 0.95 }));
+  floor.position.set(bases.length, 0, -ids.length);
+  sc.add(floor);
+  const water = params.get('water');
+  if (water) {
+    const sea = new THREE.Mesh(new THREE.PlaneGeometry(60, 30).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#2d7fb8', transparent: true, opacity: 0.45 }));
+    sea.position.set(bases.length, Number(water), -ids.length);
+    sc.add(sea);
+  }
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), new THREE.MeshBasicMaterial({ color: '#e0201c' }));
+  const BONES: CanonicalBone[] = ['pelvis', 'Head', 'foot_l', 'hand_r'];
+  const inv = new THREE.Matrix4();
+  const v = new THREE.Vector3();
+  const r3 = (o: THREE.Vector3) => o.toArray().map((x) => +x.toFixed(2));
+  const rigs: PersonRig[] = [];
+  ids.forEach((id, row) => {
+    const spec = people.spec(id);
+    if (!spec) return console.warn(`[poses] no avatar ${id}`);
+    bases.forEach((b, col) => {
+      const rig = people.create(plainLook(spec));
+      rig.setDetail(true);
+      rig.setBase(b);
+      rig.root.position.set(col * 2.2, 0, -row * 2.6);
+      rig.root.rotation.y = turn;
+      sc.add(rig.root);
+      const d = dot.clone();
+      d.position.copy(rig.root.position);
+      sc.add(d);
+      for (let i = 0; i < t * 30; i++) rig.update(1 / 30, 0);
+      // play=<clip>&pt=<s>: a one-shot from the pose, caught pt seconds in
+      const shot = params.get('play');
+      if (shot) {
+        rig.play(shot);
+        for (let i = 0; i < Number(params.get('pt') ?? 0.5) * 30; i++) rig.update(1 / 30, 0);
+      }
+      rigs.push(rig);
+      // measured facing -z (rotation 0), then turned for the picture
+      const yaw = rig.root.rotation.y;
+      rig.root.rotation.y = 0;
+      rig.root.updateMatrixWorld(true);
+      inv.copy(rig.root.matrixWorld).invert();
+      const at: Record<string, number[]> = {};
+      for (const name of BONES) at[name] = r3(v.setFromMatrixPosition(rig.bone(name).matrixWorld).applyMatrix4(inv));
+      at.headTop = r3(rig.anchor('headTop', v).applyMatrix4(inv));
+      const box = new THREE.Box3();
+      for (const bone of rig.skinnedMeshes[0].skeleton.bones) box.expandByPoint(v.setFromMatrixPosition(bone.matrixWorld).applyMatrix4(inv));
+      console.warn(`[poses] ${id} ${b}: ${JSON.stringify(at)} min ${JSON.stringify(r3(box.min))} max ${JSON.stringify(r3(box.max))} seatDrop ${rig.seatDrop.toFixed(3)}`);
+      rig.root.rotation.y = yaw;
+    });
+  });
+  if (params.get('live')) p.onFrame((dt) => rigs.forEach((r) => r.update(dt, 0)));
+  p.view({ x: (bases.length - 1) * 1.1, y: 1.6, z: 9 }, { x: (bases.length - 1) * 1.1, y: 0.6, z: -ids.length });
+}
 export default preview;

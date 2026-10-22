@@ -56,7 +56,7 @@ export class AuthController {
     return { user: toUserJson(user) };
   }
 
-  /** Fills in what the account is missing (gender, the Terms), asked after logging in. */
+  /** Fills in what the account is missing (gender, the Terms), asked after logging in; or saves the visitor's look. */
   @Patch('me')
   @UseGuards(SessionGuard)
   async updateProfile(@CurrentUser() user: User, @Body() body: UpdateProfileDto): Promise<{ user: UserJson }> {

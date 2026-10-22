@@ -1,0 +1,713 @@
+/* The visitor's customiser (world/customiser.ts): the shop's paper sheet, narrower, on the right of
+   the screen with the visitor beside it (a sheet along the bottom on phones). Candy for the first
+   visit's welcome, the booth's teal in the changing room. Focus rings are violet on the paper (the
+   game's mustard doesn't show on cream). */
+
+/* while it's open, the walking HUD steps aside (as at the booth's counter) */
+.is-dressing .hud > :not(.cust) {
+  display: none !important;
+}
+.cust {
+  --cust-ring: var(--violet);
+  --cust-accent: var(--candy);
+  --cust-accent-ink: var(--candy-dark);
+  position: fixed;
+  inset: 0;
+  z-index: 12;
+  pointer-events: none !important;
+}
+.cust[hidden] {
+  display: none;
+}
+.cust-sheet {
+  pointer-events: auto;
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  width: min(380px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.45;
+  border-radius: var(--radius);
+  border-top: 8px solid var(--cust-accent);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  animation: cust-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.cust-sheet.is-room {
+  --cust-accent: var(--teal);
+  --cust-accent-ink: #0d7a70;
+}
+@keyframes cust-in {
+  from {
+    transform: translateX(28px);
+    opacity: 0;
+  }
+}
+.cust button {
+  font-family: inherit;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+/* (two classes and a pseudo-class: these must beat styles.css's `.hud button:focus-visible`, the
+   mustard ring every HUD button gets, since the game mounts the panel in the HUD) */
+.cust .cust-sheet :focus-visible {
+  outline: 3px solid var(--cust-ring);
+  outline-offset: 2px;
+}
+/* the big candy button keeps its own ring (styles.css), in violet here */
+.cust .cust-sheet .cust-go:focus-visible {
+  outline: none;
+}
+.cust .btn-primary:focus-visible::after {
+  border-color: var(--cust-ring);
+}
+
+/* ---------- Head ---------- */
+.cust-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px 16px 10px 20px;
+}
+.cust-title {
+  flex: 1;
+  min-width: 0;
+}
+.cust-eyebrow {
+  margin: 0 0 3px;
+  font: 700 0.72rem/1 var(--body);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cust-accent-ink);
+}
+.cust-title h2 {
+  margin: 0;
+  font: 400 1.7rem/1.05 var(--display);
+  color: var(--ink);
+}
+.cust-sub {
+  margin: 6px 0 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.cust-head-tools {
+  display: flex;
+  gap: 4px;
+  margin: -4px -4px 0 0;
+}
+.cust-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(34, 22, 63, 0.06);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.cust-icon:hover {
+  background: rgba(34, 22, 63, 0.13);
+}
+.cust-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------- Tabs ---------- */
+.cust-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 2px 16px 12px;
+  border-bottom: 2px solid rgba(34, 22, 63, 0.08);
+}
+.cust-tabs button {
+  flex: 1;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(34, 22, 63, 0.06);
+  font: 700 0.92rem/1 var(--body);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.cust-tabs button:hover {
+  background: rgba(34, 22, 63, 0.12);
+}
+.cust-tabs button[aria-selected='true'] {
+  background: var(--cust-accent);
+  color: #fff;
+}
+.cust-sheet.is-room .cust-tabs button[aria-selected='true'] {
+  background: #138f84;
+}
+
+/* ---------- The scrolling middle ---------- */
+.cust-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 18px 18px;
+  scrollbar-width: thin;
+}
+.cust-panel[hidden] {
+  display: none;
+}
+
+/* Person: who to show, then the portraits */
+.cust-chips {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 14px;
+  border-radius: 999px;
+  background: rgba(34, 22, 63, 0.06);
+}
+.cust-chips button {
+  flex: 1;
+  min-height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font: 700 0.86rem/1 var(--body);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+.cust-chips button span {
+  margin-left: 2px;
+  font-weight: 500;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+.cust-chips button[aria-pressed='true'] {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 2px 6px -2px rgba(18, 8, 40, 0.35);
+}
+.cust-chips button[aria-pressed='true'] span {
+  opacity: 0.75;
+}
+.cust-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+  gap: 10px 8px;
+}
+.cust-person {
+  position: relative;
+  padding: 3px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+.cust-face {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 38%, #fffdf8 0, #ffeedd 55%, #f8dcc8 100%);
+  box-shadow: inset 0 0 0 2px rgba(34, 22, 63, 0.08);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.cust-face img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* head and shoulders: a touch closer, so the faces fill the circle */
+  transform: scale(1.18) translateY(7%);
+  -webkit-user-drag: none;
+}
+.cust-person:hover .cust-face {
+  transform: translateY(-2px);
+  box-shadow: inset 0 0 0 2px rgba(123, 92, 214, 0.5), 0 8px 14px -10px rgba(18, 8, 40, 0.6);
+}
+.cust-person[aria-checked='true'] .cust-face {
+  box-shadow: 0 0 0 3px var(--paper), 0 0 0 6px var(--cust-accent);
+}
+.cust .cust-sheet .cust-person:focus-visible {
+  outline: none;
+}
+.cust-person:focus-visible .cust-face {
+  box-shadow: 0 0 0 3px var(--paper), 0 0 0 6px var(--cust-ring);
+}
+.cust-person[aria-checked='true']:focus-visible .cust-face {
+  box-shadow: 0 0 0 3px var(--paper), 0 0 0 6px var(--cust-accent), 0 0 0 9px var(--cust-ring);
+}
+.cust-tick {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  display: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--cust-accent);
+  box-shadow: 0 0 0 2px var(--paper);
+}
+.cust-tick::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 4px;
+  width: 5px;
+  height: 10px;
+  border: solid #fff;
+  border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg);
+}
+.cust-person[aria-checked='true'] .cust-tick {
+  display: block;
+}
+/* on their way: a ring spins round the portrait until the visitor has changed into them */
+.cust-person.is-busy .cust-face::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(255, 250, 240, 0.45);
+  border: 4px solid rgba(255, 255, 255, 0.55);
+  border-top-color: var(--cust-accent);
+  animation: cust-spin 0.8s linear infinite, cust-fade 0.3s ease 0.15s backwards;
+}
+.cust-person.is-busy .cust-tick {
+  display: none;
+}
+@keyframes cust-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes cust-fade {
+  from {
+    opacity: 0;
+  }
+}
+.cust-person.is-failed .cust-face img {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
+/* Colours: a row per part, swatches in two lines of seven */
+.cust-dye + .cust-dye {
+  margin-top: 16px;
+}
+.cust-dye-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.cust-dye h3 {
+  margin: 0;
+  font: 400 1.08rem/1.1 var(--display);
+  color: var(--ink);
+}
+.cust-dye-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.cust-dye.is-off {
+  padding: 10px 14px 12px;
+  border-radius: 14px;
+  background: rgba(34, 22, 63, 0.05);
+}
+.cust-dye.is-off h3 {
+  color: var(--muted);
+}
+.cust-dye.is-off .cust-dye-name {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(34, 22, 63, 0.08);
+  font-size: 0.72rem;
+}
+.cust-dye-why {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+.cust-swatches {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(7, 44px);
+  justify-content: space-between;
+  row-gap: 2px;
+}
+.cust-sw {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+.cust-sw::before {
+  content: '';
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--c, #ccc);
+  box-shadow: inset 0 0 0 1px rgba(34, 22, 63, 0.18), inset 0 -6px 10px -6px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.cust-sw:hover::before {
+  transform: scale(1.1);
+}
+.cust-sw[aria-checked='true']::before {
+  box-shadow: inset 0 0 0 1px rgba(34, 22, 63, 0.18), 0 0 0 3px var(--paper), 0 0 0 5px var(--ink);
+}
+/* the tick on the one that's on */
+.cust-sw[aria-checked='true']::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 6px;
+  height: 11px;
+  margin: -8px 0 0 -3px;
+  border: solid var(--fg, #fff);
+  border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg);
+}
+.cust .cust-sheet .cust-sw:focus-visible {
+  outline: none;
+}
+.cust-sw:focus-visible::before {
+  box-shadow: 0 0 0 3px var(--paper), 0 0 0 6px var(--cust-ring);
+}
+/* "Original": the person's own colour, with a little return arrow */
+.cust-sw-own:not([aria-checked='true'])::after {
+  content: '↺';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 700 15px/1 var(--body);
+  color: var(--fg, #fff);
+}
+.cust-sw-own.is-unknown::before {
+  background: repeating-linear-gradient(45deg, #e8e1d6 0 4px, #fff 4px 8px);
+}
+/* "Custom": a rainbow ring round the colour picked (or a plus before there is one) */
+.cust-sw-custom::before {
+  background: conic-gradient(from 0deg, #ff4d6d, #ffc23d, #7ee2b8, #2ec4b6, #5a8dee, #7b5cd6, #ff4d6d);
+}
+.cust-sw-custom.has-colour::before {
+  background: radial-gradient(circle, var(--c) 0 9px, transparent 10px), conic-gradient(from 0deg, #ff4d6d, #ffc23d, #7ee2b8, #2ec4b6, #5a8dee, #7b5cd6, #ff4d6d);
+}
+.cust-sw-custom:not(.has-colour):not([aria-checked='true'])::after {
+  content: '+';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 700 20px/1 var(--body);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+/* the native picker is opened from the Custom swatch, and anchors to it */
+.cust-picker {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Body: two sliders, centred on the person's own size */
+.cust-slider + .cust-slider {
+  margin-top: 18px;
+}
+.cust-slider-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.cust-slider label {
+  font: 400 1.08rem/1.1 var(--display);
+  color: var(--ink);
+}
+.cust-slider output {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--cust-accent-ink);
+  font-variant-numeric: tabular-nums;
+}
+.cust-slider input[type='range'] {
+  --fill: 50%;
+  display: block;
+  width: 100%;
+  height: 44px;
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+.cust-slider input[type='range']::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 999px;
+  /* a notch at the middle: the person's own size */
+  background: linear-gradient(90deg, transparent calc(50% - 1px), rgba(34, 22, 63, 0.35) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px)),
+    linear-gradient(90deg, var(--cust-accent) var(--fill), rgba(34, 22, 63, 0.12) var(--fill));
+}
+.cust-slider input[type='range']::-moz-range-track {
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent calc(50% - 1px), rgba(34, 22, 63, 0.35) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px)),
+    linear-gradient(90deg, var(--cust-accent) var(--fill), rgba(34, 22, 63, 0.12) var(--fill));
+}
+.cust-slider input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 28px;
+  height: 28px;
+  margin-top: -9px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--cust-accent);
+  box-shadow: 0 3px 8px -2px rgba(18, 8, 40, 0.45);
+}
+.cust-slider input[type='range']::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--cust-accent);
+  box-shadow: 0 3px 8px -2px rgba(18, 8, 40, 0.45);
+}
+.cust .cust-sheet .cust-slider input[type='range']:focus-visible {
+  outline: none;
+}
+.cust-slider input[type='range']:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px var(--paper), 0 0 0 6px var(--cust-ring);
+}
+.cust-slider input[type='range']:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px var(--paper), 0 0 0 6px var(--cust-ring);
+}
+.cust-scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: -4px;
+  font-size: 0.76rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.cust-note {
+  margin: 18px 0 12px;
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+/* ---------- Status line and foot ---------- */
+.cust-status {
+  margin: 0;
+  padding: 0 20px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--cust-accent-ink);
+}
+.cust-status:not(:empty) {
+  padding-top: 8px;
+}
+.cust-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px 16px;
+  border-top: 2px solid rgba(34, 22, 63, 0.08);
+}
+.cust-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: inset 0 0 0 2px rgba(34, 22, 63, 0.16);
+  font: 700 0.9rem/1 var(--body);
+  cursor: pointer;
+  transition: box-shadow 0.2s, opacity 0.2s;
+}
+.cust-tool > span[aria-hidden='true'] {
+  font-size: 1.1rem;
+}
+.cust-tool:hover:not(:disabled) {
+  box-shadow: inset 0 0 0 2px var(--violet);
+}
+.cust-tool:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+/* (white on candy as every primary button: `.cust button`'s inherited ink would otherwise win) */
+.cust .cust-go {
+  color: #fff;
+}
+.cust-go {
+  margin-left: auto;
+  min-height: 44px;
+  white-space: nowrap;
+  margin-bottom: 5px; /* room for the button's 3D base */
+}
+.cust-reset {
+  margin-top: 2px;
+}
+
+/* ---------- Phones: a sheet along the bottom, the visitor above it ---------- */
+@media (max-width: 720px) {
+  .cust-sheet {
+    top: auto;
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: auto;
+    height: 55%;
+    animation-name: cust-up;
+  }
+  .cust-head {
+    padding: 12px 10px 8px 16px;
+  }
+  /* (the eyebrow is decoration: on a phone its line goes to the portraits) */
+  .cust-eyebrow {
+    display: none;
+  }
+  .cust-title h2 {
+    font-size: 1.35rem;
+  }
+  .cust-sub {
+    margin-top: 4px;
+    font-size: 0.8rem;
+  }
+  /* in the changing room the small print gives its lines to the portraits (the first visit's says
+     where the changing room is, so it stays) */
+  .cust-sheet.is-room .cust-sub {
+    display: none;
+  }
+  .cust-tabs {
+    padding: 0 12px 10px;
+  }
+  .cust-tabs button {
+    font-size: 0.88rem;
+  }
+  .cust-body {
+    padding: 12px 14px 14px;
+  }
+  .cust-chips {
+    margin-bottom: 12px;
+  }
+  .cust-foot {
+    padding: 10px 12px 12px;
+  }
+  .cust-tool {
+    padding: 0 12px;
+  }
+}
+@keyframes cust-up {
+  from {
+    transform: translateY(28px);
+    opacity: 0;
+  }
+}
+/* the narrowest phones: the swatches close up so seven still fit a line, and Random and Undo keep
+   their icons (their names stay for screen readers) so Done fits beside them */
+@media (max-width: 359px) {
+  .cust-swatches {
+    grid-template-columns: repeat(7, 38px);
+  }
+  .cust-sw {
+    width: 38px;
+    height: 44px;
+  }
+  .cust-tool {
+    justify-content: center;
+    min-width: 48px;
+  }
+  .cust-foot .cust-tool-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+/* phones on their side (even narrow ones, which the rules above would turn into a strip along the
+   top): the panel stays on the right, without the welcome's small print */
+@media (orientation: landscape) and (max-height: 540px) {
+  .cust-sheet {
+    top: max(8px, env(safe-area-inset-top));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    right: max(8px, env(safe-area-inset-right));
+    left: auto;
+    width: min(360px, 54vw);
+    height: auto;
+    animation-name: cust-in;
+  }
+  .cust-eyebrow,
+  .cust-sub {
+    display: none;
+  }
+  .cust-head {
+    padding: 10px 10px 6px 16px;
+  }
+  .cust-title h2 {
+    font-size: 1.3rem;
+  }
+  .cust-tabs {
+    padding-bottom: 8px;
+  }
+  .cust-foot {
+    padding: 8px 12px 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cust-sheet,
+  .cust-person.is-busy .cust-face::after {
+    animation: none;
+  }
+  .cust-face,
+  .cust-sw::before,
+  .cust-person:hover .cust-face {
+    transition: none;
+    transform: none;
+  }
+  .cust-sw:hover::before {
+    transform: none;
+  }
+  /* (the busy ring stays, still: a dashed ring instead of a spinning one) */
+  .cust-person.is-busy .cust-face::after {
+    border-style: dashed;
+    border-color: var(--cust-accent);
+  }
+}

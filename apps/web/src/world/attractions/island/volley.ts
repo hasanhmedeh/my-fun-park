@@ -12,7 +12,8 @@
 
 import * as THREE from 'three';
 import type { Attraction, Ctx } from '../../context';
-import type { Look, PeopleFactory } from '../../crowd/people';
+import type { PeopleFactory } from '../../crowd/people-factory';
+import { lookKey, type Look } from '../../crowd/looks';
 import type { Input } from '../../input';
 import { mulberry } from '../../random';
 import { PALETTE } from '../../textures';
@@ -38,7 +39,7 @@ import {
 } from './volley-ball';
 import { BLEACHER, CATCH_Z, COCONUTS, COURT_ORIGIN, Court, SHY_BACK_Z, SHY_Z, toLocal, toWorld, UMPIRE } from './volley-court';
 import { CourtFx } from './volley-fx';
-import { Athlete, beachLook, Fans, visitorBeachLook } from './volley-players';
+import { Athlete, Fans, playerLooks, visitorBeachLook } from './volley-players';
 import { digChance, ELEVS, grade, placeRings, points, reach, ringAt, SERVES, shot, TOLERANCE, type Grade, type Outcome, type Ring } from './volley-rules';
 import './volley.css';
 
@@ -138,6 +139,8 @@ export class Volley implements Attraction {
   private v2 = new THREE.Vector3();
   private v3 = new THREE.Vector3();
   private focusV = new THREE.Vector3();
+  /** The camera in the court's frame, this frame. */
+  private camLocal = new THREE.Vector3();
   private probe: Ball = ball();
   /** The ambient warm-up's pause between dropped balls. */
   private ambientT = 0;
@@ -151,12 +154,11 @@ export class Volley implements Attraction {
     this.court = new Court(ctx);
     ctx.scene.add(this.court.group, this.court.frame);
     this.fx = new CourtFx(ctx.renderer, this.court.frame, ctx.quality.shadows);
-    const r = mulberry(2207);
-    this.me = new Athlete(beachLook(r, '#2a5fc4', 'm'), SERVE_SPOT.x, SERVE_SPOT.z, Math.PI);
+    this.me = new Athlete(SERVE_SPOT.x, SERVE_SPOT.z, Math.PI);
     this.me.speed = VISITOR_SPEED;
-    this.partner = new Athlete(beachLook(r, '#2ec4b6', 'f'), -2, -4.5, Math.PI);
-    this.stand = new Athlete(beachLook(r, '#2ec4b6', 'm'), 2, -4.5, Math.PI);
-    this.locals = [new Athlete(beachLook(r, '#f2b632', 'm'), -2, 4.5, 0), new Athlete(beachLook(r, '#f2b632', 'm'), 2, 4.5, 0)];
+    this.partner = new Athlete(-2, -4.5, Math.PI);
+    this.stand = new Athlete(2, -4.5, Math.PI);
+    this.locals = [new Athlete(-2, 4.5, 0), new Athlete(2, 4.5, 0)];
     for (const l of this.locals) l.speed = 5.6;
     try {
       this.best = Number(JSON.parse(localStorage.getItem(STORE_KEY) ?? '{}').best) || 0;
@@ -179,17 +181,54 @@ export class Volley implements Attraction {
     });
   }
 
-  /** Gives the players and fans their bodies once the people models have loaded (the game plays without them). */
-  setPeople(factory: PeopleFactory, visitor: Look) {
+  /**
+   * Gives the players and fans their bodies (the game plays without them). The island's people are
+   * a set of their own, loaded on the first trip rather than at the start: until people.isSetLoaded
+   * ('island') the court waits (checked every frame, asleep or not), and the visitor's arrival asks
+   * for the set if nobody has yet (setAwake). `visitor` is the visitor's look, or a function giving
+   * it as it is now: a changed look is worn from the next round on (see start).
+   */
+  setPeople(factory: PeopleFactory, visitor: Look | (() => Look)) {
+    this.people = { factory, visitor: typeof visitor === 'function' ? visitor : () => visitor };
+    if (factory.isSetLoaded('island')) this.dress();
+    else if (this.awake) this.askForPeople();
+  }
+
+  private people: { factory: PeopleFactory; visitor: () => Look } | null = null;
+  /** The players have their bodies. */
+  private dressed = false;
+  /** The visitor's look their body was built from (lookKey). */
+  private visitorKey = '';
+
+  /** The island's people are wanted now: load their set (once; the factory shares a load already under way). */
+  private askForPeople() {
+    const people = this.people;
+    if (!people || this.dressed) return;
+    people.factory.loadSet('island').catch((e: unknown) => console.warn('volley: the island people failed to load', e));
+  }
+
+  private get shadows() {
     const q = this.ctx.quality;
-    const shadows = q.shadows && q.tier !== 'low';
+    return q.shadows && q.tier !== 'low' && q.tier !== 'lowest';
+  }
+
+  /** The players, the fans and the umpire, once the island's people are in. */
+  private dress() {
+    const people = this.people!;
+    const factory = people.factory;
+    this.dressed = true;
+    const q = this.ctx.quality;
+    const shadows = this.shadows;
     const f = this.court.frame;
-    this.me = Object.assign(new Athlete(visitorBeachLook(visitor), this.me.pos.x, this.me.pos.z, Math.PI), { speed: VISITOR_SPEED });
-    this.me.attach(factory.create(this.me.look), f, shadows);
-    this.me.rig!.root.visible = this.active;
-    this.partner.attach(factory.create(this.partner.look), f, shadows);
-    this.stand.attach(factory.create(this.stand.look), f, shadows);
-    for (const l of this.locals) l.attach(factory.create(l.look), f, shadows);
+    const visitor = people.visitor();
+    this.visitorKey = lookKey(visitor);
+    this.me.attach(factory.create(visitorBeachLook(visitor)), f, shadows);
+    this.me.rig!.root.visible = this.awake && this.active;
+    const cast = playerLooks(factory, visitor.avatar);
+    this.partner.attach(factory.create(cast.partner), f, shadows);
+    this.stand.attach(factory.create(cast.stand), f, shadows);
+    this.locals.forEach((l, i) => l.attach(factory.create(cast.locals[i]), f, shadows));
+    for (const a of this.everyone) a.rig!.setGlow(this.night);
     // fans on the bleachers' lowest rows (fewer on modest hardware), and the umpire on the stand
     const count = { high: 5, medium: 3, low: 1, lowest: 0 }[q.tier];
     const seats: { x: number; y: number; z: number; yaw: number }[] = [];
@@ -204,13 +243,29 @@ export class Volley implements Attraction {
       const [row, z] = spots[i];
       seats.push({ x: BLEACHER.x0 + row * BLEACHER.step + 0.38, y: 0.42 + row * BLEACHER.rise + 0.03, z, yaw: Math.PI / 2 });
     }
-    this.fans = new Fans(factory, f, seats, q.tier === 'lowest' ? null : { x: UMPIRE.x, y: UMPIRE.y, z: UMPIRE.z, yaw: Math.PI / 2 }, shadows);
+    this.fans = new Fans(factory, f, seats, q.tier === 'lowest' ? null : { x: UMPIRE.x, y: UMPIRE.y, z: UMPIRE.z, yaw: Math.PI / 2 }, shadows, cast.used);
     this.fans.setGlow(this.night);
+    this.fans.setVisible(this.awake);
+  }
+
+  /** The visitor in their look as it is now (they may have been to the changing room since): the same model re-dyed, or a new one. */
+  private redressVisitor() {
+    const people = this.people;
+    const rig = this.me.rig;
+    if (!people || !rig) return;
+    const visitor = people.visitor();
+    const key = lookKey(visitor);
+    if (key === this.visitorKey) return;
+    this.visitorKey = key;
+    const look = visitorBeachLook(visitor);
+    if (!rig.applyLook(look)) this.me.attach(people.factory.create(look), this.court.frame, this.shadows);
+    this.me.rig!.setGlow(this.night);
   }
 
   /** Whether the visitor is on the island: away, nothing moves and the players aren't drawn. */
   setAwake(on: boolean) {
     this.awake = on;
+    if (on) this.askForPeople();
     for (const a of this.everyone) if (a.rig) a.rig.root.visible = on && (a !== this.me || this.active);
     this.fans?.setVisible(on);
     if (!on) this.fx.showBall(null, 0);
@@ -225,6 +280,11 @@ export class Volley implements Attraction {
 
   private get everyone() {
     return [this.me, this.partner, this.stand, ...this.locals];
+  }
+
+  /** The visitor, their partner, the regular and the two locals (read-only use: the preview). */
+  get athletes(): readonly Athlete[] {
+    return this.everyone;
   }
 
   /** The two players on side `s` (the visitor's side is −1). */
@@ -277,6 +337,7 @@ export class Volley implements Attraction {
     // the regular steps off to the bench and the visitor takes their place
     this.stand.warp(-8.9, -9.2, -Math.PI / 2);
     this.stand.arms('loose');
+    this.redressVisitor();
     if (this.me.rig) this.me.rig.root.visible = true;
     this.hud.hidden = false;
     $('vb-cam').textContent = CAM_LABEL[this.cam];
@@ -1040,8 +1101,11 @@ export class Volley implements Attraction {
   }
 
   update(dt: number, t: number) {
+    // (the island's people load on the first trip: the players get their bodies once they're in)
+    if (this.people && !this.dressed && this.people.factory.isSetLoaded('island')) this.dress();
     if (!this.awake && !this.active) return;
     const camDist = this.ctx.camera.position.distanceTo(COURT_ORIGIN);
+    const cam = toLocal(this.ctx.camera.position, this.camLocal);
     const near = this.active || camDist < 260;
     this.court.update(dt, t, this.ctx.camera);
     if (!near) return;
@@ -1061,9 +1125,9 @@ export class Volley implements Attraction {
     else if (this.phase === 'aim') this.holdBall();
     for (const a of this.everyone) {
       if (a.rig) a.rig.root.visible = this.awake && camDist < 170 && (a !== this.me || this.active);
-      a.update(dt, camDist);
+      a.update(dt, cam);
     }
-    this.fans?.update(dt, camDist);
+    this.fans?.update(dt, camDist, cam);
     const showBall = this.active || camDist < 170;
     this.fx.showBall(showBall ? this.b : null, dt);
     this.updateAim(dt);

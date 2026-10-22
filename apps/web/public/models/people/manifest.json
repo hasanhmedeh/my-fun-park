@@ -1,0 +1,9034 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "id": "rocketbox",
+      "name": "Microsoft Rocketbox Avatar Library",
+      "licence": "MIT",
+      "url": "https://github.com/microsoft/Microsoft-Rocketbox",
+      "commit": "0943055db6ec570bcef9f2c8b41c9e5467c808f9"
+    },
+    {
+      "id": "makehuman",
+      "name": "MakeHuman (assets and MPFB2 system assets)",
+      "licence": "CC0-1.0",
+      "url": "https://static.makehumancommunity.org/"
+    },
+    {
+      "id": "quaternius-ual",
+      "name": "Quaternius Universal Animation Library (retargeted)",
+      "licence": "CC0-1.0",
+      "url": "https://quaternius.com/"
+    }
+  ],
+  "rigs": {
+    "rocketbox": {
+      "bones": {
+        "pelvis": "Bip01_Pelvis",
+        "spine_01": "Bip01_Spine",
+        "spine_02": "Bip01_Spine1",
+        "spine_03": "Bip01_Spine2",
+        "neck_01": "Bip01_Neck",
+        "Head": "Bip01_Head",
+        "clavicle_l": "Bip01_L_Clavicle",
+        "upperarm_l": "Bip01_L_UpperArm",
+        "lowerarm_l": "Bip01_L_Forearm",
+        "hand_l": "Bip01_L_Hand",
+        "middle_01_l": "Bip01_L_Finger2",
+        "clavicle_r": "Bip01_R_Clavicle",
+        "upperarm_r": "Bip01_R_UpperArm",
+        "lowerarm_r": "Bip01_R_Forearm",
+        "hand_r": "Bip01_R_Hand",
+        "middle_01_r": "Bip01_R_Finger2",
+        "thigh_l": "Bip01_L_Thigh",
+        "calf_l": "Bip01_L_Calf",
+        "foot_l": "Bip01_L_Foot",
+        "ball_l": "Bip01_L_Toe0",
+        "thigh_r": "Bip01_R_Thigh",
+        "calf_r": "Bip01_R_Calf",
+        "foot_r": "Bip01_R_Foot",
+        "ball_r": "Bip01_R_Toe0",
+        "eye_l": "Bip01_LEye",
+        "eye_r": "Bip01_REye"
+      },
+      "root": "Bip01"
+    }
+  },
+  "clipPacks": {
+    "m": {
+      "file": "clips-m.glb",
+      "rig": "rocketbox",
+      "gender": "m",
+      "refHeight": 1.83,
+      "refHip": 0.898,
+      "clips": [
+        {
+          "name": "Idle_Loop",
+          "duration": 11.667,
+          "loop": true,
+          "start": 0
+        },
+        {
+          "name": "Walk_Loop",
+          "duration": 1.067,
+          "loop": true,
+          "speed": 1.402,
+          "start": 13
+        },
+        {
+          "name": "Jog_Fwd_Loop",
+          "duration": 0.767,
+          "loop": true,
+          "speed": 2.411,
+          "start": 15
+        },
+        {
+          "name": "Sprint_Loop",
+          "duration": 0.6,
+          "loop": true,
+          "speed": 5.839,
+          "start": 17
+        },
+        {
+          "name": "Sitting_Enter",
+          "duration": 2.9,
+          "loop": false,
+          "start": 19
+        },
+        {
+          "name": "Sitting_Idle_Loop",
+          "duration": 16,
+          "loop": true,
+          "start": 23
+        },
+        {
+          "name": "Sitting_Exit",
+          "duration": 2.5,
+          "loop": false,
+          "start": 40
+        },
+        {
+          "name": "Idle_Talking_Loop",
+          "duration": 14,
+          "loop": true,
+          "start": 43
+        },
+        {
+          "name": "Dance_Loop",
+          "duration": 12,
+          "loop": true,
+          "start": 58
+        },
+        {
+          "name": "Squat_Idle_Loop",
+          "duration": 6.867,
+          "loop": true,
+          "start": 71
+        },
+        {
+          "name": "Take_Papers",
+          "duration": 5,
+          "loop": false,
+          "start": 79
+        },
+        {
+          "name": "Idle_Breathe",
+          "duration": 2.733,
+          "loop": true,
+          "start": 85
+        },
+        {
+          "name": "Idle_Look_Around",
+          "duration": 4.633,
+          "loop": true,
+          "start": 89
+        },
+        {
+          "name": "Idle_Look_Around_2",
+          "duration": 4.5,
+          "loop": true,
+          "start": 95
+        },
+        {
+          "name": "Idle_Weight_Shift",
+          "duration": 15.5,
+          "loop": true,
+          "start": 100
+        },
+        {
+          "name": "Idle_Waiting",
+          "duration": 16,
+          "loop": true,
+          "start": 116
+        },
+        {
+          "name": "Idle_Scratch_Head",
+          "duration": 4.967,
+          "loop": false,
+          "start": 133
+        },
+        {
+          "name": "Idle_Stretch",
+          "duration": 6.633,
+          "loop": false,
+          "start": 139
+        },
+        {
+          "name": "Idle_Yawn",
+          "duration": 9.233,
+          "loop": false,
+          "start": 147
+        },
+        {
+          "name": "Walk_Slow_Loop",
+          "duration": 1.467,
+          "loop": true,
+          "speed": 0.821,
+          "start": 157
+        },
+        {
+          "name": "Walk_Fast_Loop",
+          "duration": 1.067,
+          "loop": true,
+          "speed": 1.495,
+          "start": 159
+        },
+        {
+          "name": "Walk_Stroll_Loop",
+          "duration": 1.567,
+          "loop": true,
+          "speed": 0.693,
+          "start": 161
+        },
+        {
+          "name": "Run_Loop",
+          "duration": 0.767,
+          "loop": true,
+          "speed": 3.075,
+          "start": 164
+        },
+        {
+          "name": "Sitting_Look_Around",
+          "duration": 8.667,
+          "loop": false,
+          "start": 166
+        },
+        {
+          "name": "Talk_2",
+          "duration": 12,
+          "loop": true,
+          "start": 176
+        },
+        {
+          "name": "Talk_3",
+          "duration": 12,
+          "loop": true,
+          "start": 189
+        },
+        {
+          "name": "Talk_4",
+          "duration": 12,
+          "loop": true,
+          "start": 202
+        },
+        {
+          "name": "Talk_5",
+          "duration": 12,
+          "loop": true,
+          "start": 215
+        },
+        {
+          "name": "Talk_6",
+          "duration": 12,
+          "loop": true,
+          "start": 228
+        },
+        {
+          "name": "Listen",
+          "duration": 14,
+          "loop": true,
+          "start": 241
+        },
+        {
+          "name": "Listen_2",
+          "duration": 14,
+          "loop": true,
+          "start": 256
+        },
+        {
+          "name": "Listen_3",
+          "duration": 12,
+          "loop": true,
+          "start": 271
+        },
+        {
+          "name": "Nod",
+          "duration": 3.7,
+          "loop": false,
+          "start": 284
+        },
+        {
+          "name": "Head_Shake",
+          "duration": 3,
+          "loop": false,
+          "start": 289
+        },
+        {
+          "name": "Shrug",
+          "duration": 1.833,
+          "loop": false,
+          "start": 293
+        },
+        {
+          "name": "Laugh",
+          "duration": 8,
+          "loop": false,
+          "start": 296
+        },
+        {
+          "name": "Wave",
+          "duration": 2.833,
+          "loop": false,
+          "start": 305
+        },
+        {
+          "name": "Wave_2",
+          "duration": 6.2,
+          "loop": false,
+          "start": 309
+        },
+        {
+          "name": "Cheer",
+          "duration": 8,
+          "loop": false,
+          "start": 316
+        },
+        {
+          "name": "Cheer_2",
+          "duration": 4.2,
+          "loop": false,
+          "start": 325
+        },
+        {
+          "name": "Clap",
+          "duration": 7,
+          "loop": true,
+          "start": 330
+        },
+        {
+          "name": "Take_Photo",
+          "duration": 8.5,
+          "loop": false,
+          "start": 338
+        },
+        {
+          "name": "Phone_Call",
+          "duration": 14,
+          "loop": true,
+          "start": 347
+        },
+        {
+          "name": "Phone_Text",
+          "duration": 14,
+          "loop": true,
+          "start": 362
+        },
+        {
+          "name": "Drink",
+          "duration": 12,
+          "loop": false,
+          "start": 377
+        },
+        {
+          "name": "Hold_Bag",
+          "duration": 12,
+          "loop": true,
+          "start": 390
+        },
+        {
+          "name": "Trolley_Idle",
+          "duration": 12,
+          "loop": true,
+          "start": 403
+        },
+        {
+          "name": "Dance_2",
+          "duration": 12,
+          "loop": true,
+          "start": 416
+        }
+      ],
+      "bytes": 577172
+    },
+    "f": {
+      "file": "clips-f.glb",
+      "rig": "rocketbox",
+      "gender": "f",
+      "refHeight": 1.742,
+      "refHip": 0.923,
+      "clips": [
+        {
+          "name": "Idle_Loop",
+          "duration": 15.533,
+          "loop": true,
+          "start": 0
+        },
+        {
+          "name": "Walk_Loop",
+          "duration": 1.233,
+          "loop": true,
+          "speed": 1.295,
+          "start": 17
+        },
+        {
+          "name": "Jog_Fwd_Loop",
+          "duration": 0.833,
+          "loop": true,
+          "speed": 2.269,
+          "start": 19
+        },
+        {
+          "name": "Sprint_Loop",
+          "duration": 0.7,
+          "loop": true,
+          "speed": 5.379,
+          "start": 21
+        },
+        {
+          "name": "Sitting_Enter",
+          "duration": 4.9,
+          "loop": false,
+          "start": 23
+        },
+        {
+          "name": "Sitting_Idle_Loop",
+          "duration": 16,
+          "loop": true,
+          "start": 29
+        },
+        {
+          "name": "Sitting_Exit",
+          "duration": 3.333,
+          "loop": false,
+          "start": 46
+        },
+        {
+          "name": "Idle_Talking_Loop",
+          "duration": 14,
+          "loop": true,
+          "start": 50
+        },
+        {
+          "name": "Dance_Loop",
+          "duration": 12,
+          "loop": true,
+          "start": 65
+        },
+        {
+          "name": "Squat_Idle_Loop",
+          "duration": 9.933,
+          "loop": true,
+          "start": 78
+        },
+        {
+          "name": "Take_Papers",
+          "duration": 7.633,
+          "loop": false,
+          "start": 89
+        },
+        {
+          "name": "Idle_Breathe",
+          "duration": 2.667,
+          "loop": true,
+          "start": 98
+        },
+        {
+          "name": "Idle_Look_Around",
+          "duration": 4.467,
+          "loop": true,
+          "start": 102
+        },
+        {
+          "name": "Idle_Look_Around_2",
+          "duration": 3.667,
+          "loop": true,
+          "start": 107
+        },
+        {
+          "name": "Idle_Weight_Shift",
+          "duration": 11.233,
+          "loop": true,
+          "start": 112
+        },
+        {
+          "name": "Idle_Waiting",
+          "duration": 16,
+          "loop": true,
+          "start": 124
+        },
+        {
+          "name": "Idle_Scratch_Head",
+          "duration": 4,
+          "loop": false,
+          "start": 141
+        },
+        {
+          "name": "Idle_Stretch",
+          "duration": 7.3,
+          "loop": false,
+          "start": 146
+        },
+        {
+          "name": "Idle_Yawn",
+          "duration": 6.467,
+          "loop": false,
+          "start": 154
+        },
+        {
+          "name": "Walk_Slow_Loop",
+          "duration": 1.5,
+          "loop": true,
+          "speed": 0.887,
+          "start": 161
+        },
+        {
+          "name": "Walk_Fast_Loop",
+          "duration": 1.033,
+          "loop": true,
+          "speed": 1.53,
+          "start": 163
+        },
+        {
+          "name": "Walk_Stroll_Loop",
+          "duration": 1.4,
+          "loop": true,
+          "speed": 0.926,
+          "start": 165
+        },
+        {
+          "name": "Run_Loop",
+          "duration": 0.833,
+          "loop": true,
+          "speed": 3.157,
+          "start": 167
+        },
+        {
+          "name": "Sitting_Look_Around",
+          "duration": 7.167,
+          "loop": false,
+          "start": 169
+        },
+        {
+          "name": "Talk_2",
+          "duration": 12,
+          "loop": true,
+          "start": 177
+        },
+        {
+          "name": "Talk_3",
+          "duration": 12,
+          "loop": true,
+          "start": 190
+        },
+        {
+          "name": "Talk_4",
+          "duration": 12,
+          "loop": true,
+          "start": 203
+        },
+        {
+          "name": "Talk_5",
+          "duration": 12,
+          "loop": true,
+          "start": 216
+        },
+        {
+          "name": "Talk_6",
+          "duration": 12,
+          "loop": true,
+          "start": 229
+        },
+        {
+          "name": "Listen",
+          "duration": 14,
+          "loop": true,
+          "start": 242
+        },
+        {
+          "name": "Listen_2",
+          "duration": 14,
+          "loop": true,
+          "start": 257
+        },
+        {
+          "name": "Listen_3",
+          "duration": 12,
+          "loop": true,
+          "start": 272
+        },
+        {
+          "name": "Nod",
+          "duration": 2.033,
+          "loop": false,
+          "start": 285
+        },
+        {
+          "name": "Head_Shake",
+          "duration": 3.167,
+          "loop": false,
+          "start": 288
+        },
+        {
+          "name": "Shrug",
+          "duration": 1.833,
+          "loop": false,
+          "start": 292
+        },
+        {
+          "name": "Laugh",
+          "duration": 8,
+          "loop": false,
+          "start": 295
+        },
+        {
+          "name": "Wave",
+          "duration": 5.533,
+          "loop": false,
+          "start": 304
+        },
+        {
+          "name": "Wave_2",
+          "duration": 8.4,
+          "loop": false,
+          "start": 311
+        },
+        {
+          "name": "Cheer",
+          "duration": 8,
+          "loop": false,
+          "start": 320
+        },
+        {
+          "name": "Cheer_2",
+          "duration": 3.167,
+          "loop": false,
+          "start": 329
+        },
+        {
+          "name": "Clap",
+          "duration": 15.933,
+          "loop": true,
+          "start": 333
+        },
+        {
+          "name": "Take_Photo",
+          "duration": 8.433,
+          "loop": false,
+          "start": 350
+        },
+        {
+          "name": "Phone_Call",
+          "duration": 14,
+          "loop": true,
+          "start": 359
+        },
+        {
+          "name": "Phone_Text",
+          "duration": 14,
+          "loop": true,
+          "start": 374
+        },
+        {
+          "name": "Drink",
+          "duration": 11.9,
+          "loop": false,
+          "start": 389
+        },
+        {
+          "name": "Hold_Bag",
+          "duration": 12,
+          "loop": true,
+          "start": 402
+        },
+        {
+          "name": "Trolley_Idle",
+          "duration": 12,
+          "loop": true,
+          "start": 415
+        },
+        {
+          "name": "Dance_2",
+          "duration": 12,
+          "loop": true,
+          "start": 428
+        }
+      ],
+      "bytes": 615984
+    },
+    "extra": {
+      "file": "clips-extra.glb",
+      "rig": "rocketbox",
+      "gender": "any",
+      "refHeight": 1.823,
+      "refHip": 0.895,
+      "clips": [
+        {
+          "name": "Jump_Start",
+          "duration": 1.333,
+          "loop": false
+        },
+        {
+          "name": "Jump_Loop",
+          "duration": 2.5,
+          "loop": true
+        },
+        {
+          "name": "Jump_Land",
+          "duration": 1.267,
+          "loop": false
+        },
+        {
+          "name": "Roll",
+          "duration": 1.467,
+          "loop": false
+        },
+        {
+          "name": "Crouch_Idle_Loop",
+          "duration": 2.933,
+          "loop": true
+        },
+        {
+          "name": "Punch_Cross",
+          "duration": 1,
+          "loop": false
+        },
+        {
+          "name": "Interact",
+          "duration": 2,
+          "loop": false
+        },
+        {
+          "name": "Swim_Fwd_Loop",
+          "duration": 1.333,
+          "loop": true
+        },
+        {
+          "name": "Swim_Idle_Loop",
+          "duration": 3.333,
+          "loop": true
+        },
+        {
+          "name": "Driving_Loop",
+          "duration": 1.667,
+          "loop": true
+        },
+        {
+          "name": "Offer",
+          "duration": 1.333,
+          "loop": false
+        },
+        {
+          "name": "Eat",
+          "duration": 1.333,
+          "loop": false
+        },
+        {
+          "name": "Idle_FoldArms_Loop",
+          "duration": 2.5,
+          "loop": true
+        },
+        {
+          "name": "Idle_Rail_Loop",
+          "duration": 2.5,
+          "loop": true
+        },
+        {
+          "name": "Idle_Rail_Call",
+          "duration": 2.5,
+          "loop": true
+        },
+        {
+          "name": "Walk_Carry_Loop",
+          "duration": 2,
+          "loop": true,
+          "speed": 0.604
+        },
+        {
+          "name": "Hit_Knockback",
+          "duration": 0.833,
+          "loop": false
+        },
+        {
+          "name": "Hit_Chest",
+          "duration": 0.333,
+          "loop": false
+        },
+        {
+          "name": "Hit_Head",
+          "duration": 0.433,
+          "loop": false
+        },
+        {
+          "name": "Thumbs_Up",
+          "duration": 2.5,
+          "loop": false
+        },
+        {
+          "name": "Shake_No",
+          "duration": 2.5,
+          "loop": false
+        },
+        {
+          "name": "Pick_Up",
+          "duration": 0.833,
+          "loop": false
+        },
+        {
+          "name": "Kneel_Fix_Loop",
+          "duration": 3.2,
+          "loop": true
+        },
+        {
+          "name": "Throw_Overhand",
+          "duration": 1.333,
+          "loop": false
+        },
+        {
+          "name": "Lie_To_Stand",
+          "duration": 1.533,
+          "loop": false
+        },
+        {
+          "name": "Lie_Loop",
+          "duration": 1,
+          "loop": true
+        },
+        {
+          "name": "Sit_Ground_Loop",
+          "duration": 1,
+          "loop": true
+        }
+      ],
+      "bytes": 478196
+    }
+  },
+  "avatars": [
+    {
+      "id": "Business_Female_01",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 4,
+      "roles": [
+        "cabin"
+      ],
+      "tags": [
+        "shortHair",
+        "curlyHair",
+        "suit",
+        "trousers"
+      ],
+      "files": {
+        "crowd": "Business_Female_01.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 385440
+      },
+      "lods": 3,
+      "height": 1.7404,
+      "hip": 0.9233,
+      "seatDrop": 0.4389,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2147,
+            -0.0343,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0878,
+            -0.1297,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0048,
+            -0.0015,
+            0.0607
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f014_body",
+        "head": "f014_head",
+        "hair": "f014_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0106,
+            "colour": "#1b1a1b"
+          },
+          "bottom": {
+            "mean": 0.0081,
+            "colour": "#151618"
+          },
+          "shoes": {
+            "mean": 0.007,
+            "colour": "#181310"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0084,
+        "colour": "#1c160f"
+      }
+    },
+    {
+      "id": "Business_Female_02",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "older",
+      "skin": 2,
+      "roles": [
+        "guest"
+      ],
+      "tags": [
+        "shortHair",
+        "blonde",
+        "glasses",
+        "jacket",
+        "trousers"
+      ],
+      "files": {
+        "crowd": "Business_Female_02.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 433796
+      },
+      "lods": 3,
+      "height": 1.7288,
+      "hip": 0.9233,
+      "seatDrop": 0.4471,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.204,
+            -0.0326,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0862,
+            -0.1197,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0052,
+            -0.0011,
+            0.0588
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f015_body",
+        "head": "f015_head",
+        "hair": "f015_opacity",
+        "extras": {
+          "glasses": "f015_glasses"
+        }
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0293,
+            "colour": "#4c2520"
+          },
+          "bottom": {
+            "mean": 0.0085,
+            "colour": "#1b1610"
+          },
+          "shoes": {
+            "mean": 0.0088,
+            "colour": "#1a1711"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.1343,
+        "colour": "#7d6147"
+      }
+    },
+    {
+      "id": "Business_Female_03",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "cabin"
+      ],
+      "tags": [
+        "shortHair",
+        "suit",
+        "skirt",
+        "heels"
+      ],
+      "files": {
+        "crowd": "Business_Female_03.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 371320
+      },
+      "lods": 3,
+      "height": 1.7431,
+      "hip": 0.9233,
+      "seatDrop": 0.4371,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2174,
+            -0.0348,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0875,
+            -0.1278,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0034,
+            -0.0024,
+            0.0667
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f016_body",
+        "head": "f016_head",
+        "hair": "f016_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0985,
+            "colour": "#685549"
+          },
+          "bottom": {
+            "mean": 0.0507,
+            "colour": "#4c3c34"
+          },
+          "shoes": {
+            "mean": 0.0519,
+            "colour": "#473f39"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0056,
+        "colour": "#16100d"
+      }
+    },
+    {
+      "id": "Business_Female_04",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "cabin"
+      ],
+      "tags": [
+        "ponytail",
+        "suit",
+        "trousers"
+      ],
+      "files": {
+        "crowd": "Business_Female_04.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 333036
+      },
+      "lods": 3,
+      "height": 1.7333,
+      "hip": 0.9233,
+      "seatDrop": 0.4599,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2048,
+            -0.0328,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0868,
+            -0.1232,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0054,
+            -0.001,
+            0.0582
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f020_body",
+        "head": "f020_head",
+        "hair": "f020_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0159,
+            "colour": "#22221e"
+          },
+          "shoes": {
+            "mean": 0.0091,
+            "colour": "#191814"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0188,
+        "colour": "#2e231c"
+      }
+    },
+    {
+      "id": "Business_Male_01",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "cabin"
+      ],
+      "tags": [
+        "suit",
+        "tie"
+      ],
+      "files": {
+        "crowd": "Business_Male_01.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 341540
+      },
+      "lods": 3,
+      "height": 1.8065,
+      "hip": 0.8952,
+      "seatDrop": 0.4418,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.216,
+            -0.033,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0848,
+            -0.1197,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0287,
+            -0.0076,
+            0.0666
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m005_body",
+        "head": "m005_head",
+        "hair": "m005_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0058,
+            "colour": "#11120d"
+          },
+          "bottom": {
+            "mean": 0.0023,
+            "colour": "#080805"
+          },
+          "shoes": {
+            "mean": 0.0116,
+            "colour": "#1c1c19"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0111,
+        "colour": "#241912"
+      }
+    },
+    {
+      "id": "Business_Male_02",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "cabin"
+      ],
+      "tags": [
+        "suit",
+        "tie"
+      ],
+      "files": {
+        "crowd": "Business_Male_02.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 332584
+      },
+      "lods": 3,
+      "height": 1.8233,
+      "hip": 0.8952,
+      "seatDrop": 0.4461,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2326,
+            -0.0356,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0848,
+            -0.1197,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0295,
+            -0.0074,
+            0.0629
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m008_body",
+        "head": "m008_head",
+        "hair": "m008_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.023,
+            "colour": "#292932"
+          },
+          "shoes": {
+            "mean": 0.0126,
+            "colour": "#1e1e1b"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0064,
+        "colour": "#15120f"
+      }
+    },
+    {
+      "id": "Business_Male_03",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "cabin"
+      ],
+      "tags": [
+        "suit",
+        "tie"
+      ],
+      "files": {
+        "crowd": "Business_Male_03.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 354964
+      },
+      "lods": 3,
+      "height": 1.8192,
+      "hip": 0.8952,
+      "seatDrop": 0.4345,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2285,
+            -0.035,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0847,
+            -0.1173,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0263,
+            -0.008,
+            0.0773
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m020_body",
+        "head": "m020_head",
+        "hair": "m020_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.015,
+            "colour": "#21211d"
+          },
+          "shoes": {
+            "mean": 0.0065,
+            "colour": "#14130f"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0141,
+        "colour": "#251e1a"
+      }
+    },
+    {
+      "id": "Business_Male_04",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "older",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "bald",
+        "waistcoat",
+        "trousers"
+      ],
+      "files": {
+        "crowd": "Business_Male_04.crowd.glb",
+        "hero": "Business_Male_04.hero.glb"
+      },
+      "bytes": {
+        "crowd": 270444,
+        "hero": 687192
+      },
+      "lods": 3,
+      "height": 1.8009,
+      "hip": 0.8952,
+      "seatDrop": 0.4373,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2105,
+            -0.0322,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0843,
+            -0.1082,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0265,
+            -0.008,
+            0.0761
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m015_body",
+        "head": "m015_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0558,
+            "colour": "#43433c"
+          },
+          "bottom": {
+            "mean": 0.0116,
+            "colour": "#1e1c18"
+          },
+          "shoes": {
+            "mean": 0.0063,
+            "colour": "#141211"
+          }
+        }
+      },
+      "portrait": "portraits/Business_Male_04.webp"
+    },
+    {
+      "id": "Business_Male_05",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 4,
+      "roles": [
+        "cabin"
+      ],
+      "tags": [
+        "suit",
+        "tie"
+      ],
+      "files": {
+        "crowd": "Business_Male_05.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 275724
+      },
+      "lods": 3,
+      "height": 1.8018,
+      "hip": 0.8952,
+      "seatDrop": 0.4367,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2114,
+            -0.0323,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0846,
+            -0.1154,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0265,
+            -0.008,
+            0.0763
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m016_body",
+        "head": "m016_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0153,
+            "colour": "#22211e"
+          },
+          "bottom": {
+            "mean": 0.0095,
+            "colour": "#191916"
+          },
+          "shoes": {
+            "mean": 0.0121,
+            "colour": "#1e1c1c"
+          }
+        }
+      }
+    },
+    {
+      "id": "Business_Male_06",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "shirt",
+        "trousers"
+      ],
+      "files": {
+        "crowd": "Business_Male_06.crowd.glb",
+        "hero": "Business_Male_06.hero.glb"
+      },
+      "bytes": {
+        "crowd": 259588,
+        "hero": 658384
+      },
+      "lods": 3,
+      "height": 1.8102,
+      "hip": 0.8952,
+      "seatDrop": 0.4308,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2197,
+            -0.0336,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0843,
+            -0.1067,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0287,
+            -0.0076,
+            0.0666
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m025_body",
+        "head": "m025_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.6889,
+            "colour": "#d8d8d8"
+          },
+          "bottom": {
+            "mean": 0.0069,
+            "colour": "#141414"
+          },
+          "shoes": {
+            "mean": 0.0065,
+            "colour": "#14130f"
+          }
+        }
+      },
+      "portrait": "portraits/Business_Male_06.webp"
+    },
+    {
+      "id": "Business_Male_07",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "older",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "bald",
+        "shirt",
+        "tie",
+        "jeans"
+      ],
+      "files": {
+        "crowd": "Business_Male_07.crowd.glb",
+        "hero": "Business_Male_07.hero.glb"
+      },
+      "bytes": {
+        "crowd": 270988,
+        "hero": 700184
+      },
+      "lods": 3,
+      "height": 1.7959,
+      "hip": 0.8952,
+      "seatDrop": 0.4377,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2055,
+            -0.0314,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0842,
+            -0.1062,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0264,
+            -0.008,
+            0.0766
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m018_body",
+        "head": "m018_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.5856,
+            "colour": "#c8c9d0"
+          },
+          "bottom": {
+            "mean": 0.0932,
+            "colour": "#4c585d"
+          },
+          "shoes": {
+            "mean": 0.0201,
+            "colour": "#282721"
+          }
+        }
+      },
+      "portrait": "portraits/Business_Male_07.webp"
+    },
+    {
+      "id": "Chef_Female_01",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "vendor",
+        "staff"
+      ],
+      "tags": [
+        "hat",
+        "uniform",
+        "apron"
+      ],
+      "files": {
+        "crowd": "Chef_Female_01.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 286772
+      },
+      "lods": 3,
+      "height": 1.7334,
+      "hip": 0.9233,
+      "seatDrop": 0.4381,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2028,
+            -0.0324,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0866,
+            -0.122,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0059,
+            -0.0006,
+            0.0559
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f110_body",
+        "head": "f110_A_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.6241,
+            "colour": "#cfcfd2"
+          },
+          "bottom": {
+            "mean": 0.0087,
+            "colour": "#171717"
+          },
+          "shoes": {
+            "mean": 0.0101,
+            "colour": "#1b1919"
+          }
+        }
+      }
+    },
+    {
+      "id": "Construction_Female_01",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "ground"
+      ],
+      "tags": [
+        "helmet",
+        "hiVis",
+        "overalls",
+        "gloves",
+        "boots",
+        "radio"
+      ],
+      "files": {
+        "crowd": "Construction_Female_01.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 342720
+      },
+      "lods": 3,
+      "height": 1.7427,
+      "hip": 0.9233,
+      "seatDrop": 0.447,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2167,
+            -0.0347,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0881,
+            -0.1312,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0042,
+            -0.0019,
+            0.0632
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f101_body",
+        "head": "f101_head",
+        "extras": {
+          "helmet": "f101_helmet"
+        }
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.6489,
+            "colour": "#f0d240"
+          },
+          "bottom": {
+            "mean": 0.0414,
+            "colour": "#0e396d"
+          },
+          "trim": {
+            "mean": 0.5366,
+            "colour": "#c9c2ab"
+          }
+        }
+      }
+    },
+    {
+      "id": "Construction_Male_02",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "older",
+      "skin": 2,
+      "roles": [
+        "mechanic"
+      ],
+      "tags": [
+        "helmet",
+        "overalls",
+        "boots"
+      ],
+      "files": {
+        "crowd": "Construction_Male_02.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 324488
+      },
+      "lods": 3,
+      "height": 1.7959,
+      "hip": 0.8952,
+      "seatDrop": 0.4275,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2055,
+            -0.0314,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0848,
+            -0.1204,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0262,
+            -0.008,
+            0.0775
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m101_body",
+        "head": "m101_head",
+        "extras": {
+          "helmet": "m101_helmet"
+        }
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0521,
+            "colour": "#10436d"
+          },
+          "bottom": {
+            "mean": 0.0348,
+            "colour": "#0e365a"
+          },
+          "shoes": {
+            "mean": 0.0191,
+            "colour": "#252625"
+          }
+        }
+      }
+    },
+    {
+      "id": "Construction_Male_03",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 5,
+      "roles": [
+        "mechanic"
+      ],
+      "tags": [
+        "helmet",
+        "overalls",
+        "toolBelt",
+        "boots"
+      ],
+      "files": {
+        "crowd": "Construction_Male_03.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 412596
+      },
+      "lods": 3,
+      "height": 1.8068,
+      "hip": 0.8952,
+      "seatDrop": 0.4369,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2164,
+            -0.0331,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0849,
+            -0.1232,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0283,
+            -0.0076,
+            0.0684
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m102_body",
+        "head": "m102_head",
+        "extras": {
+          "helmet": "m102_helmet",
+          "tools": "m102_tools"
+        }
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0478,
+            "colour": "#113e73"
+          },
+          "shoes": {
+            "mean": 0.2381,
+            "colour": "#9d8258"
+          }
+        }
+      }
+    },
+    {
+      "id": "Construction_Male_04",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 1,
+      "roles": [
+        "mechanic"
+      ],
+      "tags": [
+        "helmet",
+        "overalls",
+        "toolBelt",
+        "boots"
+      ],
+      "files": {
+        "crowd": "Construction_Male_04.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 436516
+      },
+      "lods": 3,
+      "height": 1.8098,
+      "hip": 0.8952,
+      "seatDrop": 0.4444,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2193,
+            -0.0335,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0841,
+            -0.1025,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0296,
+            -0.0074,
+            0.0625
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m103_body",
+        "head": "m103_head",
+        "extras": {
+          "helmet": "m103_helmet",
+          "tools": "m103_tools"
+        }
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.4679,
+            "colour": "#bab6aa"
+          },
+          "bottom": {
+            "mean": 0.0441,
+            "colour": "#0e3b6f"
+          },
+          "shoes": {
+            "mean": 0.1515,
+            "colour": "#7e6a4d"
+          }
+        }
+      }
+    },
+    {
+      "id": "Construction_Male_05",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 1,
+      "roles": [
+        "mechanic"
+      ],
+      "tags": [
+        "helmet",
+        "overalls",
+        "boots"
+      ],
+      "files": {
+        "crowd": "Construction_Male_05.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 314696
+      },
+      "lods": 3,
+      "height": 1.8051,
+      "hip": 0.8952,
+      "seatDrop": 0.4368,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2154,
+            -0.0329,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0849,
+            -0.1219,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0281,
+            -0.0077,
+            0.0692
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m104_body",
+        "head": "m104_head",
+        "extras": {
+          "helmet": "m104_helmet"
+        }
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0575,
+            "colour": "#10447f"
+          },
+          "shoes": {
+            "mean": 0.0241,
+            "colour": "#2a2b2b"
+          }
+        }
+      }
+    },
+    {
+      "id": "Construction_Male_06",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "mechanic"
+      ],
+      "tags": [
+        "helmet",
+        "overalls",
+        "toolBelt",
+        "boots"
+      ],
+      "files": {
+        "crowd": "Construction_Male_06.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 415004
+      },
+      "lods": 3,
+      "height": 1.8149,
+      "hip": 0.8952,
+      "seatDrop": 0.4214,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2243,
+            -0.0343,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.085,
+            -0.1252,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0282,
+            -0.0077,
+            0.0686
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m105_body",
+        "head": "m105_head",
+        "extras": {
+          "helmet": "m105_helmet",
+          "tools": "m105_tools"
+        }
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0455,
+            "colour": "#133c6f"
+          },
+          "shoes": {
+            "mean": 0.0234,
+            "colour": "#292b2a"
+          }
+        }
+      }
+    },
+    {
+      "id": "Construction_Male_07",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "ground"
+      ],
+      "tags": [
+        "helmet",
+        "hiVis",
+        "overalls",
+        "boots"
+      ],
+      "files": {
+        "crowd": "Construction_Male_07.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 328628
+      },
+      "lods": 3,
+      "height": 1.8106,
+      "hip": 0.8952,
+      "seatDrop": 0.4444,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2201,
+            -0.0337,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0851,
+            -0.1276,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0246,
+            -0.0083,
+            0.0846
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m107_body",
+        "head": "m107_head",
+        "extras": {
+          "helmet": "m107_helmet"
+        }
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.3128,
+            "colour": "#f4713f"
+          },
+          "bottom": {
+            "mean": 0.0672,
+            "colour": "#164c7b"
+          },
+          "shoes": {
+            "mean": 0.0156,
+            "colour": "#222121"
+          },
+          "trim": {
+            "mean": 0.5369,
+            "colour": "#c5c2b5"
+          }
+        }
+      }
+    },
+    {
+      "id": "Construction_Male_08",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 4,
+      "roles": [
+        "ground"
+      ],
+      "tags": [
+        "helmet",
+        "hiVis",
+        "overalls",
+        "gloves",
+        "boots",
+        "radio"
+      ],
+      "files": {
+        "crowd": "Construction_Male_08.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 337076
+      },
+      "lods": 3,
+      "height": 1.8018,
+      "hip": 0.8952,
+      "seatDrop": 0.4369,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2114,
+            -0.0323,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0851,
+            -0.1276,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0246,
+            -0.0083,
+            0.0846
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m108_body",
+        "head": "m108_head",
+        "extras": {
+          "helmet": "m108_helmet"
+        }
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.6489,
+            "colour": "#f0d240"
+          },
+          "bottom": {
+            "mean": 0.0414,
+            "colour": "#0e396d"
+          },
+          "shoes": {
+            "mean": 0.2535,
+            "colour": "#a2865a"
+          },
+          "trim": {
+            "mean": 0.5381,
+            "colour": "#c9c2ab"
+          }
+        }
+      }
+    },
+    {
+      "id": "Delivery_Male_01",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 3,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "beard",
+        "hat",
+        "beanie",
+        "shirt",
+        "jeans",
+        "boots"
+      ],
+      "files": {
+        "crowd": "Delivery_Male_01.crowd.glb",
+        "hero": "Delivery_Male_01.hero.glb"
+      },
+      "bytes": {
+        "crowd": 278648,
+        "hero": 753848
+      },
+      "lods": 3,
+      "height": 1.8161,
+      "hip": 0.8952,
+      "seatDrop": 0.4393,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2255,
+            -0.0345,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0849,
+            -0.1223,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.03,
+            -0.0073,
+            0.061
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m112_body",
+        "head": "m112_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0622,
+            "colour": "#832424"
+          },
+          "bottom": {
+            "mean": 0.1157,
+            "colour": "#556266"
+          },
+          "shoes": {
+            "mean": 0.0098,
+            "colour": "#191919"
+          }
+        }
+      },
+      "portrait": "portraits/Delivery_Male_01.webp"
+    },
+    {
+      "id": "Female_Adult_01",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "ponytail",
+        "blonde",
+        "jeans",
+        "shirt"
+      ],
+      "files": {
+        "crowd": "Female_Adult_01.crowd.glb",
+        "hero": "Female_Adult_01.hero.glb"
+      },
+      "bytes": {
+        "crowd": 384204,
+        "hero": 877216
+      },
+      "lods": 3,
+      "height": 1.7433,
+      "hip": 0.9233,
+      "seatDrop": 0.4552,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2137,
+            -0.0342,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0861,
+            -0.1194,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0069,
+            0,
+            0.0521
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f001_body",
+        "head": "f001_head",
+        "hair": "f001_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.2246,
+            "colour": "#be6a76"
+          },
+          "bottom": {
+            "mean": 0.0835,
+            "colour": "#405460"
+          },
+          "shoes": {
+            "mean": 0.0215,
+            "colour": "#2b2823"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.2083,
+        "colour": "#9c7752"
+      },
+      "portrait": "portraits/Female_Adult_01.webp"
+    },
+    {
+      "id": "Female_Adult_02",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "older",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "ponytail",
+        "sweater",
+        "skirt"
+      ],
+      "files": {
+        "crowd": "Female_Adult_02.crowd.glb",
+        "hero": "Female_Adult_02.hero.glb"
+      },
+      "bytes": {
+        "crowd": 378172,
+        "hero": 879528
+      },
+      "lods": 3,
+      "height": 1.7352,
+      "hip": 0.9233,
+      "seatDrop": 0.4379,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2055,
+            -0.0329,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0857,
+            -0.1165,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0053,
+            -0.0011,
+            0.0586
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f002_body",
+        "head": "f002_head",
+        "hair": "f002_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.4714,
+            "colour": "#b6b8ad"
+          },
+          "bottom": {
+            "mean": 0.0313,
+            "colour": "#27333a"
+          },
+          "shoes": {
+            "mean": 0.0078,
+            "colour": "#161611"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0157,
+        "colour": "#2e1e14"
+      },
+      "portrait": "portraits/Female_Adult_02.webp"
+    },
+    {
+      "id": "Female_Adult_03",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 3,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "longHair",
+        "top",
+        "trousers"
+      ],
+      "files": {
+        "crowd": "Female_Adult_03.crowd.glb",
+        "hero": "Female_Adult_03.hero.glb"
+      },
+      "bytes": {
+        "crowd": 404868,
+        "hero": 883768
+      },
+      "lods": 3,
+      "height": 1.7389,
+      "hip": 0.9233,
+      "seatDrop": 0.4393,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2137,
+            -0.0342,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0844,
+            -0.1086,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0072,
+            0.0002,
+            0.0506
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f003_body",
+        "head": "f003_head",
+        "hair": "f003_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.088,
+            "colour": "#7f387b"
+          },
+          "bottom": {
+            "mean": 0.0117,
+            "colour": "#1c1d17"
+          },
+          "shoes": {
+            "mean": 0.0267,
+            "colour": "#302d24"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.007,
+        "colour": "#171310"
+      },
+      "portrait": "portraits/Female_Adult_03.webp"
+    },
+    {
+      "id": "Female_Adult_04",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "shortHair",
+        "blonde",
+        "jacket",
+        "trousers",
+        "boots"
+      ],
+      "files": {
+        "crowd": "Female_Adult_04.crowd.glb",
+        "hero": "Female_Adult_04.hero.glb"
+      },
+      "bytes": {
+        "crowd": 396824,
+        "hero": 885520
+      },
+      "lods": 3,
+      "height": 1.7659,
+      "hip": 0.9233,
+      "seatDrop": 0.4526,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2281,
+            -0.0365,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0968,
+            -0.1853,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0047,
+            -0.0015,
+            0.0611
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f004_body",
+        "head": "f004_head",
+        "hair": "f004_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0297,
+            "colour": "#422a22"
+          },
+          "bottom": {
+            "mean": 0.085,
+            "colour": "#5a523d"
+          },
+          "shoes": {
+            "mean": 0.0108,
+            "colour": "#1d1b15"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.3741,
+        "colour": "#c59e6f"
+      },
+      "portrait": "portraits/Female_Adult_04.webp"
+    },
+    {
+      "id": "Female_Adult_05",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "shortHair",
+        "jacket",
+        "jeans"
+      ],
+      "files": {
+        "crowd": "Female_Adult_05.crowd.glb",
+        "hero": "Female_Adult_05.hero.glb"
+      },
+      "bytes": {
+        "crowd": 387880,
+        "hero": 859796
+      },
+      "lods": 3,
+      "height": 1.7362,
+      "hip": 0.9233,
+      "seatDrop": 0.4422,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2108,
+            -0.0337,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0875,
+            -0.128,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0054,
+            -0.0011,
+            0.0583
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f005_body",
+        "head": "f005_head",
+        "hair": "f005_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.4367,
+            "colour": "#d6a59c"
+          },
+          "bottom": {
+            "mean": 0.0721,
+            "colour": "#364f5b"
+          },
+          "shoes": {
+            "mean": 0.0069,
+            "colour": "#14140f"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0083,
+        "colour": "#1d1511"
+      },
+      "portrait": "portraits/Female_Adult_05.webp"
+    },
+    {
+      "id": "Female_Adult_06",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 3,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "headscarf",
+        "longDress"
+      ],
+      "files": {
+        "crowd": "Female_Adult_06.crowd.glb",
+        "hero": "Female_Adult_06.hero.glb"
+      },
+      "bytes": {
+        "crowd": 298860,
+        "hero": 721944
+      },
+      "lods": 3,
+      "height": 1.7363,
+      "hip": 0.9233,
+      "seatDrop": 0.4378,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2095,
+            -0.0335,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.09,
+            -0.1434,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            -0.0052,
+            -0.0084,
+            0.1023
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f202_body",
+        "head": "f202_head",
+        "hair": "f202_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.1027,
+            "colour": "#685933"
+          },
+          "shoes": {
+            "mean": 0.0123,
+            "colour": "#201d19"
+          }
+        }
+      },
+      "portrait": "portraits/Female_Adult_06.webp"
+    },
+    {
+      "id": "Female_Adult_07",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 1,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "ponytail",
+        "jacket",
+        "jeans",
+        "boots"
+      ],
+      "files": {
+        "crowd": "Female_Adult_07.crowd.glb",
+        "hero": "Female_Adult_07.hero.glb"
+      },
+      "bytes": {
+        "crowd": 369012,
+        "hero": 837780
+      },
+      "lods": 3,
+      "height": 1.7226,
+      "hip": 0.9233,
+      "seatDrop": 0.4583,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.1972,
+            -0.0315,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0867,
+            -0.1228,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0052,
+            -0.0012,
+            0.0591
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f007_body",
+        "head": "f007_head",
+        "hair": "f007_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0171,
+            "colour": "#302019"
+          },
+          "bottom": {
+            "mean": 0.0887,
+            "colour": "#505558"
+          },
+          "shoes": {
+            "mean": 0.0113,
+            "colour": "#241915"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0227,
+        "colour": "#39251a"
+      },
+      "portrait": "portraits/Female_Adult_07.webp"
+    },
+    {
+      "id": "Female_Adult_08",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "longHair",
+        "tshirt",
+        "jeans"
+      ],
+      "files": {
+        "crowd": "Female_Adult_08.crowd.glb",
+        "hero": "Female_Adult_08.hero.glb"
+      },
+      "bytes": {
+        "crowd": 376216,
+        "hero": 870424
+      },
+      "lods": 3,
+      "height": 1.7349,
+      "hip": 0.9233,
+      "seatDrop": 0.4505,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2095,
+            -0.0335,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0916,
+            -0.1534,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.003,
+            -0.0027,
+            0.0681
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f008_body",
+        "head": "f008_head",
+        "hair": "f008_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.2128,
+            "colour": "#808079"
+          },
+          "bottom": {
+            "mean": 0.0557,
+            "colour": "#354552"
+          },
+          "shoes": {
+            "mean": 0.0264,
+            "colour": "#40271b"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0194,
+        "colour": "#32231a"
+      },
+      "portrait": "portraits/Female_Adult_08.webp"
+    },
+    {
+      "id": "Female_Adult_09",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "ponytail",
+        "cardigan",
+        "trousers"
+      ],
+      "files": {
+        "crowd": "Female_Adult_09.crowd.glb",
+        "hero": "Female_Adult_09.hero.glb"
+      },
+      "bytes": {
+        "crowd": 383836,
+        "hero": 876004
+      },
+      "lods": 3,
+      "height": 1.7354,
+      "hip": 0.9233,
+      "seatDrop": 0.4379,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.21,
+            -0.0336,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0865,
+            -0.1215,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.004,
+            -0.002,
+            0.0639
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f009_body",
+        "head": "f009_head",
+        "hair": "f009_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0724,
+            "colour": "#564a3d"
+          },
+          "bottom": {
+            "mean": 0.0073,
+            "colour": "#141511"
+          },
+          "shoes": {
+            "mean": 0.0351,
+            "colour": "#363435"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0419,
+        "colour": "#4b3526"
+      },
+      "portrait": "portraits/Female_Adult_09.webp"
+    },
+    {
+      "id": "Female_Adult_10",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "headscarf",
+        "abaya",
+        "longDress"
+      ],
+      "files": {
+        "crowd": "Female_Adult_10.crowd.glb",
+        "hero": "Female_Adult_10.hero.glb"
+      },
+      "bytes": {
+        "crowd": 261012,
+        "hero": 532172
+      },
+      "lods": 3,
+      "height": 1.7369,
+      "hip": 0.9233,
+      "seatDrop": 0.4377,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2091,
+            -0.0334,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0914,
+            -0.1518,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            -0.003,
+            -0.0068,
+            0.093
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f201_body",
+        "head": "f201_head",
+        "hair": "f201_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0081,
+            "colour": "#161616"
+          },
+          "shoes": {
+            "mean": 0.0188,
+            "colour": "#2c2419"
+          }
+        }
+      },
+      "portrait": "portraits/Female_Adult_10.webp"
+    },
+    {
+      "id": "Female_Adult_11",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "ponytail",
+        "dress",
+        "boots"
+      ],
+      "files": {
+        "crowd": "Female_Adult_11.crowd.glb",
+        "hero": "Female_Adult_11.hero.glb"
+      },
+      "bytes": {
+        "crowd": 392428,
+        "hero": 889008
+      },
+      "lods": 3,
+      "height": 1.7364,
+      "hip": 0.9233,
+      "seatDrop": 0.4378,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.211,
+            -0.0337,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0851,
+            -0.1129,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0063,
+            -0.0004,
+            0.0546
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f011_body",
+        "head": "f011_head",
+        "hair": "f011_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0156,
+            "colour": "#2e1e16"
+          },
+          "shoes": {
+            "mean": 0.0131,
+            "colour": "#2a1b15"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0084,
+        "colour": "#1e1510"
+      },
+      "portrait": "portraits/Female_Adult_11.webp"
+    },
+    {
+      "id": "Female_Adult_12",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "shortHair",
+        "fringe",
+        "hoodie",
+        "shorts",
+        "trainers"
+      ],
+      "files": {
+        "crowd": "Female_Adult_12.crowd.glb",
+        "hero": "Female_Adult_12.hero.glb"
+      },
+      "bytes": {
+        "crowd": 378836,
+        "hero": 870828
+      },
+      "lods": 3,
+      "height": 1.7267,
+      "hip": 0.9233,
+      "seatDrop": 0.4493,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2013,
+            -0.0322,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0967,
+            -0.1849,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0033,
+            -0.0025,
+            0.067
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f012_body",
+        "head": "f012_head",
+        "hair": "f012_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0131,
+            "colour": "#1e1e1a"
+          },
+          "bottom": {
+            "mean": 0.0202,
+            "colour": "#1e292e"
+          },
+          "shoes": {
+            "mean": 0.0121,
+            "colour": "#1f1c1c"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0208,
+        "colour": "#3a2217"
+      },
+      "portrait": "portraits/Female_Adult_12.webp"
+    },
+    {
+      "id": "Female_Adult_13",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "shortHair",
+        "blonde",
+        "top",
+        "jeans"
+      ],
+      "files": {
+        "crowd": "Female_Adult_13.crowd.glb",
+        "hero": "Female_Adult_13.hero.glb"
+      },
+      "bytes": {
+        "crowd": 383412,
+        "hero": 853664
+      },
+      "lods": 3,
+      "height": 1.7516,
+      "hip": 0.9233,
+      "seatDrop": 0.4506,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.226,
+            -0.0361,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0858,
+            -0.1173,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0044,
+            -0.0017,
+            0.0625
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f019_body",
+        "head": "f019_head",
+        "hair": "f019_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0561,
+            "colour": "#44433f"
+          },
+          "bottom": {
+            "mean": 0.0464,
+            "colour": "#323e4b"
+          },
+          "shoes": {
+            "mean": 0.0076,
+            "colour": "#161511"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.3136,
+        "colour": "#b5926a"
+      },
+      "portrait": "portraits/Female_Adult_13.webp"
+    },
+    {
+      "id": "Female_Adult_14",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "shortHair",
+        "cardigan",
+        "jeans",
+        "boots"
+      ],
+      "files": {
+        "crowd": "Female_Adult_14.crowd.glb",
+        "hero": "Female_Adult_14.hero.glb"
+      },
+      "bytes": {
+        "crowd": 384492,
+        "hero": 873476
+      },
+      "lods": 3,
+      "height": 1.7438,
+      "hip": 0.9233,
+      "seatDrop": 0.4494,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2141,
+            -0.0343,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0867,
+            -0.1225,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0042,
+            -0.0018,
+            0.063
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f017_body",
+        "head": "f017_head",
+        "hair": "f017_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.1994,
+            "colour": "#847a6b"
+          },
+          "bottom": {
+            "mean": 0.018,
+            "colour": "#1f2528"
+          },
+          "shoes": {
+            "mean": 0.0145,
+            "colour": "#22201c"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.053,
+        "colour": "#533c2a"
+      },
+      "portrait": "portraits/Female_Adult_14.webp"
+    },
+    {
+      "id": "Female_Adult_15",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "longHair",
+        "shirt",
+        "skirt",
+        "boots"
+      ],
+      "files": {
+        "crowd": "Female_Adult_15.crowd.glb",
+        "hero": "Female_Adult_15.hero.glb"
+      },
+      "bytes": {
+        "crowd": 417476,
+        "hero": 911152
+      },
+      "lods": 3,
+      "height": 1.739,
+      "hip": 0.9233,
+      "seatDrop": 0.4375,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2135,
+            -0.0342,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0972,
+            -0.1878,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0012,
+            -0.0039,
+            0.0756
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f018_body",
+        "head": "f018_head",
+        "hair": "f018_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.071,
+            "colour": "#454a65"
+          },
+          "bottom": {
+            "mean": 0.0058,
+            "colour": "#121110"
+          },
+          "shoes": {
+            "mean": 0.0101,
+            "colour": "#1c1918"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0572,
+        "colour": "#5d3c25"
+      },
+      "portrait": "portraits/Female_Adult_15.webp"
+    },
+    {
+      "id": "Female_Adult_16",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 3,
+      "roles": [
+        "guest"
+      ],
+      "tags": [
+        "burqa",
+        "veil",
+        "longDress"
+      ],
+      "files": {
+        "crowd": "Female_Adult_16.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 170584
+      },
+      "lods": 3,
+      "height": 1.7369,
+      "hip": 0.9233,
+      "seatDrop": 0.4377,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2091,
+            -0.0334,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0914,
+            -0.1518,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0109,
+            0.0028,
+            0.0354
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f204",
+        "head": "f204"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0964,
+            "colour": "#4a567c"
+          },
+          "shoes": {
+            "mean": 0.0217,
+            "colour": "#2f271f"
+          }
+        }
+      }
+    },
+    {
+      "id": "Female_Adult_17",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "blonde",
+        "bun",
+        "tshirt",
+        "jeans",
+        "sandals"
+      ],
+      "files": {
+        "crowd": "Female_Adult_17.crowd.glb",
+        "hero": "Female_Adult_17.hero.glb"
+      },
+      "bytes": {
+        "crowd": 375344,
+        "hero": 854412
+      },
+      "lods": 3,
+      "height": 1.751,
+      "hip": 0.9233,
+      "seatDrop": 0.4526,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.213,
+            -0.0341,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0855,
+            -0.1152,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0058,
+            -0.0007,
+            0.0564
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f006_body",
+        "head": "f006_head",
+        "hair": "f006_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.2749,
+            "colour": "#619c76"
+          },
+          "bottom": {
+            "mean": 0.2929,
+            "colour": "#7c98a3"
+          },
+          "shoes": {
+            "mean": 0.0468,
+            "colour": "#473a38"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.2205,
+        "colour": "#9f7a56"
+      },
+      "portrait": "portraits/Female_Adult_17.webp"
+    },
+    {
+      "id": "Female_Child_01",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "child",
+      "skin": 2,
+      "roles": [
+        "guest"
+      ],
+      "tags": [
+        "ponytail",
+        "blonde",
+        "tshirt",
+        "jeans",
+        "trainers"
+      ],
+      "files": {
+        "crowd": "Female_Child_01.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 275240
+      },
+      "lods": 3,
+      "height": 1.433,
+      "hip": 0.7573,
+      "seatDrop": 0.3713,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.1798,
+            -0.0288,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0703,
+            -0.0958,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0042,
+            -0.0007,
+            0.0435
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0335,
+            -0.0023,
+            -0.0151
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0335,
+            -0.0023,
+            0.0151
+          ]
+        }
+      },
+      "parts": {
+        "body": "cf001_body",
+        "head": "cf001_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.1261,
+            "colour": "#b6089e"
+          },
+          "bottom": {
+            "mean": 0.3308,
+            "colour": "#929da9"
+          },
+          "shoes": {
+            "mean": 0.6364,
+            "colour": "#d1d1d1"
+          }
+        }
+      }
+    },
+    {
+      "id": "Female_Child_02",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "child",
+      "skin": 3,
+      "roles": [
+        "guest"
+      ],
+      "tags": [
+        "headscarf",
+        "longDress"
+      ],
+      "files": {
+        "crowd": "Female_Child_02.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 276068
+      },
+      "lods": 3,
+      "height": 1.438,
+      "hip": 0.7573,
+      "seatDrop": 0.3577,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.1842,
+            -0.0295,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0738,
+            -0.1171,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            -0.0045,
+            -0.0067,
+            0.0796
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0335,
+            -0.0023,
+            -0.0151
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0335,
+            -0.0023,
+            0.0151
+          ]
+        }
+      },
+      "parts": {
+        "body": "cf011_body",
+        "head": "cf011_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0799,
+            "colour": "#45543f"
+          },
+          "shoes": {
+            "mean": 0.0123,
+            "colour": "#201d19"
+          }
+        }
+      }
+    },
+    {
+      "id": "Female_Party_01",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "longHair",
+        "blonde",
+        "shorts",
+        "boots",
+        "top"
+      ],
+      "files": {
+        "crowd": "Female_Party_01.crowd.glb",
+        "hero": "Female_Party_01.hero.glb"
+      },
+      "bytes": {
+        "crowd": 428280,
+        "hero": 897668
+      },
+      "lods": 3,
+      "height": 1.7534,
+      "hip": 0.9233,
+      "seatDrop": 0.4544,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2278,
+            -0.0364,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0845,
+            -0.1089,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0024,
+            -0.0031,
+            0.0707
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f010_body",
+        "head": "f010_head",
+        "hair": "f010_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.4269,
+            "colour": "#adafaf"
+          },
+          "shoes": {
+            "mean": 0.5904,
+            "colour": "#cdcac1"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.4224,
+        "colour": "#caa97c"
+      },
+      "portrait": "portraits/Female_Party_01.webp"
+    },
+    {
+      "id": "Female_Party_02",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 3,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "curlyHair",
+        "top",
+        "skirt",
+        "sandals"
+      ],
+      "files": {
+        "crowd": "Female_Party_02.crowd.glb",
+        "hero": "Female_Party_02.hero.glb"
+      },
+      "bytes": {
+        "crowd": 409864,
+        "hero": 911248
+      },
+      "lods": 3,
+      "height": 1.7903,
+      "hip": 0.9233,
+      "seatDrop": 0.4324,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2624,
+            -0.042,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0861,
+            -0.1194,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0065,
+            -0.0003,
+            0.0537
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f022_body",
+        "head": "f022_head",
+        "hair": "f022_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0505,
+            "colour": "#473e3a"
+          },
+          "bottom": {
+            "mean": 0.0055,
+            "colour": "#111111"
+          },
+          "shoes": {
+            "mean": 0.0167,
+            "colour": "#2f2017"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0142,
+        "colour": "#2b1d12"
+      },
+      "portrait": "portraits/Female_Party_02.webp"
+    },
+    {
+      "id": "Gardener_Male_01",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "older",
+      "skin": 2,
+      "roles": [
+        "staff"
+      ],
+      "tags": [
+        "beard",
+        "jacket",
+        "trousers",
+        "gloves",
+        "wellies"
+      ],
+      "files": {
+        "crowd": "Gardener_Male_01.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 354092
+      },
+      "lods": 3,
+      "height": 1.8124,
+      "hip": 0.8952,
+      "seatDrop": 0.4325,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2219,
+            -0.0339,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0849,
+            -0.1219,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0281,
+            -0.0077,
+            0.0692
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m106_body",
+        "head": "m106_head",
+        "hair": "m106_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0277,
+            "colour": "#382c20"
+          },
+          "shoes": {
+            "mean": 0.2274,
+            "colour": "#a27e2d"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0182,
+        "colour": "#2d231c"
+      }
+    },
+    {
+      "id": "MH_Child_Boy_01",
+      "source": "makehuman",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "child",
+      "skin": 2,
+      "roles": [
+        "guest"
+      ],
+      "tags": [
+        "polo",
+        "trousers",
+        "trainers",
+        "shortHair"
+      ],
+      "files": {
+        "crowd": "MH_Child_Boy_01.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 348532
+      },
+      "lods": 3,
+      "height": 1.199,
+      "hip": 0.5996,
+      "seatDrop": 0.2985,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.1438,
+            -0.022,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0903,
+            -0.0494,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0299,
+            0.0066,
+            0.1043
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0362,
+            -0.0029,
+            -0.0112
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0362,
+            -0.0029,
+            0.0112
+          ]
+        }
+      },
+      "parts": {
+        "body": "MH_Child_Boy_01_body",
+        "head": "MH_Child_Boy_01_head",
+        "hair": "MH_Child_Boy_01_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.2849,
+            "colour": "#919191"
+          },
+          "bottom": {
+            "mean": 0.0501,
+            "colour": "#3e3f41"
+          },
+          "shoes": {
+            "mean": 0.1459,
+            "colour": "#6c6a70"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0195,
+        "colour": "#272625"
+      }
+    },
+    {
+      "id": "MH_Child_Girl_01",
+      "source": "makehuman",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "child",
+      "skin": 1,
+      "roles": [
+        "guest"
+      ],
+      "tags": [
+        "tshirt",
+        "shorts",
+        "sandals",
+        "longHair",
+        "ponytail"
+      ],
+      "files": {
+        "crowd": "MH_Child_Girl_01.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 411704
+      },
+      "lods": 3,
+      "height": 1.1718,
+      "hip": 0.6158,
+      "seatDrop": 0.2851,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.1402,
+            -0.0224,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0959,
+            -0.0954,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0179,
+            -0.0049,
+            0.0949
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0363,
+            -0.0016,
+            -0.0105
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0363,
+            -0.0016,
+            0.0105
+          ]
+        }
+      },
+      "parts": {
+        "body": "MH_Child_Girl_01_body",
+        "head": "MH_Child_Girl_01_head",
+        "hair": "MH_Child_Girl_01_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.9999,
+            "colour": "#ffffff"
+          },
+          "bottom": {
+            "mean": 0.0292,
+            "colour": "#29303e"
+          },
+          "shoes": {
+            "mean": 0.0062,
+            "colour": "#1a100c"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0628,
+        "colour": "#5e402d"
+      }
+    },
+    {
+      "id": "MH_Older_Woman_01",
+      "source": "makehuman",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "older",
+      "skin": 1,
+      "roles": [
+        "guest"
+      ],
+      "tags": [
+        "sweater",
+        "trousers",
+        "flats",
+        "greyHair",
+        "shortHair"
+      ],
+      "files": {
+        "crowd": "MH_Older_Woman_01.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 366472
+      },
+      "lods": 3,
+      "height": 1.6309,
+      "hip": 0.855,
+      "seatDrop": 0.4148,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.1668,
+            -0.0267,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.126,
+            -0.0914,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0419,
+            0.0034,
+            0.095
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0486,
+            -0.0021,
+            -0.01
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0486,
+            -0.0021,
+            0.01
+          ]
+        }
+      },
+      "parts": {
+        "body": "MH_Older_Woman_01_body",
+        "head": "MH_Older_Woman_01_head",
+        "hair": "MH_Older_Woman_01_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0806,
+            "colour": "#8e2f2f"
+          },
+          "bottom": {
+            "mean": 0.0502,
+            "colour": "#3e3f41"
+          },
+          "shoes": {
+            "mean": 0.0483,
+            "colour": "#403e3e"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.5287,
+        "colour": "#c3c0b9"
+      }
+    },
+    {
+      "id": "MH_Older_Woman_02",
+      "source": "makehuman",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "older",
+      "skin": 5,
+      "roles": [
+        "guest"
+      ],
+      "tags": [
+        "blouse",
+        "skirt",
+        "flats",
+        "greyHair",
+        "shortHair"
+      ],
+      "files": {
+        "crowd": "MH_Older_Woman_02.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 422464
+      },
+      "lods": 3,
+      "height": 1.6469,
+      "hip": 0.8635,
+      "seatDrop": 0.4198,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.1695,
+            -0.0271,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0925,
+            0.1272,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0433,
+            0.0028,
+            0.1012
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0491,
+            -0.0022,
+            -0.01
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0491,
+            -0.0022,
+            0.01
+          ]
+        }
+      },
+      "parts": {
+        "body": "MH_Older_Woman_02_body",
+        "head": "MH_Older_Woman_02_head",
+        "hair": "MH_Older_Woman_02_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0319,
+            "colour": "#452b2f"
+          },
+          "bottom": {
+            "mean": 0.0452,
+            "colour": "#393d39"
+          },
+          "shoes": {
+            "mean": 0.0905,
+            "colour": "#6b4f3e"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.253,
+        "colour": "#8c8a85"
+      }
+    },
+    {
+      "id": "MH_Toddler_Boy_01",
+      "source": "makehuman",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "toddler",
+      "skin": 1,
+      "roles": [
+        "guest"
+      ],
+      "tags": [
+        "dungarees",
+        "trainers",
+        "shortHair"
+      ],
+      "files": {
+        "crowd": "MH_Toddler_Boy_01.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 405492
+      },
+      "lods": 3,
+      "height": 0.9539,
+      "hip": 0.4562,
+      "seatDrop": 0.2121,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.1433,
+            -0.0219,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0689,
+            -0.0642,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.018,
+            -0.0028,
+            0.0953
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0302,
+            -0.0011,
+            -0.0115
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0302,
+            -0.0011,
+            0.0115
+          ]
+        }
+      },
+      "parts": {
+        "body": "MH_Toddler_Boy_01_body",
+        "head": "MH_Toddler_Boy_01_head",
+        "hair": "MH_Toddler_Boy_01_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.5446,
+            "colour": "#bec3d0"
+          },
+          "bottom": {
+            "mean": 0.2569,
+            "colour": "#628cc9"
+          },
+          "shoes": {
+            "mean": 0.147,
+            "colour": "#6e6a6a"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0512,
+        "colour": "#4c3d33"
+      }
+    },
+    {
+      "id": "MH_Toddler_Girl_01",
+      "source": "makehuman",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "toddler",
+      "skin": 5,
+      "roles": [
+        "guest"
+      ],
+      "tags": [
+        "dress",
+        "sandals",
+        "curlyHair"
+      ],
+      "files": {
+        "crowd": "MH_Toddler_Girl_01.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 448360
+      },
+      "lods": 3,
+      "height": 0.9594,
+      "hip": 0.469,
+      "seatDrop": 0.2077,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.1474,
+            -0.0236,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0754,
+            -0.0793,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.016,
+            -0.0057,
+            0.0917
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0306,
+            -0.0013,
+            -0.0108
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0306,
+            -0.0013,
+            0.0108
+          ]
+        }
+      },
+      "parts": {
+        "body": "MH_Toddler_Girl_01_body",
+        "head": "MH_Toddler_Girl_01_head",
+        "hair": "MH_Toddler_Girl_01_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.187,
+            "colour": "#817199"
+          },
+          "shoes": {
+            "mean": 0.0061,
+            "colour": "#1a100c"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0026,
+        "colour": "#120606"
+      }
+    },
+    {
+      "id": "Male_Adult_01",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "shorts",
+        "polo",
+        "trainers"
+      ],
+      "files": {
+        "crowd": "Male_Adult_01.crowd.glb",
+        "hero": "Male_Adult_01.hero.glb"
+      },
+      "bytes": {
+        "crowd": 360280,
+        "hero": 808128
+      },
+      "lods": 3,
+      "height": 1.8237,
+      "hip": 0.8952,
+      "seatDrop": 0.4326,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.233,
+            -0.0356,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0843,
+            -0.1076,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0299,
+            -0.0073,
+            0.0615
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m002_body",
+        "head": "m002_head",
+        "hair": "m002_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.4147,
+            "colour": "#b4aba2"
+          },
+          "bottom": {
+            "mean": 0.2508,
+            "colour": "#998763"
+          },
+          "shoes": {
+            "mean": 0.1025,
+            "colour": "#5b5a58"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0134,
+        "colour": "#2a1b13"
+      },
+      "portrait": "portraits/Male_Adult_01.webp"
+    },
+    {
+      "id": "Male_Adult_02",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 1,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "sweater",
+        "trousers"
+      ],
+      "files": {
+        "crowd": "Male_Adult_02.crowd.glb",
+        "hero": "Male_Adult_02.hero.glb"
+      },
+      "bytes": {
+        "crowd": 341892,
+        "hero": 771236
+      },
+      "lods": 3,
+      "height": 1.8227,
+      "hip": 0.8952,
+      "seatDrop": 0.4411,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2321,
+            -0.0355,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0845,
+            -0.1119,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0272,
+            -0.0079,
+            0.0734
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m003_body",
+        "head": "m003_head",
+        "hair": "m003_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.31,
+            "colour": "#a8947f"
+          },
+          "bottom": {
+            "mean": 0.0157,
+            "colour": "#25211c"
+          },
+          "shoes": {
+            "mean": 0.0611,
+            "colour": "#5d3f2d"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0118,
+        "colour": "#241a14"
+      },
+      "portrait": "portraits/Male_Adult_02.webp"
+    },
+    {
+      "id": "Male_Adult_03",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "older",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "greyHair",
+        "jacket",
+        "trousers"
+      ],
+      "files": {
+        "crowd": "Male_Adult_03.crowd.glb",
+        "hero": "Male_Adult_03.hero.glb"
+      },
+      "bytes": {
+        "crowd": 331244,
+        "hero": 772228
+      },
+      "lods": 3,
+      "height": 1.8072,
+      "hip": 0.8952,
+      "seatDrop": 0.4421,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2167,
+            -0.0332,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0843,
+            -0.1075,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0254,
+            -0.0082,
+            0.0811
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m004_body",
+        "head": "m004_head",
+        "hair": "m004_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0712,
+            "colour": "#514b42"
+          },
+          "bottom": {
+            "mean": 0.0086,
+            "colour": "#171717"
+          },
+          "shoes": {
+            "mean": 0.0553,
+            "colour": "#43433e"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.1706,
+        "colour": "#886d5d"
+      },
+      "portrait": "portraits/Male_Adult_03.webp"
+    },
+    {
+      "id": "Male_Adult_04",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 4,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "curlyHair",
+        "jacket",
+        "trousers",
+        "trainers"
+      ],
+      "files": {
+        "crowd": "Male_Adult_04.crowd.glb",
+        "hero": "Male_Adult_04.hero.glb"
+      },
+      "bytes": {
+        "crowd": 382440,
+        "hero": 848816
+      },
+      "lods": 3,
+      "height": 1.8686,
+      "hip": 0.8952,
+      "seatDrop": 0.4384,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2776,
+            -0.0425,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0848,
+            -0.1202,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0204,
+            -0.0091,
+            0.1032
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m006_body",
+        "head": "m006_head",
+        "hair": "m006_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0188,
+            "colour": "#252621"
+          },
+          "bottom": {
+            "mean": 0.0347,
+            "colour": "#3c3326"
+          },
+          "shoes": {
+            "mean": 0.2474,
+            "colour": "#8b8886"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0117,
+        "colour": "#231a15"
+      },
+      "portrait": "portraits/Male_Adult_04.webp"
+    },
+    {
+      "id": "Male_Adult_05",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "older",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "greyHair",
+        "beard",
+        "gilet",
+        "sweater",
+        "trousers"
+      ],
+      "files": {
+        "crowd": "Male_Adult_05.crowd.glb",
+        "hero": "Male_Adult_05.hero.glb"
+      },
+      "bytes": {
+        "crowd": 370132,
+        "hero": 835696
+      },
+      "lods": 3,
+      "height": 1.8124,
+      "hip": 0.8952,
+      "seatDrop": 0.4282,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2219,
+            -0.0339,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0844,
+            -0.1093,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0265,
+            -0.008,
+            0.0763
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m009_body",
+        "head": "m009_head",
+        "hair": "m009_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0326,
+            "colour": "#303522"
+          },
+          "shoes": {
+            "mean": 0.0445,
+            "colour": "#49382a"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0182,
+        "colour": "#2d231c"
+      },
+      "portrait": "portraits/Male_Adult_05.webp"
+    },
+    {
+      "id": "Male_Adult_06",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "top",
+        "jeans",
+        "trainers"
+      ],
+      "files": {
+        "crowd": "Male_Adult_06.crowd.glb",
+        "hero": "Male_Adult_06.hero.glb"
+      },
+      "bytes": {
+        "crowd": 360172,
+        "hero": 814252
+      },
+      "lods": 3,
+      "height": 1.8313,
+      "hip": 0.8952,
+      "seatDrop": 0.4381,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2406,
+            -0.0368,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0843,
+            -0.107,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0284,
+            -0.0076,
+            0.068
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m011_body",
+        "head": "m011_head",
+        "hair": "m011_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0979,
+            "colour": "#a22e2c"
+          },
+          "bottom": {
+            "mean": 0.0239,
+            "colour": "#252c2d"
+          },
+          "shoes": {
+            "mean": 0.111,
+            "colour": "#595e64"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0262,
+        "colour": "#3c291c"
+      },
+      "portrait": "portraits/Male_Adult_06.webp"
+    },
+    {
+      "id": "Male_Adult_07",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 3,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "jacket",
+        "jeans"
+      ],
+      "files": {
+        "crowd": "Male_Adult_07.crowd.glb",
+        "hero": "Male_Adult_07.hero.glb"
+      },
+      "bytes": {
+        "crowd": 328300,
+        "hero": 788672
+      },
+      "lods": 3,
+      "height": 1.8205,
+      "hip": 0.8952,
+      "seatDrop": 0.4411,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2302,
+            -0.0352,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0847,
+            -0.1173,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0272,
+            -0.0078,
+            0.0732
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m013_body",
+        "head": "m013_head",
+        "hair": "m013_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0432,
+            "colour": "#3b3b36"
+          },
+          "bottom": {
+            "mean": 0.0382,
+            "colour": "#293941"
+          },
+          "shoes": {
+            "mean": 0.0127,
+            "colour": "#281b16"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0058,
+        "colour": "#1a0f09"
+      },
+      "portrait": "portraits/Male_Adult_07.webp"
+    },
+    {
+      "id": "Male_Adult_08",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "shirt",
+        "trousers"
+      ],
+      "files": {
+        "crowd": "Male_Adult_08.crowd.glb",
+        "hero": "Male_Adult_08.hero.glb"
+      },
+      "bytes": {
+        "crowd": 346364,
+        "hero": 785356
+      },
+      "lods": 3,
+      "height": 1.8257,
+      "hip": 0.8952,
+      "seatDrop": 0.4452,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.235,
+            -0.0359,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0844,
+            -0.1098,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0284,
+            -0.0076,
+            0.0681
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m014_body",
+        "head": "m014_head",
+        "hair": "m014_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.3403,
+            "colour": "#8aa0b6"
+          },
+          "bottom": {
+            "mean": 0.021,
+            "colour": "#25282e"
+          },
+          "shoes": {
+            "mean": 0.0127,
+            "colour": "#1e1e1a"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0186,
+        "colour": "#312218"
+      },
+      "portrait": "portraits/Male_Adult_08.webp"
+    },
+    {
+      "id": "Male_Adult_09",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "longHair",
+        "ponytail",
+        "tshirt",
+        "jeans"
+      ],
+      "files": {
+        "crowd": "Male_Adult_09.crowd.glb",
+        "hero": "Male_Adult_09.hero.glb"
+      },
+      "bytes": {
+        "crowd": 329028,
+        "hero": 802936
+      },
+      "lods": 3,
+      "height": 1.8222,
+      "hip": 0.8952,
+      "seatDrop": 0.4418,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2316,
+            -0.0354,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0843,
+            -0.107,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0296,
+            -0.0074,
+            0.0625
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m017_body",
+        "head": "m017_head",
+        "hair": "m017_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0176,
+            "colour": "#242329"
+          },
+          "bottom": {
+            "mean": 0.1435,
+            "colour": "#606c6f"
+          },
+          "shoes": {
+            "mean": 0.0277,
+            "colour": "#332e26"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0116,
+        "colour": "#211b17"
+      },
+      "portrait": "portraits/Male_Adult_09.webp"
+    },
+    {
+      "id": "Male_Adult_10",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "trackSuit",
+        "trainers"
+      ],
+      "files": {
+        "crowd": "Male_Adult_10.crowd.glb",
+        "hero": "Male_Adult_10.hero.glb"
+      },
+      "bytes": {
+        "crowd": 327716,
+        "hero": 752740
+      },
+      "lods": 3,
+      "height": 1.8313,
+      "hip": 0.8952,
+      "seatDrop": 0.4444,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2391,
+            -0.0366,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0845,
+            -0.1127,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0297,
+            -0.0074,
+            0.062
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m024_body",
+        "head": "m024_head",
+        "hair": "m024_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0447,
+            "colour": "#6d221f"
+          },
+          "bottom": {
+            "mean": 0.0233,
+            "colour": "#2a2a2a"
+          },
+          "shoes": {
+            "mean": 0.2231,
+            "colour": "#84827d"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0045,
+        "colour": "#140d05"
+      },
+      "portrait": "portraits/Male_Adult_10.webp"
+    },
+    {
+      "id": "Male_Adult_11",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 1,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "shirt",
+        "jeans"
+      ],
+      "files": {
+        "crowd": "Male_Adult_11.crowd.glb",
+        "hero": "Male_Adult_11.hero.glb"
+      },
+      "bytes": {
+        "crowd": 265376,
+        "hero": 678544
+      },
+      "lods": 3,
+      "height": 1.8027,
+      "hip": 0.8952,
+      "seatDrop": 0.4433,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2122,
+            -0.0325,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0841,
+            -0.1029,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0289,
+            -0.0075,
+            0.0656
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m001_body",
+        "head": "m001_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0244,
+            "colour": "#2e2b23"
+          },
+          "bottom": {
+            "mean": 0.1252,
+            "colour": "#546670"
+          },
+          "shoes": {
+            "mean": 0.0224,
+            "colour": "#352617"
+          }
+        }
+      },
+      "portrait": "portraits/Male_Adult_11.webp"
+    },
+    {
+      "id": "Male_Adult_12",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 5,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "jacket",
+        "jeans",
+        "trainers"
+      ],
+      "files": {
+        "crowd": "Male_Adult_12.crowd.glb",
+        "hero": "Male_Adult_12.hero.glb"
+      },
+      "bytes": {
+        "crowd": 275916,
+        "hero": 739864
+      },
+      "lods": 3,
+      "height": 1.8069,
+      "hip": 0.8952,
+      "seatDrop": 0.4514,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2164,
+            -0.0331,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0845,
+            -0.1113,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0305,
+            -0.0072,
+            0.0588
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m007_body",
+        "head": "m007_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.051,
+            "colour": "#394149"
+          },
+          "bottom": {
+            "mean": 0.1564,
+            "colour": "#657077"
+          },
+          "shoes": {
+            "mean": 0.3968,
+            "colour": "#a9a9a9"
+          }
+        }
+      },
+      "portrait": "portraits/Male_Adult_12.webp"
+    },
+    {
+      "id": "Male_Adult_13",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "older",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "bald",
+        "sweater",
+        "jeans"
+      ],
+      "files": {
+        "crowd": "Male_Adult_13.crowd.glb",
+        "hero": "Male_Adult_13.hero.glb"
+      },
+      "bytes": {
+        "crowd": 269788,
+        "hero": 703792
+      },
+      "lods": 3,
+      "height": 1.8059,
+      "hip": 0.8952,
+      "seatDrop": 0.4431,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2154,
+            -0.0329,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0847,
+            -0.1164,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0301,
+            -0.0073,
+            0.0606
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m010_body",
+        "head": "m010_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0937,
+            "colour": "#565656"
+          },
+          "bottom": {
+            "mean": 0.0491,
+            "colour": "#354145"
+          },
+          "shoes": {
+            "mean": 0.0446,
+            "colour": "#4f3626"
+          }
+        }
+      },
+      "portrait": "portraits/Male_Adult_13.webp"
+    },
+    {
+      "id": "Male_Adult_14",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "older",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "bald",
+        "shirt",
+        "trousers"
+      ],
+      "files": {
+        "crowd": "Male_Adult_14.crowd.glb",
+        "hero": "Male_Adult_14.hero.glb"
+      },
+      "bytes": {
+        "crowd": 266116,
+        "hero": 696552
+      },
+      "lods": 3,
+      "height": 1.7961,
+      "hip": 0.8952,
+      "seatDrop": 0.4474,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2057,
+            -0.0315,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0837,
+            -0.0936,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0289,
+            -0.0075,
+            0.0656
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m012_body",
+        "head": "m012_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.1514,
+            "colour": "#6d6d65"
+          },
+          "bottom": {
+            "mean": 0.2169,
+            "colour": "#917e60"
+          },
+          "shoes": {
+            "mean": 0.0178,
+            "colour": "#341f16"
+          }
+        }
+      },
+      "portrait": "portraits/Male_Adult_14.webp"
+    },
+    {
+      "id": "Male_Adult_15",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 4,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "beard",
+        "hat",
+        "longShirt",
+        "traditional"
+      ],
+      "files": {
+        "crowd": "Male_Adult_15.crowd.glb",
+        "hero": "Male_Adult_15.hero.glb"
+      },
+      "bytes": {
+        "crowd": 278732,
+        "hero": 701868
+      },
+      "lods": 3,
+      "height": 1.8186,
+      "hip": 0.8952,
+      "seatDrop": 0.4073,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.228,
+            -0.0349,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0842,
+            -0.1056,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0281,
+            -0.0077,
+            0.0691
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m204_body",
+        "head": "m204_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.5395,
+            "colour": "#c9c1b4"
+          },
+          "shoes": {
+            "mean": 0.0444,
+            "colour": "#48382e"
+          }
+        }
+      },
+      "portrait": "portraits/Male_Adult_15.webp"
+    },
+    {
+      "id": "Male_Adult_16",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 1,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "blonde",
+        "tshirt",
+        "jeans",
+        "trainers"
+      ],
+      "files": {
+        "crowd": "Male_Adult_16.crowd.glb",
+        "hero": "Male_Adult_16.hero.glb"
+      },
+      "bytes": {
+        "crowd": 275900,
+        "hero": 712012
+      },
+      "lods": 3,
+      "height": 1.809,
+      "hip": 0.8952,
+      "seatDrop": 0.4507,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2193,
+            -0.0335,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0843,
+            -0.107,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0297,
+            -0.0074,
+            0.062
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m019_body",
+        "head": "m019_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0939,
+            "colour": "#425873"
+          },
+          "bottom": {
+            "mean": 0.1244,
+            "colour": "#58656d"
+          },
+          "shoes": {
+            "mean": 0.0279,
+            "colour": "#2f2f2c"
+          }
+        }
+      },
+      "portrait": "portraits/Male_Adult_16.webp"
+    },
+    {
+      "id": "Male_Adult_17",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 4,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "hat",
+        "cap",
+        "hoodie",
+        "jeans",
+        "trainers"
+      ],
+      "files": {
+        "crowd": "Male_Adult_17.crowd.glb",
+        "hero": "Male_Adult_17.hero.glb"
+      },
+      "bytes": {
+        "crowd": 282652,
+        "hero": 768060
+      },
+      "lods": 3,
+      "height": 1.8117,
+      "hip": 0.8952,
+      "seatDrop": 0.4425,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2222,
+            -0.034,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0842,
+            -0.106,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0201,
+            -0.0092,
+            0.1043
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m022_body",
+        "head": "m022_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.3233,
+            "colour": "#999b96"
+          },
+          "bottom": {
+            "mean": 0.0344,
+            "colour": "#2b3638"
+          },
+          "shoes": {
+            "mean": 0.3346,
+            "colour": "#a19c8f"
+          }
+        }
+      },
+      "portrait": "portraits/Male_Adult_17.webp"
+    },
+    {
+      "id": "Male_Adult_18",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 5,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "hood",
+        "hoodie",
+        "trousers"
+      ],
+      "files": {
+        "crowd": "Male_Adult_18.crowd.glb",
+        "hero": "Male_Adult_18.hero.glb"
+      },
+      "bytes": {
+        "crowd": 250924,
+        "hero": 602164
+      },
+      "lods": 3,
+      "height": 1.8133,
+      "hip": 0.8952,
+      "seatDrop": 0.4398,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2229,
+            -0.0341,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0844,
+            -0.1107,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0294,
+            -0.0074,
+            0.0635
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m023_body",
+        "head": "m023_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.1606,
+            "colour": "#766f65"
+          },
+          "bottom": {
+            "mean": 0.0122,
+            "colour": "#1d1d1c"
+          },
+          "shoes": {
+            "mean": 0.0319,
+            "colour": "#32332a"
+          }
+        }
+      },
+      "portrait": "portraits/Male_Adult_18.webp"
+    },
+    {
+      "id": "Male_Adult_19",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 3,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "beard",
+        "keffiyeh",
+        "thobe",
+        "sandals",
+        "traditional"
+      ],
+      "files": {
+        "crowd": "Male_Adult_19.crowd.glb",
+        "hero": "Male_Adult_19.hero.glb"
+      },
+      "bytes": {
+        "crowd": 305928,
+        "hero": 744624
+      },
+      "lods": 3,
+      "height": 1.7542,
+      "hip": 0.8952,
+      "seatDrop": 0.4138,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.0505,
+            -0.0077,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0847,
+            -0.1165,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0326,
+            -0.0068,
+            0.0496
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m250_body",
+        "head": "m250_head",
+        "extras": {
+          "keffiyeh": "m250_keffiyeh"
+        }
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.544,
+            "colour": "#c4c3bf"
+          },
+          "shoes": {
+            "mean": 0.0205,
+            "colour": "#272727"
+          }
+        }
+      },
+      "portrait": "portraits/Male_Adult_19.webp"
+    },
+    {
+      "id": "Male_Adult_20",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "hoodie",
+        "jeans"
+      ],
+      "files": {
+        "crowd": "Male_Adult_20.crowd.glb",
+        "hero": "Male_Adult_20.hero.glb"
+      },
+      "bytes": {
+        "crowd": 268484,
+        "hero": 712432
+      },
+      "lods": 3,
+      "height": 1.8049,
+      "hip": 0.8952,
+      "seatDrop": 0.4519,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2149,
+            -0.0329,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0841,
+            -0.1034,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0215,
+            -0.0089,
+            0.0981
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m027_body",
+        "head": "m027_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0226,
+            "colour": "#37261e"
+          },
+          "bottom": {
+            "mean": 0.0251,
+            "colour": "#292c30"
+          },
+          "shoes": {
+            "mean": 0.089,
+            "colour": "#545454"
+          }
+        }
+      },
+      "portrait": "portraits/Male_Adult_20.webp"
+    },
+    {
+      "id": "Male_Adult_21",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 3,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "beard",
+        "keffiyeh",
+        "thobe",
+        "traditional"
+      ],
+      "files": {
+        "crowd": "Male_Adult_21.crowd.glb",
+        "hero": "Male_Adult_21.hero.glb"
+      },
+      "bytes": {
+        "crowd": 319996,
+        "hero": 838856
+      },
+      "lods": 3,
+      "height": 1.7541,
+      "hip": 0.8952,
+      "seatDrop": 0.4138,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.0446,
+            -0.0068,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0865,
+            -0.1624,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0208,
+            -0.0091,
+            0.1015
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m251_body",
+        "head": "m251_head",
+        "extras": {
+          "keffiyeh": "m251_keffiyeh"
+        }
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.5682,
+            "colour": "#c8c6c3"
+          },
+          "shoes": {
+            "mean": 0.0205,
+            "colour": "#272727"
+          }
+        }
+      },
+      "portrait": "portraits/Male_Adult_21.webp"
+    },
+    {
+      "id": "Male_Child_01",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "child",
+      "skin": 2,
+      "roles": [
+        "guest"
+      ],
+      "tags": [
+        "sweater",
+        "jeans",
+        "trainers"
+      ],
+      "files": {
+        "crowd": "Male_Child_01.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 265132
+      },
+      "lods": 3,
+      "height": 1.4328,
+      "hip": 0.7072,
+      "seatDrop": 0.3563,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.1784,
+            -0.0273,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0661,
+            -0.0724,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0245,
+            -0.0056,
+            0.0447
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.038,
+            0.0023,
+            -0.0141
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.038,
+            0.0023,
+            0.0141
+          ]
+        }
+      },
+      "parts": {
+        "body": "cm001_body",
+        "head": "cm001_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0915,
+            "colour": "#1c588d"
+          },
+          "bottom": {
+            "mean": 0.169,
+            "colour": "#66757a"
+          },
+          "shoes": {
+            "mean": 0.3424,
+            "colour": "#9e9e9e"
+          }
+        }
+      }
+    },
+    {
+      "id": "Male_Child_02",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "child",
+      "skin": 5,
+      "roles": [
+        "guest",
+        "beach"
+      ],
+      "tags": [
+        "tshirt",
+        "shorts",
+        "sandals",
+        "printedText"
+      ],
+      "files": {
+        "crowd": "Male_Child_02.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 279608
+      },
+      "lods": 3,
+      "height": 1.4255,
+      "hip": 0.7072,
+      "seatDrop": 0.3469,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.1691,
+            -0.0259,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0659,
+            -0.0676,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0253,
+            -0.0055,
+            0.0409
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.038,
+            0.0023,
+            -0.0141
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.038,
+            0.0023,
+            0.0141
+          ]
+        }
+      },
+      "parts": {
+        "body": "cm012_body",
+        "head": "cm012_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.1166,
+            "colour": "#924d33"
+          },
+          "bottom": {
+            "mean": 0.0552,
+            "colour": "#494139"
+          },
+          "shoes": {
+            "mean": 0.0263,
+            "colour": "#322c27"
+          },
+          "trim": {
+            "mean": 0.425,
+            "colour": "#b4adaa"
+          }
+        }
+      }
+    },
+    {
+      "id": "Medical_Female_02",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "staff"
+      ],
+      "tags": [
+        "labCoat",
+        "trousers"
+      ],
+      "files": {
+        "crowd": "Medical_Female_02.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 372944
+      },
+      "lods": 3,
+      "height": 1.7333,
+      "hip": 0.9233,
+      "seatDrop": 0.4381,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2048,
+            -0.0328,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0885,
+            -0.1339,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0042,
+            -0.0019,
+            0.0633
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f153_body",
+        "head": "f153_head",
+        "hair": "f153_opacity",
+        "extras": {
+          "stetoskop": "f153_stetoskop"
+        }
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.5282,
+            "colour": "#c0c0c0"
+          },
+          "bottom": {
+            "mean": 0.0076,
+            "colour": "#151516"
+          },
+          "shoes": {
+            "mean": 0.0099,
+            "colour": "#1b1915"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0188,
+        "colour": "#2e231c"
+      }
+    },
+    {
+      "id": "Medical_Male_03",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "older",
+      "skin": 2,
+      "roles": [
+        "staff"
+      ],
+      "tags": [
+        "labCoat",
+        "bald",
+        "tie",
+        "trousers"
+      ],
+      "files": {
+        "crowd": "Medical_Male_03.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 314320
+      },
+      "lods": 3,
+      "height": 1.7964,
+      "hip": 0.8952,
+      "seatDrop": 0.4096,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.206,
+            -0.0315,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0843,
+            -0.1077,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0276,
+            -0.0078,
+            0.0714
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m153_body",
+        "head": "m153_head",
+        "extras": {
+          "stetoskop": "m153_stetoskop"
+        }
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.5369,
+            "colour": "#c2c2bd"
+          },
+          "bottom": {
+            "mean": 0.0169,
+            "colour": "#232320"
+          },
+          "shoes": {
+            "mean": 0.0118,
+            "colour": "#1d1d19"
+          }
+        }
+      }
+    },
+    {
+      "id": "Pilot_Female_01",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "pilot",
+        "cabin"
+      ],
+      "tags": [
+        "hat",
+        "uniform",
+        "shortSleeves"
+      ],
+      "files": {
+        "crowd": "Pilot_Female_01.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 321460
+      },
+      "lods": 3,
+      "height": 1.7362,
+      "hip": 0.9233,
+      "seatDrop": 0.4486,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2075,
+            -0.0332,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0868,
+            -0.1234,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0059,
+            -0.0007,
+            0.056
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f168_body",
+        "head": "f168_head",
+        "extras": {
+          "hat": "f168_hat"
+        }
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.7607,
+            "colour": "#e2e2e2"
+          },
+          "bottom": {
+            "mean": 0.0126,
+            "colour": "#1e1d1b"
+          },
+          "shoes": {
+            "mean": 0.0072,
+            "colour": "#151410"
+          }
+        }
+      }
+    },
+    {
+      "id": "Pilot_Female_02",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 4,
+      "roles": [
+        "pilot",
+        "cabin"
+      ],
+      "tags": [
+        "hat",
+        "uniform",
+        "shortSleeves"
+      ],
+      "files": {
+        "crowd": "Pilot_Female_02.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 328188
+      },
+      "lods": 3,
+      "height": 1.7358,
+      "hip": 0.9233,
+      "seatDrop": 0.4486,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2071,
+            -0.0331,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0868,
+            -0.1234,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0059,
+            -0.0007,
+            0.056
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f169_body",
+        "head": "f169_head",
+        "extras": {
+          "hat": "f169_hat"
+        }
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.7278,
+            "colour": "#dddee1"
+          },
+          "bottom": {
+            "mean": 0.0126,
+            "colour": "#1e1d1b"
+          },
+          "shoes": {
+            "mean": 0.0072,
+            "colour": "#151410"
+          }
+        }
+      }
+    },
+    {
+      "id": "Pilot_Male_01",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "pilot"
+      ],
+      "tags": [
+        "hat",
+        "uniform",
+        "jacket",
+        "tie"
+      ],
+      "files": {
+        "crowd": "Pilot_Male_01.crowd.glb",
+        "hero": "Pilot_Male_01.hero.glb"
+      },
+      "bytes": {
+        "crowd": 270552,
+        "hero": 598116
+      },
+      "lods": 3,
+      "height": 1.8372,
+      "hip": 0.8952,
+      "seatDrop": 0.4354,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2338,
+            -0.0358,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0848,
+            -0.1197,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0287,
+            -0.0076,
+            0.0666
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m150_body",
+        "head": "m150_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0075,
+            "colour": "#151513"
+          },
+          "shoes": {
+            "mean": 0.0116,
+            "colour": "#1c1c19"
+          }
+        }
+      },
+      "portrait": "portraits/Pilot_Male_01.webp"
+    },
+    {
+      "id": "Pilot_Male_02",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "older",
+      "skin": 2,
+      "roles": [
+        "pilot"
+      ],
+      "tags": [
+        "hat",
+        "uniform",
+        "jacket",
+        "tie",
+        "greyHair"
+      ],
+      "files": {
+        "crowd": "Pilot_Male_02.crowd.glb",
+        "hero": "Pilot_Male_02.hero.glb"
+      },
+      "bytes": {
+        "crowd": 280332,
+        "hero": 635100
+      },
+      "lods": 3,
+      "height": 1.8372,
+      "hip": 0.8952,
+      "seatDrop": 0.4442,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2338,
+            -0.0358,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0848,
+            -0.1197,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0295,
+            -0.0074,
+            0.0629
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m151_body",
+        "head": "m151_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0091,
+            "colour": "#181818"
+          },
+          "shoes": {
+            "mean": 0.0116,
+            "colour": "#1c1c19"
+          }
+        }
+      },
+      "portrait": "portraits/Pilot_Male_02.webp"
+    },
+    {
+      "id": "Pilot_Male_03",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "pilot"
+      ],
+      "tags": [
+        "hat",
+        "uniform",
+        "shortSleeves"
+      ],
+      "files": {
+        "crowd": "Pilot_Male_03.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 293760
+      },
+      "lods": 3,
+      "height": 1.8551,
+      "hip": 0.8952,
+      "seatDrop": 0.444,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2453,
+            -0.0375,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0842,
+            -0.1048,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0284,
+            -0.0076,
+            0.0678
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m167_body",
+        "head": "m167_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.7197,
+            "colour": "#dcdce0"
+          },
+          "bottom": {
+            "mean": 0.0107,
+            "colour": "#1b1b18"
+          },
+          "shoes": {
+            "mean": 0.0055,
+            "colour": "#111111"
+          }
+        }
+      }
+    },
+    {
+      "id": "Security_Female_01",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "security"
+      ],
+      "tags": [
+        "hat",
+        "uniform"
+      ],
+      "files": {
+        "crowd": "Security_Female_01.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 393988
+      },
+      "lods": 3,
+      "height": 1.7323,
+      "hip": 0.9233,
+      "seatDrop": 0.4382,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2064,
+            -0.033,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0876,
+            -0.1285,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0042,
+            -0.0018,
+            0.0631
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f170_body",
+        "head": "f170_head",
+        "extras": {
+          "hat": "f170_hat",
+          "pistol": "f170_pistol"
+        }
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.017,
+            "colour": "#232324"
+          },
+          "bottom": {
+            "mean": 0.0077,
+            "colour": "#151516"
+          },
+          "shoes": {
+            "mean": 0.0148,
+            "colour": "#212020"
+          }
+        }
+      }
+    },
+    {
+      "id": "Security_Male_01",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "older",
+      "skin": 2,
+      "roles": [
+        "security"
+      ],
+      "tags": [
+        "hat",
+        "uniform",
+        "tie"
+      ],
+      "files": {
+        "crowd": "Security_Male_01.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 365792
+      },
+      "lods": 3,
+      "height": 1.8323,
+      "hip": 0.8952,
+      "seatDrop": 0.4336,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2373,
+            -0.0363,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0843,
+            -0.1086,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0279,
+            -0.0077,
+            0.0701
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m171_body",
+        "head": "m171_head",
+        "extras": {
+          "equipment": "m171_equipment"
+        }
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0537,
+            "colour": "#424145"
+          },
+          "bottom": {
+            "mean": 0.0077,
+            "colour": "#151515"
+          },
+          "shoes": {
+            "mean": 0.0058,
+            "colour": "#121210"
+          }
+        }
+      }
+    },
+    {
+      "id": "Sports_Female_01",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "swim",
+        "beach"
+      ],
+      "tags": [
+        "swimwear",
+        "barefoot",
+        "ponytail",
+        "blonde"
+      ],
+      "files": {
+        "crowd": "Sports_Female_01.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 296480
+      },
+      "lods": 3,
+      "height": 1.7334,
+      "hip": 0.9233,
+      "seatDrop": 0.4499,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2064,
+            -0.033,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0844,
+            -0.1086,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0073,
+            0.0003,
+            0.0504
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f021_body",
+        "head": "f021_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.1306,
+            "colour": "#a2456e"
+          }
+        }
+      }
+    },
+    {
+      "id": "Sports_Female_02",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "f",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "ponytail",
+        "top",
+        "trousers",
+        "trainers"
+      ],
+      "files": {
+        "crowd": "Sports_Female_02.crowd.glb",
+        "hero": "Sports_Female_02.hero.glb"
+      },
+      "bytes": {
+        "crowd": 362212,
+        "hero": 821844
+      },
+      "lods": 3,
+      "height": 1.7375,
+      "hip": 0.9233,
+      "seatDrop": 0.4466,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2079,
+            -0.0333,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0941,
+            -0.1686,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0069,
+            0,
+            0.0522
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0476,
+            0.0008,
+            -0.0128
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0476,
+            0.0008,
+            0.0128
+          ]
+        }
+      },
+      "parts": {
+        "body": "f013_body",
+        "head": "f013_head",
+        "hair": "f013_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.237,
+            "colour": "#868686"
+          },
+          "bottom": {
+            "mean": 0.0101,
+            "colour": "#171a1d"
+          },
+          "shoes": {
+            "mean": 0.1713,
+            "colour": "#737373"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0059,
+        "colour": "#15110e"
+      },
+      "portrait": "portraits/Sports_Female_02.webp"
+    },
+    {
+      "id": "Sports_Male_01",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 1,
+      "roles": [
+        "swim",
+        "beach"
+      ],
+      "tags": [
+        "swimwear",
+        "barefoot"
+      ],
+      "files": {
+        "crowd": "Sports_Male_01.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 269648
+      },
+      "lods": 3,
+      "height": 1.8041,
+      "hip": 0.8952,
+      "seatDrop": 0.4657,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2141,
+            -0.0328,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0832,
+            -0.0815,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0316,
+            -0.007,
+            0.0538
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m021_body",
+        "head": "m021_head"
+      },
+      "outfit": {
+        "regions": {
+          "bottom": {
+            "mean": 0.0146,
+            "colour": "#202022"
+          }
+        }
+      }
+    },
+    {
+      "id": "Sports_Male_02",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "beach"
+      ],
+      "tags": [
+        "sportsKit",
+        "shorts",
+        "printedText",
+        "footballBoots"
+      ],
+      "files": {
+        "crowd": "Sports_Male_02.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 290944
+      },
+      "lods": 3,
+      "height": 1.821,
+      "hip": 0.8952,
+      "seatDrop": 0.4328,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.215,
+            -0.0329,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0844,
+            -0.1108,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0298,
+            -0.0074,
+            0.062
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m301_body",
+        "head": "m301_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.017,
+            "colour": "#232323"
+          },
+          "shoes": {
+            "mean": 0.3555,
+            "colour": "#a1a1a1"
+          }
+        }
+      }
+    },
+    {
+      "id": "Sports_Male_03",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 4,
+      "roles": [
+        "beach"
+      ],
+      "tags": [
+        "sportsKit",
+        "shorts",
+        "curlyHair",
+        "printedText",
+        "footballBoots"
+      ],
+      "files": {
+        "crowd": "Sports_Male_03.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 388460
+      },
+      "lods": 3,
+      "height": 1.8427,
+      "hip": 0.8952,
+      "seatDrop": 0.4328,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2345,
+            -0.0359,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0845,
+            -0.1126,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0305,
+            -0.0072,
+            0.0589
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m300_body",
+        "head": "m300_head",
+        "hair": "m300_opacity"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0156,
+            "colour": "#212121"
+          },
+          "shoes": {
+            "mean": 0.0225,
+            "colour": "#292929"
+          }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0058,
+        "colour": "#15110d"
+      }
+    },
+    {
+      "id": "Sports_Male_04",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 2,
+      "roles": [
+        "beach"
+      ],
+      "tags": [
+        "vest",
+        "shorts",
+        "trainers"
+      ],
+      "files": {
+        "crowd": "Sports_Male_04.crowd.glb"
+      },
+      "bytes": {
+        "crowd": 280096
+      },
+      "lods": 3,
+      "height": 1.8042,
+      "hip": 0.8952,
+      "seatDrop": 0.4478,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2173,
+            -0.0332,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0835,
+            -0.0868,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0316,
+            -0.007,
+            0.0537
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m026_body",
+        "head": "m026_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.0366,
+            "colour": "#183562"
+          },
+          "bottom": {
+            "mean": 0.4625,
+            "colour": "#b5b5b5"
+          },
+          "shoes": {
+            "mean": 0.2766,
+            "colour": "#918f8b"
+          }
+        }
+      }
+    },
+    {
+      "id": "Wood_Male_01",
+      "source": "rocketbox",
+      "rig": "rocketbox",
+      "gender": "m",
+      "age": "adult",
+      "skin": 4,
+      "roles": [
+        "guest",
+        "playable"
+      ],
+      "tags": [
+        "hat",
+        "cap",
+        "beard",
+        "shirt",
+        "jeans",
+        "boots"
+      ],
+      "files": {
+        "crowd": "Wood_Male_01.crowd.glb",
+        "hero": "Wood_Male_01.hero.glb"
+      },
+      "bytes": {
+        "crowd": 284368,
+        "hero": 749172
+      },
+      "lods": 3,
+      "height": 1.8138,
+      "hip": 0.8952,
+      "seatDrop": 0.4465,
+      "anchors": {
+        "headTop": {
+          "bone": "Head",
+          "at": [
+            0.2232,
+            -0.0341,
+            0
+          ]
+        },
+        "back": {
+          "bone": "spine_03",
+          "at": [
+            0.0842,
+            -0.1054,
+            0
+          ]
+        },
+        "shoulderL": {
+          "bone": "clavicle_l",
+          "at": [
+            0.0291,
+            -0.0075,
+            0.065
+          ]
+        },
+        "palmL": {
+          "bone": "hand_l",
+          "at": [
+            0.0481,
+            0.0021,
+            -0.014
+          ]
+        },
+        "palmR": {
+          "bone": "hand_r",
+          "at": [
+            0.0481,
+            0.0021,
+            0.014
+          ]
+        }
+      },
+      "parts": {
+        "body": "m110_body",
+        "head": "m110_head"
+      },
+      "outfit": {
+        "regions": {
+          "top": {
+            "mean": 0.3159,
+            "colour": "#8c9ba0"
+          },
+          "bottom": {
+            "mean": 0.122,
+            "colour": "#4e6577"
+          },
+          "shoes": {
+            "mean": 0.0473,
+            "colour": "#523827"
+          }
+        }
+      },
+      "portrait": "portraits/Wood_Male_01.webp"
+    }
+  ],
+  "sets": {
+    "park": [
+      "Female_Adult_01",
+      "Female_Adult_03",
+      "Female_Adult_04",
+      "Female_Adult_06",
+      "Female_Adult_08",
+      "Female_Adult_12",
+      "Female_Party_02",
+      "Business_Female_01",
+      "Male_Adult_01",
+      "Male_Adult_04",
+      "Male_Adult_06",
+      "Male_Adult_08",
+      "Male_Adult_09",
+      "Male_Adult_12",
+      "Male_Adult_15",
+      "Male_Adult_17",
+      "Male_Adult_05",
+      "Business_Female_02",
+      "MH_Older_Woman_01",
+      "MH_Older_Woman_02",
+      "Female_Child_01",
+      "Male_Child_01",
+      "MH_Child_Boy_01",
+      "MH_Child_Girl_01",
+      "MH_Toddler_Boy_01",
+      "MH_Toddler_Girl_01"
+    ],
+    "airport": [
+      "Pilot_Male_01",
+      "Pilot_Male_03",
+      "Pilot_Female_01",
+      "Business_Female_03",
+      "Business_Female_04",
+      "Business_Male_02",
+      "Construction_Female_01",
+      "Construction_Male_07",
+      "Construction_Male_08",
+      "Construction_Male_05",
+      "Security_Female_01",
+      "Security_Male_01"
+    ],
+    "island": [
+      "Sports_Female_01",
+      "Sports_Male_01",
+      "Sports_Male_04",
+      "Female_Party_01"
+    ]
+  }
+}

@@ -135,21 +135,18 @@ const preview: PreviewScene = async (p: PreviewApi) => {
   const gate = phase === 'boarding' || phase === 'skip' || phase === 'deplane' || phase === 'offer';
   let travellers = quickTravellers();
   if (gate) {
-    const [{ GLTFLoader }, people, isle, crowd] = await Promise.all([
-      import('three/examples/jsm/loaders/GLTFLoader.js'),
-      import('../../world/crowd/people'),
-      import('../../world/island/island'),
-      import('../../world/crowd/travellers'),
-    ]);
-    const loader = new GLTFLoader();
-    const [guests, anims] = await Promise.all([loader.loadAsync(people.GUESTS_URL), loader.loadAsync(people.GUEST_ANIMS_URL)]);
+    const [people, isle, crowd] = await Promise.all([import('../../world/crowd/people-factory'), import('../../world/island/island'), import('../../world/crowd/travellers')]);
+    // the game's people: the park's, and the airport's and the island's as the first trip loads them
+    const tier = ctx.quality.tier;
+    const factory = await people.PeopleFactory.create(ctx.renderer, people.downloadPeople({ sets: ['park'], tier }), { tier });
+    await Promise.all([factory.loadSet('airport'), factory.loadSet('island')]);
     const palmCay = new isle.PalmCay(ctx);
     ctx.scene.add(palmCay.group);
     for (let i = 0; i < 200; i++) {
       home.update(1 / 30, i / 30, ctx.camera);
       island.update(1 / 30, i / 30);
     }
-    travellers = new crowd.Travellers(ctx, new people.PeopleFactory(guests, anims), { home, island, palmCay, shadows: ctx.quality.shadows, tier: ctx.quality.tier });
+    travellers = new crowd.Travellers(ctx, factory, { home, island, palmCay, shadows: ctx.quality.shadows, tier });
   }
   const ground = flightGround({ home: (x, z) => fields.home.surfaceAt(x, z), island: (x, z) => fields.island.surfaceAt(x, z) });
   const post = { setAOEnabled: () => undefined } as unknown as Post;

@@ -8,14 +8,17 @@ import { mulberry } from '../random';
 import { nearTrack } from '../rides';
 import { NavGraph } from './nav';
 import { Obstacles } from './obstacles';
-import { randomLook, type Look, type PeopleFactory, type PersonRig } from './people';
+import type { RandomLookOptions, PeopleFactory } from './people-factory';
+import type { Base, PersonRig } from './person-rig';
+import type { Look } from './looks';
 import { Dog, Leash, type DogFactory } from './pets';
 
 // The park's guests. Everyone belongs to a party (on their own, a couple, friends, or a family
 // with children, sometimes with a dog). Each party leader runs a little "day out" script —
 // stroll somewhere, queue for a coaster and ride it, watch a ride, sit on a bench, try the
 // High Striker, buy tickets, let the kids play — written as generators, one step per frame.
-// Everyone else in the party follows the leader around, or joins in.
+// Everyone else in the party follows the leader around, or joins in. Toddlers only ever come
+// with their family, who walk at a toddler's pace and leave the coasters to the bigger ones.
 
 type P = { x: number; z: number };
 type Task = Generator<void, void, void>;
@@ -146,14 +149,21 @@ interface Bench {
   seats: (Guest | null)[];
 }
 
-function benchGeometry() {
+export function benchGeometry() {
   const parts: THREE.BufferGeometry[] = [];
   for (let i = 0; i < 4; i++) parts.push(new THREE.BoxGeometry(1.8, 0.04, 0.09).translate(0, 0.45, -0.17 + i * 0.11));
   for (let i = 0; i < 3; i++) parts.push(new THREE.BoxGeometry(1.8, 0.09, 0.03).translate(0, 0.62 + i * 0.12, 0.25).rotateX(0));
   return mergeGeometries(parts)!;
 }
 
-function benchFrame() {
+/**
+ * How far in front of the bench's middle a sitter's root goes, for someone `height` tall: their
+ * seated hips are about 0.19·height behind it (see PersonRig.seatPoint), so a grown-up sits back
+ * against the backrest and a child further forward, knees over the front edge.
+ */
+export const benchFront = (height: number) => 0.06 + 0.09 * height;
+
+export function benchFrame() {
   const parts: THREE.BufferGeometry[] = [];
   for (const x of [-0.78, 0.78]) {
     parts.push(new THREE.BoxGeometry(0.06, 0.45, 0.06).translate(x, 0.225, -0.18));
@@ -180,6 +190,8 @@ class Guest {
   speed = 0;
   /** Preferred walking pace (m/s). */
   pace: number;
+  /** Running pace, catching up or playing tag (a toddler's is a trot). */
+  readonly runPace: number;
   /** Which side of the path this person keeps to (-1…1). */
   lane = R(-0.8, 0.8);
   task: Task | null = null;
@@ -208,19 +220,38 @@ class Guest {
   alight = false;
   done = false;
   private animDt = 0;
-  readonly hands: [THREE.Object3D, THREE.Object3D];
+  /** The palms (a dog's leash is held in one). */
+  hands!: [THREE.Object3D, THREE.Object3D];
+  rig!: PersonRig;
 
   constructor(
-    readonly rig: PersonRig,
-    readonly look: Look,
+    rig: PersonRig,
     readonly index: number,
   ) {
-    this.hands = [rig.root.getObjectByName('hand_l')!, rig.root.getObjectByName('hand_r')!];
-    this.pace = look.child ? R(1.0, 1.35) : R(0.95, 1.35);
+    this.dress(rig);
+    const { age, child } = rig.look;
+    // (a toddler's legs: the walk clips at their size go about 0.75 m/s, a jog 1.3)
+    this.pace = age === 'toddler' ? R(0.8, 0.9) : child ? R(1.0, 1.35) : R(0.95, 1.35);
+    this.runPace = age === 'toddler' ? R(1.3, 1.5) : child ? R(2.6, 3.2) : 3;
+  }
+
+  /** Wear this rig from now on (a new one when the visitor took this guest's avatar: see Crowd.setExclude). */
+  dress(rig: PersonRig) {
+    this.rig = rig;
+    this.hands = [rig.anchorObject('palmL'), rig.anchorObject('palmR')];
+  }
+
+  /** What the guest looks like (the rig's: a stand-in says what it really is). */
+  get look(): Look {
+    return this.rig.look;
   }
 
   get child() {
-    return this.look.child;
+    return this.rig.look.child;
+  }
+
+  get toddler() {
+    return this.rig.look.age === 'toddler';
   }
 
   get arrived() {
@@ -279,7 +310,12 @@ class Guest {
 export interface CrowdOptions {
   count: number;
   shadows: boolean;
+  /** Avatars nobody in the crowd wears: the visitor's, so they meet no double of themselves (see setExclude). */
+  exclude?: string[];
 }
+
+/** No party with someone smaller than this rides the coasters (the height check at the gate). */
+const RIDE_MIN_HEIGHT = 1.1;
 
 /** Simulates and draws the park's guests and their dogs. */
 export class Crowd {
@@ -299,6 +335,7 @@ export class Crowd {
   private tmpV = new THREE.Vector3();
   private watchSpots: { at: P; look: () => P & { y?: number } }[];
   private player: { position: THREE.Vector3 } | null = null;
+  private exclude: string[];
 
   constructor(
     private ctx: Ctx,
@@ -308,6 +345,7 @@ export class Crowd {
     private striker: Striker,
     private opts: CrowdOptions,
   ) {
+    this.exclude = [...(opts.exclude ?? [])];
     this.obs = new Obstacles(ctx.world);
     this.buildBenches(); // (benches are obstacles too: place them before routing round things)
     this.nav.repair(this.obs, LAYOUT.spawn);
@@ -355,6 +393,43 @@ export class Crowd {
 
   setPlayer(p: { position: THREE.Vector3 }) {
     this.player = p;
+  }
+
+  /**
+   * Avatars nobody in the crowd may wear (the visitor's, whenever they change it): any guest
+   * wearing one now is dressed as someone else of the same kind, there and then.
+   */
+  setExclude(ids: string[]) {
+    this.exclude = [...ids];
+    const out = new Set(ids);
+    for (const g of this.guests) {
+      if (!out.has(g.rig.look.avatar)) continue;
+      const was = g.rig;
+      const { gender, age, child } = was.look;
+      const rig = this.people.create(this.randomLook({ child, gender, age }));
+      if (out.has(rig.look.avatar)) {
+        // (nobody else of that kind is loaded: a double is better than nobody)
+        rig.dispose();
+        continue;
+      }
+      rig.setShadows(this.opts.shadows);
+      rig.setGlow(Math.max(0, this.night));
+      rig.setBase(was.pose);
+      rig.armsUp = was.armsUp;
+      // seated: the new body's own drop below the seat
+      if (was.pose === 'sit' && !g.ride) g.y += was.seatDrop - rig.seatDrop;
+      rig.root.position.copy(was.root.position);
+      rig.root.quaternion.copy(was.root.quaternion);
+      rig.root.visible = was.root.visible;
+      this.ctx.scene.add(rig.root);
+      was.dispose();
+      g.dress(rig);
+    }
+  }
+
+  /** A guest's look from the park's avatars, never one of the excluded. */
+  private randomLook(o: RandomLookOptions = {}): Look {
+    return this.people.randomLook(rnd, { ...o, exclude: this.exclude });
   }
 
   // ---------------------------------------------------------------- setup
@@ -421,7 +496,7 @@ export class Crowd {
   private makeGuest(look: Look) {
     const rig = this.people.create(look);
     rig.setShadows(this.opts.shadows);
-    const g = new Guest(rig, look, this.guests.length);
+    const g = new Guest(rig, this.guests.length);
     this.ctx.scene.add(rig.root);
     this.guests.push(g);
     return g;
@@ -432,22 +507,26 @@ export class Crowd {
     while (n < total) {
       const roll = rnd();
       const looks: Look[] = [];
-      if (roll < 0.3) looks.push(randomLook(rnd));
+      if (roll < 0.3) looks.push(this.randomLook());
       else if (roll < 0.52) {
-        const a = randomLook(rnd);
-        looks.push(a, randomLook(rnd, { gender: chance(0.8) ? (a.gender === 'm' ? 'f' : 'm') : a.gender }));
+        const a = this.randomLook();
+        looks.push(a, this.randomLook({ gender: chance(0.8) ? (a.gender === 'm' ? 'f' : 'm') : a.gender }));
       } else if (roll < 0.88) {
-        // a family: one or two grown-ups and up to three children
-        looks.push(randomLook(rnd, { age: 'young' }));
-        if (chance(0.7)) looks.push(randomLook(rnd, { gender: looks[0].gender === 'm' ? 'f' : 'm', age: 'young' }));
+        // a family: one or two grown-ups and up to three children (the grown-ups first: a family
+        // cut short at the end still has one, so no child, let alone a toddler, is ever alone)
+        looks.push(this.randomLook({ age: 'young' }));
+        if (chance(0.7)) looks.push(this.randomLook({ gender: looks[0].gender === 'm' ? 'f' : 'm', age: 'young' }));
         const kids = 1 + Math.floor(rnd() * 3);
-        for (let k = 0; k < kids; k++) looks.push(randomLook(rnd, { child: true }));
-      } else for (let k = 0; k < 3; k++) looks.push(randomLook(rnd, { age: 'young' }));
+        for (let k = 0; k < kids; k++) looks.push(this.randomLook({ child: true }));
+      } else for (let k = 0; k < 3; k++) looks.push(this.randomLook({ age: 'young' }));
       const members = looks.slice(0, Math.max(1, total - n)).map((l) => this.makeGuest(l));
       n += members.length;
       const party: Party = { members, leader: members[0], dog: null };
       for (const m of members) m.party = party;
       this.parties.push(party);
+      // a toddler sets the family's pace: the leader slows to a stroll the little one keeps up with
+      // (and the others, a touch quicker, stay with the leader)
+      if (members.some((m) => m.toddler)) for (const m of members) if (!m.toddler) m.pace = m === party.leader ? R(0.6, 0.68) : R(0.7, 0.8);
       // place them together somewhere in the park
       const at = this.nav.random(rnd, PARK.r - 5);
       members.forEach((m, i) => this.place(m, at.x + R(-1.5, 1.5) + i * 0.3, at.z + R(-1.5, 1.5), R(-Math.PI, Math.PI)));
@@ -587,7 +666,8 @@ export class Crowd {
       const shorter = waits.indexOf(Math.min(...waits));
       const stop = this.stops[chance(0.7) ? shorter : Math.floor(rnd() * this.stops.length)];
       const act = (a: string) => (L.activity = a);
-      if (!p.dog && pick < 0.24 && stop && free(stop.queue)) act(`coaster:${this.stops.indexOf(stop)}`), yield* this.coasterTrip(p, stop);
+      const tall = p.members.every((m) => m.look.height >= RIDE_MIN_HEIGHT);
+      if (!p.dog && tall && pick < 0.24 && stop && free(stop.queue)) act(`coaster:${this.stops.indexOf(stop)}`), yield* this.coasterTrip(p, stop);
       else if (kids.length && pick < 0.46) act('play'), yield* this.play(p);
       else if (pick < 0.58 && this.watchSpots.length) act('watch'), yield* this.watch(p);
       else if (pick < 0.68 && p.members.length <= 3) act('bench'), yield* this.bench(p);
@@ -609,13 +689,15 @@ export class Crowd {
     const L = p.leader;
     yield* this.walkTo(L, w.at.x + R(-1.2, 1.2), w.at.z + R(-1.2, 1.2));
     L.face = w.look;
+    if (!L.child && chance(0.3)) L.rig.setBase('foldArms');
     const end = R(10, 25);
     for (let t = 0; t < end; t += this.dt) {
       // the odd photo or a wave at the riders
-      if (chance(this.dt * 0.08)) L.rig.play('Interact');
+      if (chance(this.dt * 0.08)) L.rig.play(L.rig.has('Take_Photo') ? 'Take_Photo' : 'Interact');
       else if (chance(this.dt * 0.05)) L.rig.wave();
       yield;
     }
+    L.rig.setBase('stand');
     L.face = null;
   }
 
@@ -631,7 +713,7 @@ export class Crowd {
     const end = R(8, 16);
     for (let t = 0; t < end; t += this.dt) {
       const talker = p.members[Math.floor((t / 3) % p.members.length)];
-      for (const m of p.members) if (!m.child) m.rig.setBase(m === talker ? 'talk' : 'stand');
+      for (const m of p.members) if (!m.child) m.rig.setBase(m === talker ? 'talk' : 'listen');
       yield;
     }
     for (const m of p.members) {
@@ -692,7 +774,8 @@ export class Crowd {
     yield* this.wait(0.5);
     m.rig.setBase('sit');
     // back into the seat (facing away from the backrest)
-    yield* this.glide(m, new THREE.Vector3(b.x + fx * 0.06 + rx * off, 0.47 - m.rig.seatDrop, b.z + fz * 0.06 + rz * off), 0.5, false);
+    const front = benchFront(m.look.height);
+    yield* this.glide(m, new THREE.Vector3(b.x + fx * front + rx * off, 0.47 - m.rig.seatDrop, b.z + fz * front + rz * off), 0.5, false);
   }
 
   private *strike(p: Party): Task {
@@ -738,10 +821,18 @@ export class Crowd {
     g.rig.armsUp = 0;
   }
 
+  /** How someone stands in a line: waiting, arms folded, or on their phone (children just stand). */
+  private queueBase(g: Guest): Base {
+    if (g.child) return 'stand';
+    const r = rnd();
+    return r < 0.4 ? 'wait' : r < 0.6 ? 'foldArms' : r < 0.78 ? 'text' : 'stand';
+  }
+
   /** Join a queue, shuffle forward, take your turn when you reach the front, then leave. */
   private *queueTurn(g: Guest, q: Queue, turn: () => Task): Task {
     q.join(g);
     const slot = { x: 0, z: 0, heading: 0 };
+    g.rig.setBase(this.queueBase(g));
     for (;;) {
       const i = q.people.indexOf(g);
       q.slot(i, slot);
@@ -750,6 +841,7 @@ export class Crowd {
       if (i === 0 && far < 0.5) break;
       yield;
     }
+    g.rig.setBase('stand');
     yield* turn();
     q.leave(g);
     g.done = true;
@@ -765,7 +857,11 @@ export class Crowd {
         L.faceHeading = 0; // facing the window, north
         yield* this.wait(0.6);
         L.rig.play('Interact');
-        yield* this.wait(R(3, 6));
+        yield* this.wait(1.2);
+        // hearing what the tickets get them
+        L.rig.setBase('listen');
+        yield* this.wait(R(2, 5));
+        L.rig.setBase('stand');
       }.call(this),
     );
     L.done = false;
@@ -782,10 +878,13 @@ export class Crowd {
     const adults = p.members.filter((m) => !m.child && m !== L);
     const centre = { x: px, z: pz };
     L.face = centre;
+    // the grown-ups keep an eye on them, some with their arms folded
+    for (const a of [L, ...adults]) if (chance(0.35)) a.rig.setBase('foldArms');
     for (const a of adults) a.setTask(this.idleAt(a, centre));
     for (const k of kids) k.setTask(this.kidPlay(k, px, pz, pr * 0.75));
     yield* this.wait(R(20, 40));
     L.face = null;
+    L.rig.setBase('stand');
     for (const m of p.members) if (m !== L) {
       m.rig.setBase('stand');
       m.setTask(this.follow(m));
@@ -848,6 +947,7 @@ export class Crowd {
     const slot = { x: 0, z: 0, heading: 0 };
     g.done = false;
     // ---- queue until the operator calls you to a seat
+    g.rig.setBase(this.queueBase(g));
     while (g.seatIndex < 0) {
       const i = q.people.indexOf(g);
       if (i < 0) q.join(g);
@@ -858,6 +958,7 @@ export class Crowd {
     }
     const seat = g.seatIndex;
     // ---- up the entrance stairs, along the platform, into the seat
+    g.rig.setBase('stand');
     g.stop();
     yield* this.glide(g, st.entryFoot, g.pace);
     yield* this.glide(g, st.entryTop, g.pace * 0.7);
@@ -946,7 +1047,7 @@ export class Crowd {
           }
           else {
             g.progress(d, dt);
-            want = g.run ? (g.child ? R(2.6, 3.2) : 3) : g.pace;
+            want = g.run ? g.runPace : g.pace;
             if (last) want = Math.min(want, 0.3 + d * 1.2);
             vx = dx / d;
             vz = dz / d;
@@ -1003,7 +1104,9 @@ export class Crowd {
     const stop = g.ride!;
     const seat = stop.coaster.seats[g.rideSeat];
     const m = seat.car.matrix;
-    this.tmpV.set(seat.local.x, seat.local.y - g.rig.seatDrop, seat.local.z + 0.08).applyMatrix4(m);
+    // (the seat's back is 0.29 m behind its middle and seated hips about 0.19·height behind the root:
+    // a grown-up's back against it, a child a little forward of it, as on a bench)
+    this.tmpV.set(seat.local.x, seat.local.y - g.rig.seatDrop, seat.local.z - 0.09 * g.look.height).applyMatrix4(m);
     g.x = this.tmpV.x;
     g.y = this.tmpV.y;
     g.z = this.tmpV.z;
@@ -1012,9 +1115,11 @@ export class Crowd {
     g.rig.root.quaternion.setFromRotationMatrix(this.mat4.extractRotation(m));
   }
 
+  private hand = new THREE.Vector3();
+  private collar = new THREE.Vector3();
+
   private updateDogs(dt: number) {
-    const hand = new THREE.Vector3();
-    const collar = new THREE.Vector3();
+    const { hand, collar } = this;
     for (const d of this.dogs) {
       const o = d.owner;
       const c = Math.cos(o.heading);
@@ -1047,7 +1152,7 @@ export class Crowd {
       const visible = d < 160 && (inView || d < 10);
       g.rig.root.visible = visible;
       if (!visible) continue;
-      g.rig.setDetail(d < 22);
+      g.rig.setDistance(d);
       g.animate(dt, d < 30 ? 1 : d < 70 ? 2 : 4, this.frame);
     }
     for (const d of this.dogs) {
@@ -1114,6 +1219,20 @@ export class Crowd {
       booth: this.booth.people.length,
       nav: this.nav.nodes.filter((n) => n.live).length + '/' + this.nav.nodes.length,
     };
+  }
+
+  /**
+   * Dev: the first guest whose party is doing `what` (an activity: 'bench', 'coaster:0', 'chat'…)
+   * and who is in the pose `pose` if given ('sit', 'wait'…), or a toddler with `what` 'toddler': where
+   * they are, which way they face, and who they are; or null.
+   */
+  whereIs(what: string, pose?: Base) {
+    for (const g of this.guests) {
+      const doing = what === 'toddler' ? g.toddler : what === 'riding' ? !!g.ride : g.party.leader.activity.startsWith(what);
+      if (!doing || (pose && g.rig.pose !== pose)) continue;
+      return { x: g.x, y: g.y, z: g.z, heading: g.heading, avatar: g.look.avatar, height: g.look.height, pose: g.rig.pose, activity: g.party.leader.activity };
+    }
+    return null;
   }
 
   get count() {

@@ -12,6 +12,7 @@ import { DUMMY_HASH, hashPassword, verifyPassword } from './password.js';
 import type { GoogleSignupPayload, SessionPayload } from './session.js';
 import { TERMS_VERSION } from './terms.js';
 import { usernameProblem } from './username-policy.js';
+import { toVisitorLook } from './visitor-look.js';
 
 /** Who Google says someone is. Only verified emails get this far. */
 export interface GoogleIdentity {
@@ -90,11 +91,13 @@ export class AuthService {
     });
   }
 
-  /** Fills in what the account is missing (asked after logging in). */
-  async updateProfile(user: User, { gender, acceptTerms }: UpdateProfileDto): Promise<User> {
+  /** Fills in what the account is missing (asked after logging in), or saves (null: forgets) the visitor's look. */
+  async updateProfile(user: User, { gender, acceptTerms, visitorLook }: UpdateProfileDto): Promise<User> {
     const data: Prisma.UserUpdateInput = {};
     if (gender) data.gender = gender;
     if (acceptTerms) Object.assign(data, { termsAcceptedAt: new Date(), termsVersion: TERMS_VERSION });
+    // DbNull empties the column (JsonNull would store a JSON null, which the table refuses)
+    if (visitorLook !== undefined) data.visitorLook = visitorLook === null ? Prisma.DbNull : (toVisitorLook(visitorLook) as unknown as Prisma.InputJsonObject);
     if (Object.keys(data).length === 0) return user;
     return this.prisma.user.update({ where: { id: user.id }, data });
   }

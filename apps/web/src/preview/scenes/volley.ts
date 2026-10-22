@@ -8,15 +8,20 @@
 //   ?scene=volley&play=rally&vcam=tv                the locals' attack coming at you, the dig meter up
 //   ?scene=volley&play=spike                        at the top of your spike jump
 //   ?scene=volley&play=coconut                      a serve knocking the middle coconut off
+//   ?scene=volley&play=dive&at=0.3                  a local diving for a serve into the corner, `at` seconds in
+//   ?scene=volley&skip=6&vcam=fans                  the warm-up from the court, looking at the fans and the umpire
 //   &vcam=player|tv|beach                           the game's camera; a cam / look in the URL overrides it
+//   &me=Male_Adult_06                               the visitor's avatar (a playable one)
+// The people are the game's: the park set first, then the island set (on the first trip in the game),
+// so the court waits for it as it does there.
 import type { PreviewScene } from '../main';
 import type { Ctx } from '../../world/context';
 import type { UI } from '../../world/ui';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { GUEST_ANIMS_URL, GUESTS_URL, PeopleFactory, VISITOR_LOOK } from '../../world/crowd/people';
+import { downloadPeople, PeopleFactory } from '../../world/crowd/people-factory';
+import { lookFromVisitor } from '../../world/crowd/looks';
 import { PalmCay } from '../../world/island/island';
 import { Volley } from '../../world/attractions/island/volley';
-import { COURT_ORIGIN } from '../../world/attractions/island/volley-court';
+import { COURT_ORIGIN, toWorld } from '../../world/attractions/island/volley-court';
 import { stage } from './island';
 
 const preview: PreviewScene = async (p) => {
@@ -39,9 +44,14 @@ const preview: PreviewScene = async (p) => {
   const park = new PalmCay(ctx);
   ctx.scene.add(park.group);
   const vb = new Volley(ctx);
-  const loader = new GLTFLoader();
-  const [guests, anims] = await Promise.all([loader.loadAsync(GUESTS_URL), loader.loadAsync(GUEST_ANIMS_URL)]);
-  vb.setPeople(new PeopleFactory(guests, anims), VISITOR_LOOK);
+  // the game's order: the park's people (and the visitor's hero file) at the start, the island's later
+  const tier = ctx.quality.tier;
+  const me = q.get('me') ?? 'Male_Adult_06';
+  const dl = downloadPeople({ sets: ['park'], hero: [me], tier });
+  const people = await PeopleFactory.create(ctx.renderer, dl, { tier });
+  const visitor = lookFromVisitor({ v: 1, avatar: me, top: null, bottom: null, shoes: null, hair: null, height: 1, build: 1 }, people.spec(me)!);
+  vb.setPeople(people, () => visitor);
+  await people.loadSet('island');
   stage(p, (k) => {
     park.setNight(k);
     vb.setNight(k);
@@ -51,7 +61,7 @@ const preview: PreviewScene = async (p) => {
   const camera = p.ctx.camera;
   const dt = 1 / 60;
   const play = q.get('play');
-  const follow = !!play && !q.get('cam');
+  const follow = !!play && play !== 'dive' && !q.get('cam');
   const step = (n: number, stop?: () => boolean) => {
     for (let k = 0; k < n; k++) {
       t += dt;
@@ -62,7 +72,20 @@ const preview: PreviewScene = async (p) => {
     return false;
   };
   if (!play) step(Math.round(Number(q.get('skip') ?? 6) / dt));
-  else {
+  else if (play === 'dive') {
+    // a serve into the far corner, until a local is `at` seconds into a dive for it
+    vb.start();
+    ctx.ui.hidePanel();
+    vb.aimAt({ x: -3.7, z: 7.6 });
+    const at = Number(q.get('at') ?? 0.3);
+    for (let k = 0; k < 40 / dt; k++) {
+      const cue = vb.cue;
+      if (!cue) vb.action();
+      else if (cue.toPerfect <= dt / 2) vb.action();
+      step(1);
+      if (vb.athletes.some((a) => a.diving >= at)) break;
+    }
+  } else {
     vb.start();
     ctx.ui.hidePanel();
     const order = ['player', 'tv', 'beach'];
@@ -103,6 +126,7 @@ const preview: PreviewScene = async (p) => {
       });
     }
   }
+  console.warn("DEBUG", JSON.stringify(vb.athletes.map((a) => a.rig?.spec.id)), JSON.stringify((vb as any).fans?.rigs.map((f: any) => f.rig.spec.id)));
   p.onFrame((fdt, ft) => {
     park.update(fdt, ft, camera);
     if (!play) {
@@ -112,6 +136,12 @@ const preview: PreviewScene = async (p) => {
     // the shadows and the grass follow the court
     if (follow) p.view(camera.position, COURT_ORIGIN);
   });
-  if (!follow) p.view({ x: 196, y: 2.4, z: 41424 }, { x: 210, y: 1, z: 41400 });
+  if (q.get('vcam') === 'fans' || (play === 'dive' && !q.get('cam'))) {
+    // from the court: the bleachers and the umpire's stand (fans), or across at the diver (dive)
+    const diver = vb.athletes.find((a) => a.diving >= 0) ?? vb.athletes[3];
+    const from = play === 'dive' ? toWorld(diver.pos.x + 3.2, 1.6, diver.pos.z - 2.6) : toWorld(1, 2.2, -4);
+    const to = play === 'dive' ? toWorld(diver.pos.x, 0.5, diver.pos.z) : toWorld(9.6, 1.1, 0);
+    p.view(from, to);
+  } else if (!follow) p.view({ x: 196, y: 2.4, z: 41424 }, { x: 210, y: 1, z: 41400 });
 };
 export default preview;

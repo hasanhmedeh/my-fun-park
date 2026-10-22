@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 
@@ -39,6 +42,11 @@ function seo(): Plugin {
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
+  <url>
+    <loc>${SITE_URL}/credits</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.2</priority>
+  </url>
 </urlset>
 `,
       });
@@ -67,6 +75,38 @@ function cleanUrls(): Plugin {
   };
 }
 
+/**
+ * The people's KTX2 textures are transcoded in the browser by the Basis Universal transcoder that
+ * three ships beside KTX2Loader. It is served at <base>basis/ in dev and copied into the build from
+ * the installed three, so it always matches the loader that calls it (KTX2Loader's
+ * setTranscoderPath(`${import.meta.env.BASE_URL}basis/`)).
+ */
+function basisTranscoder(): Plugin {
+  const dir = dirname(createRequire(import.meta.url).resolve('three/examples/jsm/libs/basis/basis_transcoder.js'));
+  const types = new Map([
+    ['basis_transcoder.js', 'text/javascript'],
+    ['basis_transcoder.wasm', 'application/wasm'],
+  ]);
+  let prefix = '/basis/';
+  return {
+    name: 'basis-transcoder',
+    configResolved: (config) => void (prefix = `${config.base.startsWith('/') ? config.base : '/'}basis/`),
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const path = req.url?.split('?')[0] ?? '';
+        const type = path.startsWith(prefix) ? types.get(path.slice(prefix.length)) : undefined;
+        if (!type) return next();
+        res.setHeader('Content-Type', type);
+        res.setHeader('Cache-Control', 'no-cache');
+        res.end(readFileSync(join(dir, path.slice(prefix.length))));
+      });
+    },
+    generateBundle() {
+      for (const name of types.keys()) this.emitFile({ type: 'asset', fileName: `basis/${name}`, source: readFileSync(join(dir, name)) });
+    },
+  };
+}
+
 // Let ngrok tunnels reach the dev/preview server (a leading dot allows every subdomain,
 // so new random tunnel URLs keep working without editing this file).
 const tunnelHosts = ['.ngrok-free.app', '.ngrok-free.dev', '.ngrok.app', '.ngrok.io'];
@@ -80,17 +120,23 @@ const proxy = {
 };
 
 export default defineConfig({
-  plugins: [seo(), cleanUrls()],
+  plugins: [seo(), cleanUrls(), basisTranscoder()],
   // `open` launches the browser on `pnpm dev` (BROWSER=none skips it)
   server: { allowedHosts: tunnelHosts, open: true, proxy },
   preview: { allowedHosts: tunnelHosts, proxy },
   build: {
     target: 'es2020',
     chunkSizeWarningLimit: 1300,
-    // The game, the legal pages and The Ringmaster's Office (served as /terms, /privacy and
-    // /ringmaster thanks to cleanUrls in vercel.json)
+    // The game, the legal pages, the credits and The Ringmaster's Office (served as /terms,
+    // /privacy, /credits and /ringmaster thanks to cleanUrls in vercel.json)
     rolldownOptions: {
-      input: { index: page('./index.html'), terms: page('./terms.html'), privacy: page('./privacy.html'), ringmaster: page('./ringmaster.html') },
+      input: {
+        index: page('./index.html'),
+        terms: page('./terms.html'),
+        privacy: page('./privacy.html'),
+        credits: page('./credits.html'),
+        ringmaster: page('./ringmaster.html'),
+      },
       // The engines (three.js with its addons, cannon-es) get a chunk of their own: they load with
       // the Game chunk (in parallel, the same import), and stay cached across releases of the game.
       // The airport, the A320neo and Palm Cay are split off by Game's dynamic import of

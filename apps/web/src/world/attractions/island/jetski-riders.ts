@@ -1,17 +1,22 @@
-// The Jet-Ski Race's riders as real people: crowd rigs (crowd/people.ts) sat astride the saddle in
-// beachwear and a life vest. The seated clip carries the breathing; on top of it the pose a rider
-// holds is laid procedurally every frame: the back bent forward over the bars, both hands on the
-// grips and both feet in the footwells (two-bone IK, so they stay put however the rider leans),
-// the head turned into the corner. The vest is a foam shell fitted to the body's own torso once
-// (from its skinned vertices) and carried by the upper spine.
+// The Jet-Ski Race's riders as real people (crowd/person-rig.ts) sat astride the saddle in their
+// own clothes and a life vest. The riding clip (Driving_Loop: seated, fists closed on a wheel)
+// carries the breathing and the grip; on top of it the pose a rider holds is laid procedurally
+// every frame: the back bent forward over the bars, both hands on the grips and both feet in the
+// footwells (two-bone IK, so they stay put however the rider leans), the head turned into the
+// corner. The vest is a foam shell fitted to the body's own torso once (from its skinned
+// vertices) and carried by the upper spine.
 //
 // Every rider lives in its ski's "seat" frame (the saddle's top, which the race leans and bobs),
 // nose to −z. Far away a rider swaps to the old merged figure (one draw call) in matching colours.
 
 import * as THREE from 'three';
-import { beachLook, swimLook, type Look, type PersonRig } from '../../crowd/people';
+import type { PeopleFactory } from '../../crowd/people-factory';
+import type { PersonRig } from '../../crowd/person-rig';
+import type { CanonicalBone } from '../../crowd/people-manifest';
+import { dyeLook, pickFrom, SWIM, type Look } from '../../crowd/looks';
 import { mulberry } from '../../random';
 import { FOOTWELL, GRIP, SADDLE } from './jetski-models';
+import { castLook } from './volley-players';
 
 const V = new THREE.Vector3();
 const W = new THREE.Vector3();
@@ -89,39 +94,42 @@ export interface RiderColours {
   skin: string;
 }
 
-const SKIN_BASE = new THREE.Color('#efcdb4');
-const hex = (c: THREE.Color) => `#${c.getHexString()}`;
-
-/** Bare feet: the painted shoe the colour of the skin (the trainers mesh is hidden). */
-function barefoot(look: Look): Look {
-  return { ...look, shoe: SKIN_BASE.clone().multiply(look.skin).multiplyScalar(0.92) };
-}
-
-/** The visitor on the water: their own face, hair and build, their tee, their trousers cut to shorts, bare feet. */
+/** The visitor on the water: themselves as they are (no bought hat out there, so their own cap shows again). */
 export function visitorRiderLook(v: Look): Look {
-  return barefoot({ ...v, skin: v.skin.clone(), hair: v.hair.clone(), top: v.top.clone(), pants: v.pants.clone(), shoe: v.shoe.clone(), legEnd: Math.max(v.legEnd, 0.31), child: false });
+  return { ...v, hide: undefined };
 }
 
-/** The four rivals' beachwear, by name order: Kai, Rosa, Sami, Theo (always the same people). */
-export function rivalRiderLooks(): Look[] {
+/**
+ * The four rivals, by name order: Kai, Rosa, Sami and Theo, always the same people. They're the
+ * island set's four (Kai and Rosa its swimmers, barefoot in their swimwear; Sami and Theo in shorts),
+ * dyed from a fixed seed; another avatar stands in only where one of them is the visitor's own.
+ * (Reef Rosa isn't the mainland booth's Rosa: castLook never picks her avatar.)
+ */
+export function rivalRiderLooks(people: PeopleFactory, visitor: string): Look[] {
   const r = mulberry(7311);
-  const kai = swimLook(r, { gender: 'm' });
-  const rosa = swimLook(r, { gender: 'f' });
-  const sami = beachLook(r, { gender: 'f' });
-  const theo = beachLook(r, { gender: 'm' });
-  // a rash vest's short sleeves for Sami, a tank for Theo
-  sami.sleeve = 0.22;
-  theo.sleeve = -0.1;
-  return [kai, rosa, sami, theo].map((l) => barefoot({ ...l, child: false }));
+  const used = new Set([visitor]);
+  const cast = (prefer: string, role: 'swim' | 'beach', gender: 'm' | 'f') => {
+    const look = castLook(people, [prefer], role, r, gender, used);
+    used.add(look.avatar);
+    const spec = people.spec(look.avatar);
+    const regions = spec?.outfit?.regions ?? {};
+    if (role === 'swim') {
+      // swimwear in a colour of its own
+      const c = pickFrom(r, SWIM);
+      if (regions.top) look.top = c;
+      if (regions.bottom) look.bottom = c;
+    } else if (spec) dyeLook(look, spec, r, 1, true);
+    // dark water shoes (boots and trainers out on the water read as neoprene)
+    if (regions.shoes && !spec?.tags.includes('barefoot')) look.shoes = '#23262d';
+    return look;
+  };
+  return [cast('Sports_Male_01', 'swim', 'm'), cast('Sports_Female_01', 'swim', 'f'), cast('Female_Party_01', 'beach', 'f'), cast('Sports_Male_04', 'beach', 'm')];
 }
 
-export function riderColours(look: Look, vest: string): RiderColours {
-  return { vest, hair: hex(look.hair), skin: hex(SKIN_BASE.clone().multiply(look.skin)) };
-}
-
-/** A short key of what a look wears, to tell when the visitor has changed (the shop, a new hair cut). */
-export function lookKey(l: Look) {
-  return [l.gender, l.height, hex(l.skin), hex(l.hair), l.hairStyle, l.beard, hex(l.top), hex(l.pants), l.sleeve, l.build].join('|');
+/** The colours of a rider's far stand-in: the vest, the hair for the helmet, the skin for the suit. */
+export function riderColours(people: PeopleFactory, look: Look, vest: string): RiderColours {
+  const c = people.coloursOf(look);
+  return { vest, hair: c.hair, skin: c.skin };
 }
 
 // ------------------------------------------------------------------------------------ the vest
@@ -157,7 +165,7 @@ function smoothNormals(pos: number[]) {
   return out;
 }
 
-const TORSO_BONES = new Set(['pelvis', 'spine_01', 'spine_02', 'spine_03', 'neck_01', 'clavicle_l', 'clavicle_r']);
+const TORSO_BONES: readonly CanonicalBone[] = ['pelvis', 'spine_01', 'spine_02', 'spine_03', 'neck_01', 'clavicle_l', 'clavicle_r'];
 
 /**
  * A life vest fitted round the body as it sits now: horizontal slices of the torso's skinned
@@ -166,12 +174,13 @@ const TORSO_BONES = new Set(['pelvis', 'spine_01', 'spine_02', 'spine_03', 'neck
  * Built in `frame`'s coordinates (the seat frame).
  */
 function fitVest(rig: PersonRig, frame: THREE.Object3D, colour: string) {
-  const body = rig.skinnedMeshes.find((m) => (m.material as THREE.Material).name.includes('Superhero'))!;
+  const body = rig.parts.body;
   const bones = body.skeleton.bones;
+  const torso = new Set<THREE.Object3D>(TORSO_BONES.map((n) => rig.bone(n)));
   rig.root.updateMatrixWorld(true);
   frame.updateWorldMatrix(true, false);
   const inv = M.copy(frame.matrixWorld).invert();
-  const at = (name: string) => rig.root.getObjectByName(name)!.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv);
+  const at = (name: CanonicalBone) => rig.bone(name).getWorldPosition(new THREE.Vector3()).applyMatrix4(inv);
   const o = at('spine_01');
   const neck = at('neck_01');
   const Y = neck.clone().sub(o);
@@ -196,7 +205,7 @@ function fitVest(rig: PersonRig, frame: THREE.Object3D, colour: string) {
         best = si.getComponent(i, k);
       }
     }
-    if (!TORSO_BONES.has(bones[best]?.name ?? '')) continue;
+    if (!torso.has(bones[best])) continue;
     body.getVertexPosition(i, p);
     p.applyMatrix4(body.matrixWorld).applyMatrix4(inv).sub(o);
     pts.push(p.dot(X), p.dot(Y), p.dot(Z));
@@ -364,13 +373,26 @@ export interface RiderState {
 }
 
 const FAR = 75;
-const NEAR = 16;
+/** How far the hips sink into the saddle's foam. */
+const SINK = 0.02;
+
+/** The bones the riding pose turns (put back to the clip's before each update: see Rider.update). */
+const BENT: readonly CanonicalBone[] = [
+  'spine_01', 'neck_01', 'Head',
+  'upperarm_l', 'lowerarm_l', 'hand_l', 'upperarm_r', 'lowerarm_r', 'hand_r',
+  'thigh_l', 'calf_l', 'foot_l', 'thigh_r', 'calf_r', 'foot_r',
+];
+/** …and the ones it only reads. */
+const READ: readonly CanonicalBone[] = ['pelvis', 'spine_03', 'middle_01_l', 'middle_01_r', 'ball_l', 'ball_r'];
 
 export class Rider {
   readonly rig: PersonRig;
   private vest: THREE.Mesh;
-  private b: Record<string, THREE.Object3D> = {};
-  private near = true;
+  private b = {} as Record<CanonicalBone, THREE.Object3D>;
+  private bent: THREE.Object3D[];
+  /** The bent bones' rotations as the clip left them this frame. */
+  private clipRot: THREE.Quaternion[];
+  private posed = false;
   private shadowsOk: boolean;
   private shadowsOn: boolean | null = null;
   private bend = 0.55;
@@ -391,21 +413,29 @@ export class Rider {
   ) {
     this.rig = rig;
     this.shadowsOk = shadows;
-    rig.setBase('sit');
-    for (const m of rig.skinnedMeshes) if (m.name === 'shoes') m.visible = false;
-    for (const n of ['pelvis', 'spine_01', 'spine_03', 'neck_01', 'Head', 'clavicle_l', 'clavicle_r', 'upperarm_l', 'lowerarm_l', 'hand_l', 'middle_01_l', 'upperarm_r', 'lowerarm_r', 'hand_r', 'middle_01_r', 'thigh_l', 'calf_l', 'foot_l', 'ball_l', 'thigh_r', 'calf_r', 'foot_r', 'ball_r'])
-      this.b[n] = rig.root.getObjectByName(n)!;
+    for (const n of BENT) this.b[n] = rig.bone(n);
+    for (const n of READ) this.b[n] = rig.bone(n);
+    this.bent = BENT.map((n) => this.b[n]);
+    this.clipRot = BENT.map(() => new THREE.Quaternion());
     seat.add(rig.root);
-    // settle into the seated clip, then sit the pelvis on the saddle, a little forward
-    for (let k = 0; k < 4; k++) rig.update(1, 0);
-    rig.root.updateMatrixWorld(true);
-    const s = rig.height / 1.8;
-    const pelvis = rig.root.worldToLocal(this.b.pelvis.getWorldPosition(new THREE.Vector3()));
-    rig.root.position.set(-pelvis.x, 0.1 * s - pelvis.y, 0.04 - pelvis.z);
+    const pelvis = new THREE.Vector3();
+    const hips = () => {
+      for (let k = 0; k < 4; k++) rig.update(1, 0);
+      rig.root.updateMatrixWorld(true);
+      return rig.root.worldToLocal(this.b.pelvis.getWorldPosition(pelvis));
+    };
+    // How high the hips ride over a seat: the seated pose's, which the avatar's seatDrop is measured
+    // for. The riding clip (Driving_Loop: in a car seat, fists closed on the wheel) then sits them at
+    // that height on the saddle, sunk a couple of centimetres into the foam and a little forward.
+    rig.setBase('sit');
+    const lift = hips().y - rig.seatDrop;
+    if (rig.has('Driving_Loop')) rig.setBase('drive');
+    hips();
+    rig.root.position.set(-pelvis.x, lift - SINK - pelvis.y, 0.04 - pelvis.z);
+    this.keepClip();
     this.pose({ steer: 0, throttle: 0.5, air: false, dist: 0 }, 0);
     // the vest, fitted to this body as it sits, carried by the upper back
     this.vest = new THREE.Mesh(fitVest(rig, seat, vestColour), vestMat);
-    this.vest.castShadow = shadows;
     this.vest.matrixAutoUpdate = false;
     const spine = this.b.spine_03;
     spine.updateWorldMatrix(true, false);
@@ -418,9 +448,8 @@ export class Rider {
   private setShadows(on: boolean) {
     if (on === this.shadowsOn) return;
     this.shadowsOn = on;
-    // only the body and the vest cast (the hair, eyes and brows would each cost a shadow draw)
-    for (const m of this.rig.skinnedMeshes) m.castShadow = on && (m.material as THREE.Material).name.includes('Superhero');
-    if (this.vest) this.vest.castShadow = on;
+    this.rig.setShadows(on);
+    this.vest.castShadow = on;
   }
 
   /** After dark: the crowd's glow, but only a third of it (out on the water there's no park light to explain more). */
@@ -439,16 +468,21 @@ export class Rider {
     this.rig.root.visible = visible && !far;
     this.far.visible = visible && far;
     if (!visible || far) return;
-    const near = st.dist < NEAR;
-    if (near !== this.near) {
-      this.near = near;
-      this.rig.setDetail(near);
-    }
+    this.rig.setDistance(st.dist);
     this.setShadows(this.shadowsOk && st.dist < 22);
     // middle distance: the pose every other frame is plenty
     if (st.dist > 60 && (this.skip = (this.skip + 1) % 2)) return;
+    // the clip only writes a bone whose value it changes: the pose's turns would pile up on the
+    // bones it holds still, so they go back to the clip's first
+    if (this.posed) for (let i = 0; i < this.bent.length; i++) this.bent[i].quaternion.copy(this.clipRot[i]);
     this.rig.update(st.dist > 60 ? dt * 2 : dt, 0);
+    this.keepClip();
     this.pose(st, dt);
+  }
+
+  private keepClip() {
+    for (let i = 0; i < this.bent.length; i++) this.clipRot[i].copy(this.bent[i].quaternion);
+    this.posed = true;
   }
 
   private dir(x: number, y: number, z: number, frame: THREE.Object3D) {
@@ -474,21 +508,26 @@ export class Rider {
     aim(b.spine_01, b.neck_01, this.dir(-this.look * 0.12, 1, -Math.tan(this.bend), seat));
     aim(b.neck_01, b.Head, this.dir(0, 1, -0.05, seat), 0.8);
     turn(b.Head, this.dir(0, 1, 0, seat), this.look * 0.45);
-    // arms to the grips: elbows out and a little down
-    for (const [side, sx] of [
-      ['l', -1],
-      ['r', 1],
-    ] as const) {
-      TGT.set(sx * GRIP.x, GRIP.y, GRIP.z).applyMatrix4(ski.matrixWorld);
-      POLE.set(sx * 1, -0.7, 0.4).transformDirection(ski.matrixWorld);
-      twoBone(b[`upperarm_${side}`], b[`lowerarm_${side}`], b[`hand_${side}`], TGT, POLE);
-      aim(b[`hand_${side}`], b[`middle_01_${side}`], this.dir(sx * 0.2, -0.45, -0.85, ski), 0.9);
-      // legs: knees up and forward along the hull, feet flat in the footwells
-      const s = this.rig.height / 1.8;
-      TGT.set(sx * (FOOTWELL.x - 0.02), FOOTWELL.y + 0.075 * s, SADDLE.z - 0.5).applyMatrix4(ski.matrixWorld);
-      POLE.set(sx * 0.7, 0.3, -1).transformDirection(ski.matrixWorld);
-      twoBone(b[`thigh_${side}`], b[`calf_${side}`], b[`foot_${side}`], TGT, POLE);
-      aim(b[`foot_${side}`], b[`ball_${side}`], this.dir(sx * 0.08, -0.3, -1, ski));
-    }
+    // arms to the grips (elbows out and a little down), legs along the hull to the footwells
+    this.arm(b.upperarm_l, b.lowerarm_l, b.hand_l, b.middle_01_l, -1, ski);
+    this.arm(b.upperarm_r, b.lowerarm_r, b.hand_r, b.middle_01_r, 1, ski);
+    this.leg(b.thigh_l, b.calf_l, b.foot_l, b.ball_l, -1, ski);
+    this.leg(b.thigh_r, b.calf_r, b.foot_r, b.ball_r, 1, ski);
+  }
+
+  private arm(upper: THREE.Object3D, lower: THREE.Object3D, hand: THREE.Object3D, finger: THREE.Object3D, sx: number, ski: THREE.Object3D) {
+    TGT.set(sx * GRIP.x, GRIP.y, GRIP.z).applyMatrix4(ski.matrixWorld);
+    POLE.set(sx, -0.7, 0.4).transformDirection(ski.matrixWorld);
+    twoBone(upper, lower, hand, TGT, POLE);
+    aim(hand, finger, this.dir(sx * 0.2, -0.45, -0.85, ski), 0.9);
+  }
+
+  /** Knees up and forward along the hull, feet flat in the footwells. */
+  private leg(thigh: THREE.Object3D, calf: THREE.Object3D, foot: THREE.Object3D, ball: THREE.Object3D, sx: number, ski: THREE.Object3D) {
+    const s = this.rig.height / 1.8;
+    TGT.set(sx * (FOOTWELL.x - 0.02), FOOTWELL.y + 0.075 * s, SADDLE.z - 0.5).applyMatrix4(ski.matrixWorld);
+    POLE.set(sx * 0.7, 0.3, -1).transformDirection(ski.matrixWorld);
+    twoBone(thigh, calf, foot, TGT, POLE);
+    aim(foot, ball, this.dir(sx * 0.08, -0.3, -1, ski));
   }
 }

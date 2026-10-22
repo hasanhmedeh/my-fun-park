@@ -1,18 +1,21 @@
 // Souvenirs from the booth's shop, worn in the fair: a cap or a top hat, star shades, a balloon on a
-// string, a foam finger. They aren't parented to the skeleton (its bones carry the model's own
-// scale and axes); each frame they're placed from the bones' world positions instead.
+// string, a foam finger. Head pieces ride on the head bone, so they nod and turn with the head and
+// grow with the wearer's height and build just as the head does; the balloon and the foam finger
+// are placed each frame from the hands' bones.
 //
-// Head pieces are fitted to the wearer's actual head: once, while they stand upright, the posed
-// meshes are measured (the eyes, the top of the skull and of the hair, the head's width and its
-// front and back) in the wearer's own frame, and each piece is sized and placed from that.
+// Head pieces are fitted to the wearer's own head: once per avatar, its head and hair meshes are
+// measured in the bind pose in the head bone's frame (the top of the skull and of the hair, the
+// head's width and its front and back at the brow), and the eyes are read from the eye bones. Each
+// piece is sized and placed from that, in a frame on the head: x to the wearer's right, y up
+// through the crown, -z forward.
 import * as THREE from 'three';
 import { std } from './context';
-import type { PersonRig } from './crowd/people';
+import type { PersonRig } from './crowd/person-rig';
 import { PALETTE } from './textures';
 
 type Holder = 'head' | 'leftHand' | 'rightHand';
 
-/** The wearer's head, measured in their own frame from the head bone: x right, y up, -z forward. */
+/** The wearer's head, in the head frame (x right, y up through the crown, -z forward; origin at the head bone). */
 interface Head {
   /** Top of the skull (under the hair) and of the hair. */
   skull: number;
@@ -21,7 +24,7 @@ interface Head {
   half: number;
   front: number;
   back: number;
-  /** The same, taking the hair in (what a cap has to cover). */
+  /** The same, taking the hair cards in. */
   hairHalf: number;
   hairFront: number;
   hairBack: number;
@@ -29,27 +32,55 @@ interface Head {
   eyeY: number;
   eyeFront: number;
   eyeGap: number;
+  /** Half the head's width at the temples, just behind the eyes (where the shades' arms go). */
+  temple: number;
+}
+
+/** A head measured for one avatar, and the head frame's turn within its head bone. */
+interface Fit {
+  head: Head;
+  frame: THREE.Matrix4;
 }
 
 interface Piece {
   id: string;
   holder: Holder;
   object: THREE.Object3D;
-  /** Head pieces: sizes the piece to the head and says where it goes (in the wearer's frame). */
+  /** Head pieces: sizes the piece to the head and says where it goes (in the head frame). */
   fit?: (head: Head) => THREE.Vector3;
-  offset?: THREE.Vector3;
   dispose: () => void;
 }
 
+/** The pieces that sit on the crown: the hair under them is tucked away (PersonRig.setHatClip). */
+const HATS = new Set(['cap', 'top-hat']);
+/** An eyeball's radius: the shades sit in front of the eyeballs, whose bones are at their centres. */
+const EYEBALL = 0.012;
+/**
+ * How far past the head a cap reaches for the hair cards. Cards beyond that are tucked away by the
+ * hat clip, so a cap fits the head as a real one does rather than ballooning round loose hair; hair
+ * modelled into the head mesh itself (a few avatars' curls) can't be clipped, so the cap goes round it.
+ */
+const HAIR_ROOM = 0.008;
+
+/** Every avatar's head, measured once (the hero file and the crowd file share their proportions). */
+const fits = new Map<string, Fit | null>();
+
 const UP = new THREE.Vector3(0, 1, 0);
 const v = new THREE.Vector3();
+const hand = new THREE.Vector3();
+const elbow = new THREE.Vector3();
+const along = new THREE.Vector3();
+const face = new THREE.Vector3();
+const across = new THREE.Vector3();
+const rest = new THREE.Vector3();
+const pull = new THREE.Vector3();
+const knot = new THREE.Vector3();
 const yaw = new THREE.Quaternion();
 const basis = new THREE.Matrix4();
 
 /** Everything one person wears from the shop. */
 export class Wardrobe {
   private pieces = new Map<string, Piece>();
-  private head: Head | null = null;
   private shown = true;
   private balloon: { pos: THREE.Vector3; vel: THREE.Vector3 } | null = null;
 
@@ -62,7 +93,7 @@ export class Wardrobe {
   set(items: readonly string[]) {
     for (const [id, p] of this.pieces)
       if (!items.includes(id)) {
-        this.scene.remove(p.object);
+        p.object.removeFromParent();
         p.dispose();
         this.pieces.delete(id);
       }
@@ -70,106 +101,86 @@ export class Wardrobe {
       if (this.pieces.has(id)) continue;
       const piece = build(id);
       if (!piece) continue;
-      if (this.head && piece.fit) piece.offset = piece.fit(this.head);
-      piece.object.visible = this.shown && (!piece.fit || !!piece.offset);
-      this.scene.add(piece.object);
       this.pieces.set(id, piece);
+      this.put(piece);
       if (id === 'balloon') this.balloon = null;
     }
+    this.clipHair();
+  }
+
+  /**
+   * The wearer became someone else (Player.setRig): everything worn moves over to the new person,
+   * refitted to their head. The old rig is left as it is (it's about to be disposed of).
+   */
+  setRig(rig: PersonRig) {
+    if (rig === this.rig) return;
+    for (const p of this.pieces.values()) p.object.removeFromParent();
+    this.rig = rig;
+    for (const p of this.pieces.values()) this.put(p);
+    this.balloon = null;
+    this.clipHair();
   }
 
   /** Show or hide everything (e.g. while the wearer is out of sight on a ride). */
   setVisible(on: boolean) {
     this.shown = on;
-    for (const p of this.pieces.values()) p.object.visible = on && (!p.fit || !!p.offset);
+    for (const p of this.pieces.values()) p.object.visible = on && (p.holder !== 'head' || !!p.object.parent);
   }
 
   update(dt: number) {
     if (!this.pieces.size) return;
-    const root = this.rig.root;
-    root.updateWorldMatrix(true, false);
-    const headBone = this.rig.bone('Head');
-    headBone.updateWorldMatrix(true, false);
-    const headPos = headBone.getWorldPosition(new THREE.Vector3());
-    root.getWorldQuaternion(yaw);
-
-    // measure the head once, standing upright (not mid-roll); head pieces wait out of sight till then
-    if (!this.head) {
-      const feet = root.getWorldPosition(new THREE.Vector3());
-      if (headPos.y - feet.y > this.rig.height * 0.8) {
-        this.head = this.measure(headPos);
-        if (this.head)
-          for (const p of this.pieces.values())
-            if (p.fit) {
-              p.offset = p.fit(this.head);
-              p.object.visible = this.shown;
-            }
-      }
-    }
-
+    // the hand pieces live in the scene: they go when the wearer does (on a ride, say)
+    const seen = this.shown && visibleInWorld(this.rig.root);
+    let measured = false;
     for (const p of this.pieces.values()) {
-      if (p.fit) {
-        if (!p.offset) continue;
-        p.object.position.copy(p.offset).applyQuaternion(yaw).add(headPos);
-        p.object.quaternion.copy(yaw);
-      } else if (p.id === 'balloon') this.updateBalloon(p, dt);
-      else this.wearOnHand(p, 'r');
+      if (p.holder === 'head') continue;
+      p.object.visible = seen;
+      if (!seen) continue;
+      if (!measured) {
+        this.rig.root.updateWorldMatrix(true, false);
+        this.rig.root.getWorldQuaternion(yaw);
+        measured = true;
+      }
+      if (p.id === 'balloon') this.updateBalloon(p, dt);
+      else this.wearOnHand(p);
     }
+    if (!seen) this.balloon = null;
   }
 
-  /**
-   * The head, measured from the posed meshes (skinning applied) in the wearer's frame around the
-   * head bone. Null if the meshes don't give a sensible answer.
-   */
-  private measure(headPos: THREE.Vector3): Head | null {
-    const inv = yaw.clone().invert();
-    const body: THREE.Vector3[] = [];
-    const hair: THREE.Vector3[] = [];
-    const eyes: THREE.Vector3[] = [];
-    for (const mesh of this.rig.skinnedMeshes) {
-      const name = (mesh.material as THREE.Material).name;
-      const kind = name.includes('Superhero') ? body : name === 'MI_Eyes' ? eyes : name.startsWith('MI_Hair') ? hair : null;
-      if (!kind || !mesh.visible) continue;
-      mesh.updateWorldMatrix(true, false);
-      const n = mesh.geometry.getAttribute('position').count;
-      for (let i = 0; i < n; i++) {
-        mesh.getVertexPosition(i, v).applyMatrix4(mesh.matrixWorld).sub(headPos).applyQuaternion(inv);
-        // only around the head
-        if (v.y < -0.12 || v.y > 0.4 || Math.abs(v.x) > 0.2 || Math.abs(v.z) > 0.2) continue;
-        kind.push(v.clone());
-      }
+  /** Puts a piece on the wearer: a head piece on the head bone (fitted), the others in the scene. */
+  private put(p: Piece) {
+    if (p.holder !== 'head') {
+      this.scene.add(p.object);
+      p.object.visible = this.shown;
+      return;
     }
-    if (body.length < 50 || eyes.length < 10) return null;
-    const eyeY = avg(eyes, 'y');
-    const left = eyes.filter((e) => e.x < 0);
-    const right = eyes.filter((e) => e.x >= 0);
-    const eyeGap = left.length && right.length ? Math.abs(avg(right, 'x') - avg(left, 'x')) : 0.064;
-    const eyeFront = Math.min(...eyes.map((e) => e.z));
-    const skull = Math.max(...body.map((b) => b.y));
-    const brow = body.filter((b) => b.y > eyeY + 0.02 && b.y < eyeY + 0.07);
-    const band = brow.length ? brow : body;
-    const front = Math.min(...band.map((b) => b.z));
-    const back = Math.max(...band.map((b) => b.z));
-    const half = Math.max(...band.map((b) => Math.abs(b.x)));
-    const hairTop = hair.length ? Math.max(...hair.map((h) => h.y)) : skull;
-    // the hair above the brow: how far it stands out round the head
-    const crop = hair.filter((p) => p.y > eyeY + 0.03);
-    const hairHalf = Math.max(half, ...crop.map((p) => Math.abs(p.x)));
-    const hairFront = Math.min(front, ...crop.filter((p) => p.y > eyeY + 0.06).map((p) => p.z));
-    const hairBack = Math.max(back, ...crop.map((p) => p.z));
-    return { skull, hair: Math.max(skull, hairTop), half, front, back, hairHalf, hairFront, hairBack, eyeY, eyeFront, eyeGap };
+    const fit = fitFor(this.rig);
+    if (!fit || !p.fit) return;
+    const at = p.fit(fit.head).applyMatrix4(fit.frame);
+    p.object.position.copy(at);
+    p.object.quaternion.setFromRotationMatrix(fit.frame);
+    p.object.visible = this.shown;
+    this.rig.bone('Head').add(p.object);
+  }
+
+  /** A hat tucks the hair under it (and hides the avatar's own hat); without one it's all back. */
+  private clipHair() {
+    let hat = false;
+    for (const id of this.pieces.keys()) if (HATS.has(id)) hat = true;
+    this.rig.setHatClip(hat ? this.rig.defaultHatClip() : null);
   }
 
   /** Worn on the right hand like a glove: along the forearm, palm out of the fist. */
-  private wearOnHand(p: Piece, side: 'l' | 'r') {
-    const hand = this.rig.bone(side === 'r' ? 'hand_r' : 'hand_l').getWorldPosition(new THREE.Vector3());
-    const elbow = this.rig.bone(side === 'r' ? 'lowerarm_r' : 'lowerarm_l').getWorldPosition(new THREE.Vector3());
-    const along = hand.clone().sub(elbow).normalize();
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(yaw);
-    const face = forward.clone().addScaledVector(along, -forward.dot(along));
+  private wearOnHand(p: Piece) {
+    this.rig.bone('hand_r').getWorldPosition(hand);
+    this.rig.bone('lowerarm_r').getWorldPosition(elbow);
+    along.subVectors(hand, elbow).normalize();
+    // the wearer's forward, square to the forearm
+    face.set(0, 0, -1).applyQuaternion(yaw);
+    face.addScaledVector(along, -face.dot(along));
     if (face.lengthSq() < 1e-4) face.set(1, 0, 0).applyQuaternion(yaw);
     face.normalize();
-    const across = new THREE.Vector3().crossVectors(along, face).normalize();
+    across.crossVectors(along, face).normalize();
     basis.makeBasis(across, along, face);
     p.object.quaternion.setFromRotationMatrix(basis);
     p.object.position.copy(hand).addScaledVector(along, 0.02);
@@ -177,29 +188,32 @@ export class Wardrobe {
 
   /** The balloon floats a string's length above the left hand, lagging behind and bobbing. */
   private updateBalloon(p: Piece, dt: number) {
-    const handBone = this.rig.bone('hand_l').getWorldPosition(new THREE.Vector3());
-    const elbow = this.rig.bone('lowerarm_l').getWorldPosition(new THREE.Vector3());
+    this.rig.bone('hand_l').getWorldPosition(hand);
+    this.rig.bone('lowerarm_l').getWorldPosition(elbow);
     // the string comes out of the fist
-    const hand = handBone.clone().addScaledVector(handBone.clone().sub(elbow).normalize(), 0.07);
-    const back = new THREE.Vector3(0, 0, 1).applyQuaternion(yaw);
-    const rest = hand.clone().addScaledVector(UP, 1.05).addScaledVector(back, 0.18);
+    along.subVectors(hand, elbow).normalize();
+    hand.addScaledVector(along, 0.07);
+    face.set(0, 0, 1).applyQuaternion(yaw);
+    rest.copy(hand).addScaledVector(UP, 1.05).addScaledVector(face, 0.18);
     if (!this.balloon) this.balloon = { pos: rest.clone(), vel: new THREE.Vector3() };
     const b = this.balloon;
     const k = Math.min(dt, 1 / 20);
     // a soft spring towards its spot, with drag: it trails when you run
-    b.vel.addScaledVector(rest.clone().sub(b.pos).multiplyScalar(12), k).multiplyScalar(Math.exp(-k * 3.2));
+    pull.subVectors(rest, b.pos).multiplyScalar(12);
+    b.vel.addScaledVector(pull, k).multiplyScalar(Math.exp(-k * 3.2));
     b.pos.addScaledVector(b.vel, k);
     // never further than the string allows
     const d = b.pos.distanceTo(hand);
     if (d > 1.12) b.pos.sub(hand).multiplyScalar(1.12 / d).add(hand);
     const group = p.object as THREE.Group;
-    const ball = group.getObjectByName('ball')!;
-    const line = group.getObjectByName('string') as THREE.Line;
+    const ball = group.children[0];
+    const line = group.children[1] as THREE.Line;
     ball.position.copy(b.pos);
     // it leans the way it's pulled
-    ball.quaternion.setFromUnitVectors(UP, b.pos.clone().sub(hand).normalize());
+    pull.subVectors(b.pos, hand).normalize();
+    ball.quaternion.setFromUnitVectors(UP, pull);
     const pts = line.geometry.getAttribute('position') as THREE.BufferAttribute;
-    const knot = b.pos.clone().addScaledVector(b.pos.clone().sub(hand).normalize(), -0.2);
+    knot.copy(b.pos).addScaledVector(pull, -0.2);
     pts.setXYZ(0, hand.x, hand.y, hand.z);
     pts.setXYZ(1, knot.x, knot.y, knot.z);
     pts.needsUpdate = true;
@@ -211,8 +225,127 @@ export class Wardrobe {
   }
 }
 
-function avg(list: THREE.Vector3[], axis: 'x' | 'y' | 'z') {
-  return list.reduce((s, p) => s + p[axis], 0) / list.length;
+/** Whether `o` is drawn: it and everything above it visible, all the way up to the scene. */
+function visibleInWorld(o: THREE.Object3D) {
+  let n: THREE.Object3D | null = o;
+  for (; n; n = n.parent) {
+    if (!n.visible) return false;
+    if ((n as THREE.Scene).isScene) return true;
+  }
+  return false;
+}
+
+// ---------- Measuring the head ----------
+
+/** The rig's avatar's head (measured the first time it's asked for), or null if it can't be. */
+function fitFor(rig: PersonRig): Fit | null {
+  const id = rig.spec.id;
+  if (!fits.has(id)) fits.set(id, measure(rig));
+  return fits.get(id)!;
+}
+
+/**
+ * The head frame within the head bone, and the head measured in it. The head bone's own axes
+ * (Rocketbox's Bip01 Head) run x up the neck to the crown, y forward and z to the left; the head
+ * frame is turned to stand along the avatar's headTop anchor, so a piece stands straight up from
+ * the crown however the bone leans. Vertices are taken in the bind pose (each skinned vertex's place
+ * in the bone's frame is boneInverse × bindMatrix × position), so the measure doesn't depend on the
+ * pose the wearer is in when it's taken.
+ */
+function measure(rig: PersonRig): Fit | null {
+  const headBone = rig.bone('Head');
+  const skeleton = rig.parts.head.skeleton;
+  const hi = skeleton.bones.indexOf(headBone as THREE.Bone);
+  if (hi < 0) return null;
+  const top = rig.spec.anchors.headTop.at;
+  const up = new THREE.Vector3(top[0], top[1], top[2]).normalize();
+  const fwd = new THREE.Vector3(0, 1, 0).addScaledVector(up, -up.y).normalize();
+  const right = new THREE.Vector3().crossVectors(fwd, up);
+  const rear = fwd.clone().negate();
+  const frame = new THREE.Matrix4().makeBasis(right, up, rear);
+  const toFrame = frame.clone().transpose();
+
+  // the eyes, from their bones (at the eyeballs' centres)
+  const eyes: THREE.Vector3[] = [];
+  for (const name of ['eye_l', 'eye_r'] as const) {
+    let bone: THREE.Object3D;
+    try {
+      bone = rig.bone(name);
+    } catch {
+      continue;
+    }
+    const i = skeleton.bones.indexOf(bone as THREE.Bone);
+    if (i < 0) continue;
+    const m = new THREE.Matrix4().copy(skeleton.boneInverses[i]).invert().premultiply(skeleton.boneInverses[hi]).premultiply(toFrame);
+    eyes.push(new THREE.Vector3().setFromMatrixPosition(m));
+  }
+  if (eyes.length < 2) return null;
+  const eyeY = (eyes[0].y + eyes[1].y) / 2;
+  const eyeGap = Math.abs(eyes[0].x - eyes[1].x);
+  const eyeFront = Math.min(eyes[0].z, eyes[1].z) - EYEBALL;
+
+  // one pass over a mesh's vertices near the head, in the head frame
+  const each = (mesh: THREE.SkinnedMesh | null, fn: (p: THREE.Vector3) => void) => {
+    if (!mesh) return;
+    const m = new THREE.Matrix4().multiplyMatrices(skeleton.boneInverses[hi], mesh.bindMatrix).premultiply(toFrame);
+    const pos = mesh.geometry.getAttribute('position');
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(m);
+      if (v.y < -0.12 || v.y > 0.4 || Math.abs(v.x) > 0.2 || Math.abs(v.z) > 0.2) continue;
+      fn(v);
+    }
+  };
+  let skull = -Infinity;
+  let n = 0;
+  // the brow: just above the eyes (or, if nothing's there, the whole head)
+  const brow = { front: Infinity, back: -Infinity, half: 0, n: 0 };
+  const all = { front: Infinity, back: -Infinity, half: 0 };
+  let temple = 0;
+  each(rig.parts.head, (p) => {
+    n++;
+    if (Math.abs(p.y - eyeY) < 0.015 && p.z > eyeFront && p.z < eyeFront + 0.035) temple = Math.max(temple, Math.abs(p.x));
+    skull = Math.max(skull, p.y);
+    all.front = Math.min(all.front, p.z);
+    all.back = Math.max(all.back, p.z);
+    all.half = Math.max(all.half, Math.abs(p.x));
+    if (p.y > eyeY + 0.02 && p.y < eyeY + 0.07) {
+      brow.n++;
+      brow.front = Math.min(brow.front, p.z);
+      brow.back = Math.max(brow.back, p.z);
+      brow.half = Math.max(brow.half, Math.abs(p.x));
+    }
+  });
+  if (n < 50) return null;
+  const band = brow.n ? brow : all;
+  const { front, back, half } = band;
+  // the hair cards above the brow: how far they stand out round the head
+  let hairTop = skull;
+  let hairHalf = half;
+  let hairFront = front;
+  let hairBack = back;
+  const hair = rig.parts.hair;
+  if (hair && hair !== rig.parts.head)
+    each(hair, (p) => {
+      hairTop = Math.max(hairTop, p.y);
+      if (p.y <= eyeY + 0.03) return;
+      hairHalf = Math.max(hairHalf, Math.abs(p.x));
+      hairBack = Math.max(hairBack, p.z);
+      if (p.y > eyeY + 0.06) hairFront = Math.min(hairFront, p.z);
+    });
+  return { head: { skull, hair: Math.max(skull, hairTop), half, front, back, hairHalf, hairFront, hairBack, eyeY, eyeFront, eyeGap, temple }, frame };
+}
+
+/**
+ * What a hat has to go round at the brow, and to clear on top: the head (with any hair modelled into
+ * it), and the hair cards only as far as HAIR_ROOM past it.
+ */
+function covered(h: Head) {
+  return {
+    half: Math.max(h.half, Math.min(h.hairHalf, h.half + HAIR_ROOM)),
+    front: Math.min(h.front, Math.max(h.hairFront, h.front - HAIR_ROOM)),
+    back: Math.max(h.back, Math.min(h.hairBack, h.back + HAIR_ROOM)),
+    top: Math.max(h.skull, Math.min(h.hair, h.skull + HAIR_ROOM)),
+  };
 }
 
 // ---------- The pieces ----------
@@ -250,13 +383,15 @@ function build(id: string): Piece | null {
         object: g,
         dispose,
         fit: (h) => {
-          // sits over the hair (flattening it a little), round the widest part, down to the brow
-          const rx = Math.max(h.half + 0.014, h.hairHalf + 0.004);
-          const front = Math.min(h.front - 0.012, h.hairFront - 0.004);
-          const back = Math.max(h.back + 0.012, h.hairBack + 0.004);
+          // snug round the head at the brow, the band just above the eyebrows, the crown's top
+          // just over the head's (the crown starts a tenth of its height above the rim)
+          const c = covered(h);
+          const rx = c.half + 0.007;
+          const front = c.front - 0.007;
+          const back = c.back + 0.007;
           const rz = (back - front) / 2;
-          const rim = h.eyeY + 0.052;
-          const ry = Math.max(0.06, h.hair + 0.008 - rim);
+          const rim = h.eyeY + 0.038;
+          const ry = Math.max(0.07, (c.top + 0.006 - rim) / 1.1);
           crown.scale.set(rx, ry, rz);
           // the sweatband: from the crown's edge down to the brow
           band.scale.set(rx, ry, rz);
@@ -289,9 +424,10 @@ function build(id: string): Piece | null {
         dispose,
         fit: (h) => {
           // the crown's opening fits round the head; it sits down on the hair, level
-          const r = Math.max(h.hairHalf, (h.hairBack - h.hairFront) / 2) * 0.97 + 0.004;
-          g.scale.set(r, r * 0.98, r * ((h.back - h.front) / 2 + 0.008) / r);
-          return new THREE.Vector3(0, h.hair - 0.045, (h.front + h.back) / 2);
+          const c = covered(h);
+          const r = Math.max(c.half, (c.back - c.front) / 2) * 0.97 + 0.004;
+          g.scale.set(r, r * 0.98, (c.back - c.front) / 2 + 0.008);
+          return new THREE.Vector3(0, c.top - 0.045, (c.front + c.back) / 2);
         },
       };
     }
@@ -312,7 +448,8 @@ function build(id: string): Piece | null {
       }
       const bridge = mesh(new THREE.BoxGeometry(1, 0.12, 0.12), gold);
       const arms = [-1, 1].map((side) => {
-        const arm = mesh(new THREE.BoxGeometry(0.1, 0.1, 1), gold);
+        // (a unit length running back from its hinge, so it can be stretched and swung from there)
+        const arm = mesh(new THREE.BoxGeometry(0.1, 0.1, 1).translate(0, 0, 0.5), gold);
         arm.userData.side = side;
         g.add(arm);
         return arm;
@@ -333,10 +470,17 @@ function build(id: string): Piece | null {
             lens.rotation.y = Math.PI;
           }
           bridge.scale.set(h.eyeGap * 0.3, r * 0.9, r * 0.9);
-          const depth = h.back - h.eyeFront - 0.04;
+          // the arms hinge on the stars' outer points (or the temples, if they're wider) and run
+          // back to the ears, splaying a little to clear the side of the head
+          const tip = h.eyeGap / 2 + r * 0.9;
+          const hinge = THREE.MathUtils.clamp(h.temple + 0.003, tip, tip + 0.015);
+          const depth = h.eyeGap * 1.6;
+          const splay = Math.max(0, Math.min(h.half, hinge + 0.02) + 0.004 - hinge);
           for (const arm of arms) {
-            arm.scale.set(r * 0.9, r * 0.9, depth);
-            arm.position.set(arm.userData.side * (h.half + 0.004), r * 0.15, depth / 2);
+            const side = arm.userData.side;
+            arm.scale.set(r * 0.9, r * 0.9, Math.hypot(depth, splay));
+            arm.position.set(side * hinge, r * 0.15, 0.004);
+            arm.rotation.y = side * Math.atan2(splay, depth);
           }
           return new THREE.Vector3(0, h.eyeY + 0.002, h.eyeFront - 0.016);
         },
@@ -354,6 +498,7 @@ function build(id: string): Piece | null {
       const string = new THREE.Line(stringGeo, stringMat);
       string.name = 'string';
       string.frustumCulled = false;
+      // (the ball first, then the string: updateBalloon reads them in that order)
       g.add(ball, string);
       return { id, holder: 'leftHand', object: g, dispose };
     }
@@ -386,8 +531,8 @@ function crownGeometry() {
   const pts: THREE.Vector2[] = [];
   for (let i = 0; i <= 16; i++) {
     const y = i / 16;
-    // a superellipse profile: (x^3 + y^3 = 1)
-    pts.push(new THREE.Vector2(Math.max(0.0001, Math.cbrt(1 - y ** 3)), y));
+    // a superellipse profile (x^2.4 + y^2.4 = 1): a rounded dome, fuller than a half-ellipsoid
+    pts.push(new THREE.Vector2(Math.max(0.0001, (1 - y ** 2.4) ** (1 / 2.4)), y));
   }
   return new THREE.LatheGeometry(pts, 32);
 }

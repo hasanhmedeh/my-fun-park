@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { shadowed, staticBox, staticCylinder, std, type Attraction, type Ctx } from '../context';
 import { LAYOUT } from '../layout';
 import { textMesh } from '../letters';
-import type { PersonRig } from '../crowd/people';
+import type { PersonRig } from '../crowd/person-rig';
 import { Wardrobe } from '../souvenirs';
 import { hdr, PALETTE, signMaterial, signTexture, stripeTexture } from '../textures';
 

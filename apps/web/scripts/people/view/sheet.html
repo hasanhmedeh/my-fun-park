@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <title>People sheet</title>
+    <style>
+      body { margin: 0; background: #d9dde3; font: 11px system-ui, sans-serif; }
+      #wrap { position: relative; }
+      #labels { position: absolute; left: 0; top: 0; pointer-events: none; color: #222; }
+      #labels div { padding: 3px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #labels div.row { color: #444; background: rgba(255, 255, 255, 0.6); }
+      canvas { display: block; }
+    </style>
+  </head>
+  <body>
+    <div id="wrap"><div id="labels"></div></div>
+    <script type="module" src="./sheet.js"></script>
+  </body>
+</html>

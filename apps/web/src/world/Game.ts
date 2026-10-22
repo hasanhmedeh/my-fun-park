@@ -3,7 +3,13 @@ import * as CANNON from 'cannon-es';
 import { Sfx } from './audio';
 import { Player } from './player';
 import { Crowd } from './crowd/crowd';
-import { GUEST_ANIMS_URL, GUESTS_URL, PeopleFactory, VISITOR_LOOK } from './crowd/people';
+import { downloadPeople, PEOPLE_URL, PeopleFactory } from './crowd/people-factory';
+import type { PersonRig } from './crowd/person-rig';
+import { lookFromVisitor, type Look } from './crowd/looks';
+import type { VisitorLook } from './crowd/people-manifest';
+import { defaultLook, visitorLook } from './visitor-look';
+import { Customiser, customiserPeople } from './customiser';
+import { ChangingRoom } from './attractions/changing-room';
 import { DOG_URLS, DogFactory } from './crowd/pets';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { Ctx } from './context';
@@ -16,7 +22,7 @@ import { escapeHtml, UI } from './ui';
 import { Zones } from './zones';
 import { Wayfinding } from './wayfinding';
 import { perks } from './perks';
-import { Shop, VENDOR_LOOK } from './shop';
+import { Shop, VENDOR_AVATAR, vendorLook } from './shop';
 import { Ideas } from './ideas';
 import { Gallery } from './gallery';
 import { Wardrobe } from './souvenirs';
@@ -25,7 +31,7 @@ import { WorldMap } from './world-map';
 import { Trackside } from './trackside';
 import { TimeControl } from './time-control';
 import { Post } from './post';
-import { AdaptiveResolution, detectQuality, type Quality } from './quality';
+import { AdaptiveResolution, detectQuality, loadQualityChoice, TIERS, type Quality, type Tier } from './quality';
 import { GraphicsMenu } from './graphics-menu';
 import { wind } from './wind';
 import { Coaster } from './attractions/coaster';
@@ -65,7 +71,7 @@ import type { Flight } from './attractions/flight';
 /** The airport and island code, loaded on its own (flight/world-kit.ts). */
 type WorldKit = typeof import('./flight/world-kit');
 import { PARK, canTravel, registerWalkAreas, REGION_INFO, ZONE_REGION } from './layout';
-import { regionAt, type Region } from './geo';
+import { regionAt, SKYLINK, type Region } from './geo';
 import { FOOT_VIEW } from './minimap';
 import { boardListHtml, leaderboard, resetClock, resetIn, trailTime } from '../account/leaderboard';
 import {
@@ -100,6 +106,33 @@ import { Builder } from '../workshop/builder';
 const TIME_CONTROLS = false;
 /** How many guests walk the park, by graphics tier. */
 const CROWD_SIZE = { high: 80, medium: 56, low: 32, lowest: 14 } as const;
+/**
+ * While dressing after dark the visitor glows this much more than on their night walks (the
+ * customiser's preview level), so the colours being chosen can be seen against the lit room.
+ */
+const DRESSING_GLOW = 1.35;
+/**
+ * The airport's and Palm Cay's people load on the first trip out: as the visitor comes this close
+ * to the SkyLink's park station (its hall is about 20 × 24 m), or anywhere south of this line (the
+ * airport's side of the coast, past the fair's lawn).
+ */
+const TRIP_STATION_M = 16;
+const TRIP_SOUTH_Z = 150;
+
+/**
+ * The quality tier when it can be known before the renderer exists, for the people's download
+ * (it starts first thing, and the low tiers fetch fewer of the park's avatars): a forced or saved
+ * choice, or a phone with fewer than 8 cores, which detection always puts on 'low'. Otherwise
+ * undefined: everything is fetched, and the factory lets go of what the tier doesn't keep.
+ */
+function earlyTier(mobile: boolean): Tier | undefined {
+  const forced = new URLSearchParams(location.search).get('quality');
+  if (forced && (TIERS as string[]).includes(forced)) return forced as Tier;
+  const choice = loadQualityChoice();
+  if (choice !== 'auto') return choice;
+  if (mobile && (navigator.hardwareConcurrency ?? 4) < 8) return 'low';
+  return undefined;
+}
 
 type Mode =
   | 'drive'
@@ -122,7 +155,8 @@ type Mode =
   | 'slides'
   | 'cannons'
   | 'volley'
-  | 'skylink';
+  | 'skylink'
+  | 'dressing';
 
 /** The SkyLink ride lasts about 80 s door to door; skipping it runs the rest of it in steps this long. */
 const SKYLINK_SKIP_DT = 0.1;
@@ -334,6 +368,23 @@ export class Game {
   private museumStop = -1;
   /** What the visitor wears from the shop. */
   private wardrobe: Wardrobe | null = null;
+  /** The people's models: the visitor, Rosa, the crowd, and the airport's and the island's once asked for. */
+  private people: PeopleFactory | null = null;
+  /** The visitor's look as worn now (saved, or being tried on in the customiser). */
+  private wornLook: VisitorLook | null = null;
+  /** Counts changes to the visitor's look: a person still downloading for an earlier change isn't put on (the latest wins). */
+  private dressSeq = 0;
+  /** The visitor's Look, one object kept up to date in place (the jet-skis compare it at each start). */
+  private readonly dressed = {} as Look;
+  /** No saved look (or its person is no longer offered): the customiser opens as the visitor comes in. */
+  private firstLook = false;
+  /** The changing room by the booth, and the customiser it (and a first visit) opens. */
+  private room!: ChangingRoom;
+  private customiser: Customiser | null = null;
+  /** While dressing: the camera's spot and where it looks (the room's shot, or in front of the visitor on a first visit). */
+  private dressCam = { pos: new THREE.Vector3(), look: new THREE.Vector3(), inRoom: true };
+  /** The airport's and Palm Cay's people have been asked for (on the first trip out). */
+  private tripPeople = false;
   /** The crates round's HUD badge, as last drawn. */
   private cratesBadge = '';
   /** Whose account the open cards were drawn for, so they redraw when someone signs in or out. */
@@ -390,9 +441,25 @@ export class Game {
 
   /** Builds the whole fair in small steps so the progress bar can update. */
   async build(onProgress: (p: number) => void) {
-    // the people (visitor and guests) and the dogs download while the world is being built
+    // the people first of all (no renderer needed): the manifest, the clips, the park's crowd, and
+    // Rosa's and the visitor's own close-up files, downloading while the world is built
+    const saved = this.devLook() ?? visitorLook.get();
+    const dl = downloadPeople({ sets: ['park'], hero: saved ? [VENDOR_AVATAR, saved.avatar] : [VENDOR_AVATAR], tier: earlyTier(this.mobile) });
+    // who the visitor is: their saved look, or (none yet, or that person is no longer offered) a
+    // default, picked as soon as the manifest is in so their file downloads with the rest
+    const firstLook = dl.manifest.then((m) => {
+      const playable = m.avatars.filter((a) => a.roles.includes('playable') && a.files.hero);
+      if (saved && playable.some((a) => a.id === saved.avatar)) return { look: saved, first: false };
+      const look = defaultLook(session.user?.gender, playable);
+      if (!look) throw new Error('people: no playable avatars in the manifest');
+      const file = playable.find((a) => a.id === look.avatar)?.files.hero;
+      if (file) void dl.file(file).catch(() => undefined);
+      return { look, first: true };
+    });
+    firstLook.catch(() => undefined);
+    // (parsed from the renderer's step on: see the people's step)
+    let peopleReady: Promise<PeopleFactory> | null = null;
     const loader = new GLTFLoader();
-    const peopleModels = Promise.all([loader.loadAsync(GUESTS_URL), loader.loadAsync(GUEST_ANIMS_URL)]);
     const dogModels = Promise.all([loader.loadAsync(DOG_URLS.shiba), loader.loadAsync(DOG_URLS.husky)]).catch(() => null);
     // the airport's, the aircraft's and Palm Cay's code: its own chunk, downloading while the fair builds
     const worldKit = import('./flight/world-kit');
@@ -401,7 +468,12 @@ export class Game {
     const steps: [number, () => void | Promise<void>][] = [];
     const step = (w: number, fn: () => void | Promise<void>) => steps.push([w, fn]);
 
-    step(1, () => this.setupRenderer());
+    step(1, () => {
+      this.setupRenderer();
+      // the people's files are parsed as they arrive (the KTX2 transcoder needs the renderer)
+      peopleReady = PeopleFactory.create(this.renderer, dl, { tier: this.quality.tier });
+      peopleReady.catch(() => undefined);
+    });
     step(1, () => this.setupPhysics());
     // (everything the fair builds from here to the airport is its own scenery: see fairObjects)
     let fairFrom = 0;
@@ -420,6 +492,11 @@ export class Game {
       this.updatables.push(new Carousel(this.ctx));
       this.booth = new Booth(this.ctx);
       this.updatables.push(this.booth);
+      // the changing room beside it (before the crowd, which reads the colliders once), whose ring
+      // is the one ZONES has for it
+      this.room = new ChangingRoom(this.ctx);
+      this.updatables.push(this.room);
+      Object.assign(ZONES.changing, this.room.zone);
       this.ideaKiosk = new IdeaKiosk(this.ctx);
       this.updatables.push(this.ideaKiosk);
     });
@@ -654,11 +731,17 @@ export class Game {
     });
     step(1, async () => {
       this.zones = new Zones(this.ctx);
-      const [guests, anims] = await peopleModels;
-      const people = new PeopleFactory(guests, anims);
-      this.player = new Player(this.ctx, people.create(VISITOR_LOOK));
+      const people = await peopleReady!;
+      this.people = people;
+      // the visitor, as they made themselves (or as the customiser will first offer them)
+      const { look, first } = await firstLook;
+      this.firstLook = first;
+      await people.load(look.avatar, { hero: true });
+      this.wornLook = look;
+      this.player = new Player(this.ctx, people.create(lookFromVisitor(look, people.spec(look.avatar)!)));
+      Object.assign(this.dressed, this.player.rig.look);
       // Rosa behind the booth's counter, and what the visitor wears from her shop
-      this.booth.setVendor(people.create(VENDOR_LOOK));
+      this.booth.setVendor(people.create(vendorLook(people.spec(VENDOR_AVATAR)!)));
       this.wardrobe = new Wardrobe(this.player.rig, this.scene);
       // the airport's and the island's travellers (they map the colliders, so everything stands by now)
       const { Travellers, Flight, flightGround } = this.kit;
@@ -669,8 +752,9 @@ export class Game {
         shadows: this.quality.shadows && this.quality.tier !== 'low',
         tier: this.quality.tier,
       });
-      this.volley.setPeople(people, this.player.rig.look);
-      this.jetski.setPeople(people, this.player.rig.look);
+      // the island's players and riders: the visitor's own look, as it is when each round starts
+      this.volley.setPeople(people, () => this.player.rig.look);
+      this.jetski.setPeople(people, this.dressed);
       // the flight, with the world's ground under it: the terrain and the sea, the airfields' pavement
       this.flight = new Flight(this.ctx, {
         env: this.env,
@@ -694,6 +778,8 @@ export class Game {
       const crowd = new Crowd(this.ctx, people, dogs && new DogFactory({ shiba: dogs[0], husky: dogs[1] }), [this.stack, this.falcon], this.striker, {
         count: CROWD_SIZE[this.quality.tier],
         shadows: this.quality.shadows && this.quality.tier !== 'low',
+        // (nobody in the crowd is the visitor's double)
+        exclude: [this.player.rig.look.avatar],
       });
       crowd.setPlayer(this.player);
       this.player.onWave = () => crowd.waveBack(this.player.position);
@@ -701,6 +787,7 @@ export class Game {
       this.updatables.push(crowd); // after the coasters, so riders sit where their seats are now
       this.crowd = crowd;
       this.fairObjects.push(...this.scene.children.slice(crowdFrom));
+      this.setupDressing();
     });
     step(2, () => {
       // warm up: upload textures/compile shaders before the user enters
@@ -1093,6 +1180,12 @@ export class Game {
       this.inspected = true;
       void this.openInspect(inspect);
     }
+    // no look of their own yet: the customiser opens on the visitor where they stand, to make one
+    // (it covers the welcome below until it closes; after the office's link, it waits for next time)
+    if (this.firstLook && !inspect && this.mode === 'drive' && this.customiser) {
+      this.firstLook = false;
+      this.startDressing(false);
+    }
     // back in after the park's maintenance: no second welcome
     if (this.welcomed) return;
     this.welcomed = true;
@@ -1108,6 +1201,7 @@ export class Game {
     // one line per place, listed district by district (the order and the districts are the map's)
     const line: Partial<Record<ZoneId, string>> = {
       booth: "🎟️ <strong>Ticket Booth</strong> — Rosa's counter: your free tickets, treats with perks, and souvenirs to wear",
+      changing: '👕 <strong>Changing room</strong> — beside the booth: be someone else, dye your clothes or try another height. Free, no ticket',
       ideas: "💡 <strong>Idea Box</strong> — on the entrance plaza: tell us what you'd love to see in the fair, and follow what becomes of it",
       crates: `🥫 <strong>Crate Smash</strong> — ${CRATES_ROUND} seconds to knock down as many crates as you can ${cost('crates')}`,
       striker: `🔔 <strong>High Striker</strong> — three swings to ring the bell ${cost('striker')}`,
@@ -1181,6 +1275,8 @@ export class Game {
       this.enterMuseum(0);
     } else if (z === 'booth') {
       this.enterShop();
+    } else if (z === 'changing') {
+      this.enterChanging();
     } else if (z === 'ideas') {
       this.enterIdeas();
     } else if (z === 'workshop') {
@@ -1479,6 +1575,7 @@ export class Game {
   private closeFair() {
     if (!this.inFair) return;
     if (this.mode === 'shop') this.leaveShop();
+    if (this.mode === 'dressing') this.leaveDressing(false);
     if (this.mode === 'ideas') this.leaveIdeas();
     if (this.mode === 'museum') this.leaveMuseum(true);
     if (this.mode === 'workshop') this.leaveWorkshop(true);
@@ -1782,6 +1879,169 @@ export class Game {
     this.camYaw = 0; // behind the visitor, who faces the booth
     this.resize();
     this.sfx.chime();
+  }
+
+  // ---------- The visitor's look: the customiser, the changing room ----------
+
+  /**
+   * The customiser (in the HUD), and the visitor following their look wherever it changes: Done
+   * in the customiser, or a member's own look arriving as they log in.
+   */
+  private setupDressing() {
+    const people = this.people!;
+    this.customiser = new Customiser(
+      {
+        people: customiserPeople(people.manifest.avatars, PEOPLE_URL),
+        preview: (look) => this.dressVisitor(look),
+        close: (saved) => this.leaveDressing(saved),
+        turn: () => this.player.face(this.player.facing + Math.PI),
+      },
+      this.ui.hud,
+    );
+    visitorLook.onChange((look) => {
+      // (while the customiser is open it puts on the looks itself, and its Done ends in leaveDressing)
+      if (!look || this.customiser?.isOpen || !people.spec(look.avatar)?.roles.includes('playable')) return;
+      this.dressVisitor(look).catch((e: unknown) => console.warn('The Funfair: the visitor’s look could not be put on.', e));
+    });
+  }
+
+  /**
+   * Puts `v` on the visitor: in place when it's the same person (colours, height and build change
+   * at once), or as another person once their close-up file is in (swapRig). The latest call wins:
+   * someone still downloading for an earlier call isn't put on once a later call has shown
+   * someone else. Rejects when the person can't be fetched (the customiser goes back to whoever
+   * was shown before).
+   */
+  private async dressVisitor(v: VisitorLook): Promise<void> {
+    const people = this.people;
+    const spec = people?.spec(v.avatar);
+    if (!people || !spec) throw new Error(`people: no avatar "${v.avatar}"`);
+    const seq = ++this.dressSeq;
+    const look = lookFromVisitor(v, spec);
+    if (!this.player.rig.applyLook(look)) {
+      await people.load(v.avatar, { hero: true });
+      if (seq !== this.dressSeq) return;
+      if (!people.has(v.avatar, true)) throw new Error(`people: ${v.avatar} could not be fetched`);
+      this.swapRig(people.create(look));
+    }
+    this.wornLook = v;
+    Object.assign(this.dressed, this.player.rig.look);
+  }
+
+  /** The visitor becomes another person: whatever holds their body (the player, their souvenirs) moves over to the new one. */
+  private swapRig(rig: PersonRig) {
+    const old = this.player.rig;
+    this.player.setRig(rig);
+    this.wardrobe?.setRig(rig);
+    // nobody in the crowd may wear the visitor's new face (a guest wearing it becomes someone else)
+    if (rig.look.avatar !== old.look.avatar) this.crowd?.setExclude([rig.look.avatar]);
+    old.dispose();
+  }
+
+  /**
+   * Steps into the changing room: the visitor stands inside facing out (behind a quick fade), the
+   * camera moves in front of the cubicle, and the customiser opens beside them.
+   */
+  private enterChanging() {
+    if (this.mode !== 'drive' || this.round || this.boarding || !this.customiser) return;
+    this.ui.hidePanel();
+    this.panelZone = null;
+    this.ui.prompt('', '', '');
+    this.player.enabled = false;
+    // the shot starts from where the camera is, and glides over
+    this.camPos.copy(this.camera.position);
+    this.fade(() => {
+      const at = this.room.standAt;
+      this.placeVisitor(at.x, at.z, this.room.facing);
+      this.startDressing(true);
+    });
+  }
+
+  /**
+   * Opens the customiser on what the visitor wears: in the changing room, or (`inRoom` false, a
+   * first visit) where they stand, the camera in front of them. The game's keys wait meanwhile.
+   */
+  private startDressing(inRoom: boolean) {
+    if (!this.customiser || !this.wornLook) return;
+    this.mode = 'dressing';
+    this.player.enabled = false;
+    this.input.paused = true;
+    this.dressCam.inRoom = inRoom;
+    this.customiser.open(this.wornLook, { firstVisit: !inRoom });
+    this.resize();
+    // (into the room the camera glides from behind the visitor; on a first visit it starts in front
+    // of them, rather than swooping over their head)
+    if (!inRoom) {
+      this.camPos.copy(this.dressCam.pos);
+      this.camTarget.copy(this.dressCam.look);
+    }
+  }
+
+  /**
+   * The customiser closed: Done (`saved`: the look is in visitorLook) or Cancel (its preview has
+   * just put the old look back). Back to the fair, the camera behind the visitor. A person still
+   * downloading when Done is pressed changes the visitor as they land.
+   */
+  private leaveDressing(saved: boolean) {
+    if (this.mode !== 'dressing') return;
+    if (this.customiser?.isOpen) {
+      // called away (the park closing): the look saved before is put back
+      this.customiser.close();
+      const back = visitorLook.get();
+      if (back) this.dressVisitor(back).catch(() => undefined);
+      // a first visit that never chose: the customiser comes back next time
+      else this.firstLook = true;
+    } else if (saved) {
+      // (the panel may have had a change still to show when Done came)
+      const look = visitorLook.get();
+      if (look) this.dressVisitor(look).catch((e: unknown) => console.warn('The Funfair: the visitor’s look could not be put on.', e));
+    }
+    this.mode = 'drive';
+    this.input.paused = false;
+    this.player.enabled = this.inFair;
+    this.camYaw = this.player.facing; // behind the visitor, wherever they face
+    this.camPitch = 0.2;
+    this.resize();
+    this.sfx.chime();
+  }
+
+  /** The customiser's camera: the room's shot, or (a first visit) in front of the visitor where they stand. */
+  private aimDressCam() {
+    const portrait = this.camera.aspect < 0.8;
+    const c = this.dressCam;
+    if (c.inRoom) {
+      const { pos, look } = this.room.shot(portrait);
+      c.pos.copy(pos);
+      c.look.copy(look);
+      return;
+    }
+    // as the room's: a few metres in front of them (their forward is (-sin h, -cos h)), a little
+    // to their right ((cos h, -sin h)), the whole visitor in frame
+    const p = this.player.position;
+    const h = this.player.facing;
+    const floor = p.y - BODY_R;
+    const d = portrait ? 5.3 : 4.2;
+    const side = portrait ? 0.35 : 0.55;
+    c.pos.set(p.x - Math.sin(h) * d + Math.cos(h) * side, floor + 1.6, p.z - Math.cos(h) * d - Math.sin(h) * side);
+    c.look.set(p.x, floor + 1, p.z);
+  }
+
+  /** Dev only: ?look=Female_Adult_01 plays as that person in their own colours (nothing saved, no first-visit customiser). */
+  private devLook(): VisitorLook | null {
+    if (!import.meta.env.DEV) return null;
+    const id = new URLSearchParams(location.search).get('look');
+    return id ? { v: 1, avatar: id, top: null, bottom: null, shoes: null, hair: null, height: 1, build: 1 } : null;
+  }
+
+  /**
+   * The airport's and Palm Cay's people, asked for once on the first trip out (they don't download
+   * with the fair's): near the SkyLink's park station, aboard it, or jumping to the airport or the
+   * island. The travellers and the island's games dress them as their sets arrive.
+   */
+  private loadTripPeople() {
+    if (this.tripPeople || !this.people) return;
+    this.tripPeople = true;
+    for (const set of ['airport', 'island']) this.people.loadSet(set).catch((e: unknown) => console.warn(`people: the ${set} set failed to load`, e));
   }
 
   /** Takes the visitor to the Ticket Booth and opens its counter. */
@@ -2161,6 +2421,8 @@ export class Game {
   }
 
   private onEscape() {
+    // (the customiser has the keyboard while it's open: its Escape is Cancel)
+    if (this.mode === 'dressing') return;
     if (this.mode === 'shop') return this.leaveShop();
     if (this.mode === 'ideas') return this.leaveIdeas();
     if (this.mode === 'museum') return this.leaveMuseum();
@@ -2246,7 +2508,11 @@ export class Game {
       this.leaving = false;
       return this.skipSkyLink();
     }
-    const exit: Record<Exclude<Mode, 'drive' | 'striker' | 'ducks' | 'cannons' | 'volley' | 'skylink' | 'shop' | 'ideas' | 'museum' | 'workshop'>, () => void> = {
+    if (this.mode === 'dressing') {
+      this.leaving = false;
+      return this.leaveDressing(false);
+    }
+    const exit: Record<Exclude<Mode, 'drive' | 'striker' | 'ducks' | 'cannons' | 'volley' | 'skylink' | 'shop' | 'ideas' | 'museum' | 'workshop' | 'dressing'>, () => void> = {
       coaster: () => this.ride.exit(),
       rocket: () => this.rocket.exit(),
       wheel: () => this.wheel.exit(),
@@ -2448,6 +2714,8 @@ export class Game {
     // no walking across the sea: Palm Cay is reached by air only
     if (!canTravel(regionAt(this.player.position.x, this.player.position.z), id)) return this.showAcrossSea(id);
     const z = ZONES[id];
+    // a jump to the airport (or beyond): its people start loading during the fade
+    if (z.z > TRIP_SOUTH_Z) this.loadTripPeople();
     this.fade(() => {
       // park just in front of the trigger ring so the prompt shows up immediately
       this.placeVisitor(z.x, z.z, z.heading, z.y ?? 0);
@@ -2469,6 +2737,7 @@ export class Game {
     this.ui.hidePanel();
     this.panelZone = null;
     this.ui.prompt('', '', '');
+    this.loadTripPeople();
     this.skyRide = { ride: this.skylink.ride(from), to: from === 'park' ? 'skylinkBack' : 'skylink', aboard: false, yaw: 0 };
     this.mode = 'skylink';
     this.player.enabled = false;
@@ -2595,7 +2864,11 @@ export class Game {
             ? this.gallery.viewOffset(w, h)
             : this.mode === 'workshop' && this.workshop
               ? this.workshop.viewOffset(w, h)
-              : null;
+              : this.mode === 'dressing' && this.customiser
+                ? this.customiser.viewOffset(w, h)
+                : null;
+    // (the customiser's camera stands further back on a portrait screen)
+    if (this.mode === 'dressing') this.aimDressCam();
     if (off && (off.x || off.y)) this.camera.setViewOffset(w, h, off.x, off.y, w, h);
     else this.camera.clearViewOffset();
     this.camera.updateProjectionMatrix();
@@ -2650,6 +2923,10 @@ export class Game {
     this.trail.ambient = this.mode === 'drive';
     // where the visitor is: the aircraft's region while flying it, else where they stand
     if (this.mode === 'skylink') this.updateSkyRide(dt);
+    if (!this.tripPeople) {
+      const p = this.player.position;
+      if (p.z > TRIP_SOUTH_Z || Math.hypot(p.x - SKYLINK.park.x, p.z - SKYLINK.park.z) < TRIP_STATION_M) this.loadTripPeople();
+    }
     const region = this.flight.active ? this.flight.region : regionAt(this.player.position.x, this.player.position.z);
     if (region !== this.region) this.enterRegion(region);
     // the AI traffic first: the flight reads where everyone is this frame
@@ -2713,6 +2990,15 @@ export class Game {
       this.camera.lookAt(this.camTarget);
       this.env.follow(this.player.position);
       this.shop.update(dt);
+    } else if (this.mode === 'dressing') {
+      this.camera.up.set(0, 1, 0);
+      this.zones.setVisible(false);
+      const k = 1 - Math.exp(-dt * 2.6);
+      this.camPos.lerp(this.dressCam.pos, k);
+      this.camTarget.lerp(this.dressCam.look, k);
+      this.camera.position.copy(this.camPos);
+      this.camera.lookAt(this.camTarget);
+      this.env.follow(this.player.position);
     } else if (this.mode === 'ideas' && this.ideas) {
       this.camera.up.set(0, 1, 0);
       this.zones.setVisible(false);
@@ -2807,7 +3093,7 @@ export class Game {
     if (this.mode === 'drive' && !this.debugCam) this.focus.copy(this.camTarget);
     else this.focus.copy(this.camera.position);
     this.env.update(t, this.focus);
-    this.player.setNightGlow(this.env.night);
+    this.player.setNightGlow(this.mode === 'dressing' ? this.env.night * DRESSING_GLOW : this.env.night);
     this.crowd?.setNight(this.env.night);
     this.timeControl?.update();
 

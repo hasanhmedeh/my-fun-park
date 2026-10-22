@@ -115,6 +115,7 @@ export type ZoneId =
   | 'ducks'
   | 'ferris'
   | 'booth'
+  | 'changing'
   | 'ideas'
   | 'drone'
   | 'flip'
@@ -225,6 +226,11 @@ export const ZONES: Record<ZoneId, Zone> = {
   // at the wheel's boarding terminal, at the far end of the road out of the park
   ferris: near(LAYOUT.ferris, 0, 19, { radius: 3.6, title: 'Giant Wheel', action: 'Ride the 250 m wheel', heading: 0 }),
   booth: near(LAYOUT.booth, 0, 6, { radius: 3.4, title: 'Ticket Booth', action: 'Step up to the counter', heading: 0 }),
+  // on the worn patch in front of the changing room beside the booth, facing in (north-east). The
+  // room (attractions/changing-room.ts) stands 6 m east of the booth with its front turned to the
+  // south-west, and this ring 2.25 m out in front of it; it can't be imported here (it imports this
+  // module), so the game copies the room's own `zone` over this one when it builds it.
+  changing: near(LAYOUT.booth, 6 - 2.25 * Math.SQRT1_2, 0.5 + 2.25 * Math.SQRT1_2, { radius: 1.4, title: 'Changing room', action: 'Change your look', heading: -Math.PI / 4 }),
   // in front of the Idea Box, facing west at its slot
   ideas: near(LAYOUT.ideas, 3.5, 0, { radius: 2.6, title: 'Idea Box', action: 'Share an idea', heading: Math.PI / 2 }),
   // at the kiosk counter, facing east
@@ -284,7 +290,7 @@ export type DistrictId = 'gate' | 'midway' | 'falcon' | 'cosmos' | 'thrill' | 'm
 /** A district: the region (landmass) it's on, its plaza (where its sign stands), where the map writes its name, and its places. */
 export type District = { name: string; icon: string; color: string; region: Region; plaza: [number, number]; label: [number, number]; zones: ZoneId[] };
 export const DISTRICTS: Record<DistrictId, District> = {
-  gate: { name: 'Main Gate', icon: '🎪', color: '#ff4d6d', region: 'home', plaza: [0, 18], label: [0, 6], zones: ['entrance', 'booth', 'ideas', 'skylink'] },
+  gate: { name: 'Main Gate', icon: '🎪', color: '#ff4d6d', region: 'home', plaza: [0, 18], label: [0, 6], zones: ['entrance', 'booth', 'changing', 'ideas', 'skylink'] },
   midway: { name: 'The Midway', icon: '🎯', color: '#ffb627', region: 'home', plaza: [79, 18], label: [79, 2], zones: ['crates', 'striker', 'ducks'] },
   falcon: { name: 'Falcon Gate', icon: '🦅', color: '#2ec4b6', region: 'home', plaza: [64, -50], label: [84, -66], zones: ['falcon', 'museum'] },
   cosmos: { name: 'Cosmos', icon: '🚀', color: '#7b5cd6', region: 'home', plaza: [0, -138], label: [-24, -140], zones: ['rocket', 'ship', 'drone', 'ferris'] },
@@ -384,6 +390,7 @@ export const FOOTPRINTS: [number, number, number][] = [
   [LAYOUT.arch.x + 8, LAYOUT.arch.z, 2],
   [LAYOUT.letters.x, LAYOUT.letters.z, 10],
   [LAYOUT.booth.x, LAYOUT.booth.z, 4.5],
+  [LAYOUT.booth.x + 6, LAYOUT.booth.z + 0.5, 2], // the changing room beside it
   [LAYOUT.ideas.x, LAYOUT.ideas.z, 3],
   [LAYOUT.rocket.x, LAYOUT.rocket.z, 9],
   [LAYOUT.rocket.x + 5.2, LAYOUT.rocket.z, 3],

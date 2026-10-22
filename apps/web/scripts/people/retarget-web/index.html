@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Retarget sheet</title>
+    <!--
+      Contact sheet for scripts/people/retarget.mjs: every baked clip at a few moments, on each given
+      avatar, from two sides. Open it through the dev server (it imports three through Vite):
+        http://localhost:5199/scripts/people/retarget-web/index.html?pack=/models/people/clips-extra.glb
+          &avatars=<url>,<url>&clips=Roll,Consume&t=0.1,0.45,0.8&cell=220x300
+      or screenshot it with scripts/people/retarget-check.mjs. The title turns READY when drawn.
+    -->
+    <style>
+      html, body { margin: 0; background: #d9dde2; font: 12px system-ui, sans-serif; color: #1d232b; }
+      canvas { display: block; }
+      #labels { position: absolute; inset: 0; pointer-events: none; }
+      #labels div { position: absolute; white-space: nowrap; }
+      .row { font-weight: 700; font-size: 13px; background: #f3f4f6cc; padding: 1px 6px; border-radius: 3px; }
+      .cell { color: #3b4450; font-size: 11px; }
+      .bad { color: #b42318; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <div id="labels"></div>
+    <script type="module" src="./sheet.js"></script>
+  </body>
+</html>

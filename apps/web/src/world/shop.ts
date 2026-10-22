@@ -8,31 +8,27 @@ import type { AuthMode } from '../account/auth-dialog';
 import { everyHours, formatWait, session } from '../account/session';
 import type { Sfx } from './audio';
 import { BOOTH_COUNTER, BOOTH_VENDOR, type Booth } from './attractions/landmarks';
-import type { Look } from './crowd/people';
+import { plainLook, type Look } from './crowd/looks';
+import type { AvatarSpec } from './crowd/people-manifest';
 import { perks } from './perks';
 import type { Player } from './player';
 import { historyHtml, legalLinksHtml, priceListHtml, ticketsText } from './ticket-counter';
+import { PALETTE } from './textures';
 import { escapeHtml } from './ui';
 
 type Aisle = 'tickets' | 'treats' | 'souvenirs';
 const AISLES: Aisle[] = ['tickets', 'treats', 'souvenirs'];
 
-/** Rosa: teal vest over a cream shirt, the fair's cap (she wears the souvenir she sells). */
-export const VENDOR_LOOK: Look = {
-  gender: 'f',
-  height: 1.68,
-  child: false,
-  skin: new THREE.Color('#d6b196'),
-  hair: new THREE.Color('#2b1d14'),
-  hairStyle: 'Hair_Buns',
-  beard: false,
-  top: new THREE.Color('#2ec4b6'),
-  pants: new THREE.Color('#2b3d63'),
-  shoe: new THREE.Color('#1a1a1a'),
-  sleeve: 0.55,
-  legEnd: 0.045,
-  build: 1,
-};
+/** Rosa's avatar (its hero file loads with the visitor's, before the fair opens). */
+export const VENDOR_AVATAR = 'Female_Adult_09';
+
+/**
+ * Rosa: her own cardigan and trousers under the booth's teal apron, 1.68 m tall (the counter was
+ * built round her), and the fair's cap from the Wardrobe (she wears the souvenir she sells).
+ */
+export function vendorLook(spec: AvatarSpec): Look {
+  return { ...plainLook(spec, 1.68 / spec.height, 1, true), wear: { apron: PALETTE.teal } };
+}
 
 /** What Rosa says about each item when you look at it. */
 const PITCH: Record<string, string> = {

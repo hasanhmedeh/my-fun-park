@@ -3,12 +3,13 @@ import * as CANNON from 'cannon-es';
 import type { Ctx } from './context';
 import type { Input } from './input';
 import { clampToGrounds, LAYOUT, respawnFor } from './layout';
-import type { PersonRig } from './crowd/people';
+import type { PersonRig } from './crowd/person-rig';
 import { perks } from './perks';
 
-// The visitor is one of the park's realistic people (see crowd/people.ts): the same rig and
-// animation library as every guest, with a fixed outfit. Idle / walk / jog / sprint blend by
-// speed; rolling, kicking, waving and reaching out are layered on top.
+// The visitor is one of the park's realistic people (see crowd/person-rig.ts): the same rig and
+// animation library as every guest, in the look they made in the customiser (customiser.ts), which
+// can change while they play (setRig). Idle / walk / jog / sprint blend by speed; rolling, kicking,
+// waving and reaching out are layered on top.
 
 const WALK_SPEED = 7; // m/s: the park is big, so plain walking already moves at a run
 const RUN_SPEED = 11; // holding Shift: a flat-out sprint
@@ -42,16 +43,16 @@ export class Player {
   private lean = new THREE.Group();
   /** True while a ride carries the visitor (see carry): no walking, no gravity, no keeping to the ground. */
   private carried = false;
+  private person: PersonRig;
+  /** The night glow last asked for, kept for a new rig (setRig). */
+  private glow = 0;
 
   constructor(
     private ctx: Ctx,
-    readonly rig: PersonRig,
+    rig: PersonRig,
   ) {
-    // the rig stands on its feet; the physics body's centre sits BODY_R above the ground
-    rig.root.position.y = -BODY_R;
-    rig.setShadows(true);
-    rig.setDetail(true);
-    this.lean.add(rig.root);
+    this.person = rig;
+    this.fit(rig);
     this.group.add(this.lean);
     ctx.scene.add(this.group);
 
@@ -71,8 +72,39 @@ export class Player {
     this.reset(LAYOUT.spawn.x, LAYOUT.spawn.z, LAYOUT.spawn.heading);
   }
 
+  /** The visitor's body: the person they are (a new one after setRig). */
+  get rig(): PersonRig {
+    return this.person;
+  }
+
+  /**
+   * The visitor becomes another person (a new avatar from the customiser, or a look arriving as a
+   * member logs in): the new rig takes the old one's place, mid-stride, with the same glow. A move
+   * under way (a roll, a kick) ends. The caller disposes of the old rig once nothing else holds it.
+   */
+  setRig(rig: PersonRig) {
+    if (rig === this.person) return;
+    this.lean.remove(this.person.root);
+    this.person = rig;
+    this.fit(rig);
+    this.move = null;
+    this.moveT = 0;
+    rig.setGlow(this.glow);
+  }
+
+  private fit(rig: PersonRig) {
+    // the rig stands on its feet; the physics body's centre sits BODY_R above the ground
+    rig.root.position.set(0, -BODY_R, 0);
+    rig.root.rotation.set(0, 0, 0);
+    rig.setShadows(true);
+    rig.setDetail(true);
+    this.lean.add(rig.root);
+  }
+
   /** After dark the visitor carries a faint glow of their own colours, so they stay readable. */
   setNightGlow(k: number) {
+    if (k === this.glow) return;
+    this.glow = k;
     this.rig.setGlow(k);
   }
 
@@ -129,6 +161,18 @@ export class Player {
 
   get forward() {
     return new THREE.Vector2(-Math.sin(this.heading), -Math.cos(this.heading));
+  }
+
+  /** Which way the visitor faces (0: north, -z; as ZONES' headings). */
+  get facing() {
+    return this.heading;
+  }
+
+  /** Turns the visitor on the spot to face `heading` (the customiser's Turn button). */
+  face(heading: number) {
+    this.heading = Math.atan2(Math.sin(heading), Math.cos(heading));
+    this.turnRate = 0;
+    this.sync();
   }
 
   /** Wave with the right hand (upper body only, so it works while walking). */

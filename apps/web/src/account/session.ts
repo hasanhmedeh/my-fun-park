@@ -31,6 +31,7 @@ import {
   type Tickets,
   type User,
 } from './api';
+import type { VisitorLook } from '../world/crowd/people-manifest';
 
 type Listener = () => void;
 
@@ -597,8 +598,11 @@ class Session {
     return user;
   }
 
-  /** Fills in what the member's account is missing (asked after logging in). */
-  async updateProfile(body: { gender?: Gender; acceptTerms?: true }) {
+  /**
+   * Fills in what the member's account is missing (asked after logging in), or saves their look
+   * (world/visitor-look.ts does, after the customiser).
+   */
+  async updateProfile(body: { gender?: Gender; acceptTerms?: true; visitorLook?: VisitorLook | null }) {
     try {
       const { user } = await api.updateProfile(body);
       this.set(user);

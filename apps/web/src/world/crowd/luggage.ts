@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import type { PersonRig } from './people';
+import type { PersonRig } from './person-rig';
 
 // What travellers and beachgoers carry: rolling suitcases (and the crew's smaller roll-aboards,
 // the same mesh scaled), backpacks, beach totes, straw sun hats and pilots' caps. Each kind is one
 // instanced draw for everyone in both places; every frame the owners' poses write the matrices.
-// Hats and backpacks follow the head and spine bones; a pulled case hangs off the hand, which
-// is posed on top of the walk so the arm really reaches back for the handle.
+// Hats and backpacks sit at the avatar's own anchors (the top of the head, the back) and turn with
+// the head and the upper spine; a tote hangs from the left shoulder; a pulled case hangs off the
+// hand, which is posed on top of the walk so the arm really reaches back for the handle. A hat
+// hides the hair under it while it's worn (PersonRig.setHatClip), and shows it again once it's off.
 
 export type PropKind = 'suitcase' | 'backpack' | 'tote' | 'strawHat' | 'pilotCap';
 export const PROP_KINDS: PropKind[] = ['suitcase', 'backpack', 'tote', 'strawHat', 'pilotCap'];
@@ -186,12 +188,20 @@ export class Luggage {
     this.set(item, HIDDEN);
   }
 
-  /** Upload what changed this frame. */
+  /** Upload what changed this frame (call it once a frame, after placing everything). */
   flush() {
     for (const k of this.dirty) this.meshes[k].instanceMatrix.needsUpdate = true;
     this.dirty.clear();
     if (this.handlesDirty) this.handles.instanceMatrix.needsUpdate = true;
     this.handlesDirty = false;
+    // a hat not put on anyone's head this frame has come off (or was put away): their hair shows again
+    for (const [rig, worn] of hatted) {
+      if (worn) hatted.set(rig, false);
+      else {
+        rig.setHatClip(null);
+        hatted.delete(rig);
+      }
+    }
   }
 
   /** Hide or show the lot (the region the visitor isn't in). */
@@ -209,6 +219,7 @@ const q1 = new THREE.Quaternion();
 const q2 = new THREE.Quaternion();
 const e1 = new THREE.Euler(0, 0, 0, 'YXZ');
 const s1 = new THREE.Vector3();
+const reach = new THREE.Vector3();
 
 /** Turn a bone (in world space) so the direction to its child bone becomes `dir`, by amount k. */
 function aim(bone: THREE.Object3D, child: THREE.Object3D, dir: THREE.Vector3, k: number) {
@@ -235,13 +246,14 @@ const arms = new WeakMap<PersonRig, Arm>();
 function rightArm(rig: PersonRig): Arm {
   let a = arms.get(rig);
   if (!a) {
-    const upper = rig.root.getObjectByName('upperarm_r')!;
-    const lower = rig.root.getObjectByName('lowerarm_r')!;
-    const hand = rig.root.getObjectByName('hand_r')!;
+    const upper = rig.bone('upperarm_r');
+    const lower = rig.bone('lowerarm_r');
+    const hand = rig.bone('hand_r');
     rig.root.updateMatrixWorld(true);
     const p = (o: THREE.Object3D) => new THREE.Vector3().setFromMatrixPosition(o.matrixWorld);
-    // bone to bone, plus the palm to the grip
-    const length = p(upper).distanceTo(p(lower)) + p(lower).distanceTo(p(hand)) + 0.07 * (rig.height / 1.8);
+    // bone to bone (the hand bone is at the wrist), then on past the palm to where the fingers close round the grip
+    const palm = rig.anchor('palmR').distanceTo(p(hand));
+    const length = p(upper).distanceTo(p(lower)) + p(lower).distanceTo(p(hand)) + palm * 1.5;
     a = { upper, lower, hand, length };
     arms.set(rig, a);
   }
@@ -279,7 +291,8 @@ export function pulledCase(rig: PersonRig, heading: number, floorY: number, st: 
     const hy = sh.y + dir.y * arm.length;
     const hz = sh.z + dir.z * arm.length;
     if (posed) {
-      const d = v2.copy(dir);
+      // (its own vector: aim() works in v1 and v2)
+      const d = reach.copy(dir);
       aim(arm.upper, arm.lower, d, st.pull);
       aim(arm.lower, arm.hand, d, st.pull);
     }
@@ -310,54 +323,73 @@ export function standingCase(x: number, y: number, z: number, yaw: number, flat:
   return out.compose(v1.set(x, y, z), q1, s1.setScalar(scale));
 }
 
-/** Where the top of the head is, from the head bone (it sits at the skull's base): world space. */
-export function headTop(rig: PersonRig, heading: number, out: THREE.Vector3) {
-  const head = rig.bone('Head');
-  head.updateWorldMatrix(true, false);
-  out.setFromMatrixPosition(head.matrixWorld);
+/**
+ * How far the upper spine's and the head's bones lean back from upright in the avatars' bind
+ * pose, turning about their own z (the person's left): the same on every man's skeleton and on
+ * every woman's (measured with ?scene=crowd&mode=frames). In those bones' frames x runs up the
+ * spine to the crown, +y is forward and +z the person's left.
+ */
+const BIND_LEAN = { spine_03: { m: 0.041, f: 0.16 }, Head: { m: -0.152, f: -0.159 } };
+
+const m1 = new THREE.Matrix4();
+
+/**
+ * A prop's orientation on a bone (its +y up, its −z the way the person faces: the park's
+ * convention) from the bone's world rotation: upright and facing forward when the bone is as it is
+ * in the bind pose, and turning with it (a head looking round, a back bending over).
+ */
+function onBone(rig: PersonRig, bone: 'spine_03' | 'Head', out: THREE.Quaternion) {
+  const a = BIND_LEAN[bone][rig.spec.gender];
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  // in the bone's frame: the prop's x (the person's right) is −z, its y (up) is (c, s, 0) and its
+  // z (behind them) is (s, −c, 0)
+  m1.set(0, c, s, 0, 0, s, -c, 0, -1, 0, 0, 0, 0, 0, 0, 1);
+  q2.setFromRotationMatrix(m1);
+  return rig.bone(bone).getWorldQuaternion(out).multiply(q2);
+}
+
+/** A head's size against a grown-up's, from the avatar's own height (a child's head is big for their size). */
+const headSize = (rig: PersonRig) => THREE.MathUtils.clamp(Math.sqrt(rig.spec.height / 1.75), 0.8, 1.05);
+
+/** Where the top of the head is (world space): the avatar's own crown, hair and all. (The heading isn't needed any more.) */
+export function headTop(rig: PersonRig, _heading: number, out: THREE.Vector3) {
+  return rig.anchor('headTop', out);
+}
+
+/** Rigs given a hat this frame (true) or last frame (false): see Luggage.flush. */
+const hatted = new Map<PersonRig, boolean>();
+
+/**
+ * A hat on the head, turning with it: its origin a little under the crown, so the hat's crown sits
+ * over the top of the head and the brim at the brow. The hair under it is hidden while it's worn
+ * (the rig's hat clip; Luggage.flush takes it off again once the hat isn't on their head).
+ */
+export function hatOnHead(rig: PersonRig, _heading: number, scale: number, out: THREE.Matrix4) {
+  // (only on an avatar without headwear of its own: a cap or hat baked into the head can't be hidden)
+  if (!hatted.has(rig)) rig.setHatClip(rig.defaultHatClip());
+  hatted.set(rig, true);
+  const q = onBone(rig, 'Head', q1);
+  // (the look's own scale on top of the avatar's head size: the hat isn't a child of the bone)
+  const k = headSize(rig) * (rig.height / rig.spec.height);
+  const up = v1.set(0, 1, 0).applyQuaternion(q);
+  rig.anchor('headTop', v3).addScaledVector(up, -0.055 * k);
+  return out.compose(v3, q, s1.setScalar(scale * k));
+}
+
+/** A backpack between the shoulder blades, on the back and leaning with it. */
+export function backpackOn(rig: PersonRig, _heading: number, out: THREE.Matrix4) {
+  const q = onBone(rig, 'spine_03', q1);
+  // (the back anchor is on the back's surface, level with the shoulder blades)
+  rig.anchor('back', v3);
   const k = rig.height / 1.8;
-  // up the skull, and a touch forward (the face side) to sit over the brow
-  out.y += 0.165 * k;
-  out.x += -Math.sin(heading) * 0.012 * k;
-  out.z += -Math.cos(heading) * 0.012 * k;
-  return out;
+  return out.compose(v3, q, s1.set(k * rig.look.build, k, k));
 }
 
-/** A hat on the head (turning with the body; heads barely tilt in the clips). */
-export function hatOnHead(rig: PersonRig, heading: number, scale: number, out: THREE.Matrix4) {
-  headTop(rig, heading, v3);
-  e1.set(-0.06, heading, 0);
-  q1.setFromEuler(e1);
-  return out.compose(v3, q1, s1.setScalar(scale * (rig.height / 1.8) * (rig.look.child ? 1.08 : 1)));
-}
-
-/** A backpack between the shoulder blades, following the upper spine. */
-export function backpackOn(rig: PersonRig, heading: number, out: THREE.Matrix4) {
-  const spine = rig.bone('spine_03');
-  spine.updateWorldMatrix(true, false);
-  v3.setFromMatrixPosition(spine.matrixWorld);
-  const k = rig.height / 1.8;
-  // from the spine bone out to the back's surface (the back is +z in the wearer's frame)
-  v3.x += Math.sin(heading) * 0.11 * k;
-  v3.z += Math.cos(heading) * 0.11 * k;
-  v3.y += 0.02 * k;
-  e1.set(0.08, heading, 0);
-  q1.setFromEuler(e1);
-  return out.compose(v3, q1, s1.set(k * rig.look.build, k, k));
-}
-
-/** A tote's strap over the left shoulder, the bag at the hip. */
+/** A tote's strap over the left shoulder, the bag at the hip (hanging straight down, turned with the body). */
 export function toteOn(rig: PersonRig, heading: number, out: THREE.Matrix4) {
-  const spine = rig.bone('spine_03');
-  spine.updateWorldMatrix(true, false);
-  v3.setFromMatrixPosition(spine.matrixWorld);
+  rig.anchor('shoulderL', v3);
   const k = rig.height / 1.8;
-  // the left shoulder: the wearer's left is −x in their own frame
-  const lx = -Math.cos(heading);
-  const lz = Math.sin(heading);
-  v3.x += lx * 0.2 * k * rig.look.build;
-  v3.z += lz * 0.2 * k * rig.look.build;
-  v3.y += 0.1 * k;
   e1.set(0, heading + Math.PI / 2, -0.06);
   q1.setFromEuler(e1);
   return out.compose(v3, q1, s1.setScalar(k));

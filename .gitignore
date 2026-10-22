@@ -6,3 +6,6 @@ dist
 .env
 .env.*
 !.env.example
+
+# raw and intermediate files for scripts/people (Rocketbox, MakeHuman, tools)
+apps/web/.people-cache/

@@ -1,4 +1,5 @@
 import type { Gender, Role, User } from '../generated/prisma/client.js';
+import type { VisitorLook } from './visitor-look.js';
 
 /** A user as the web client sees them. Never includes the password hash. */
 export interface UserJson {
@@ -15,6 +16,8 @@ export interface UserJson {
   google: boolean;
   /** Null for an account that never accepted them: the game asks after logging in. */
   termsAcceptedAt: string | null;
+  /** The look saved from the game's customiser, or null for none yet (the game then keeps the browser's). */
+  visitorLook: VisitorLook | null;
   createdAt: string;
 }
 
@@ -28,6 +31,8 @@ export function toUserJson(user: User): UserJson {
     hasPassword: user.passwordHash !== null,
     google: user.googleId !== null,
     termsAcceptedAt: user.termsAcceptedAt?.toISOString() ?? null,
+    // checked by UpdateProfileDto on the way in, so stored as a VisitorLook
+    visitorLook: (user.visitorLook as unknown as VisitorLook | null) ?? null,
     createdAt: user.createdAt.toISOString(),
   };
 }

@@ -11,8 +11,9 @@ import { Spray, Wakes } from './jetski-fx';
 import { archGeometry, BUOY_H, buoyBody, buoyTrim, rampGeometry, rampTexture, riderGeometry, SADDLE, skiGeometry, spectatorBody, spectatorHead } from './jetski-models';
 import { forwardSpeed, VMAX, type Craft } from './jetski-physics';
 import { aiControls, collideRacers, MISS_PENALTY, newRacer, standings, stepRacer, toGhost, toGrid, VTOP, type RaceEvents, type Racer } from './jetski-race';
-import { lookKey, rivalRiderLooks, Rider, riderColours, visitorRiderLook, type RiderColours } from './jetski-riders';
-import type { Look, PeopleFactory } from '../../crowd/people';
+import { rivalRiderLooks, Rider, riderColours, visitorRiderLook, type RiderColours } from './jetski-riders';
+import type { PeopleFactory } from '../../crowd/people-factory';
+import { lookKey, type Look } from '../../crowd/looks';
 import './jetski.css';
 
 /** The T-head's middle, where the dock's crowd stands: for their cheering and the idle focus. */
@@ -129,7 +130,9 @@ export class JetSki implements Attraction {
   private ropeMat = new THREE.LineBasicMaterial({ color: ROPE });
   private awake = true;
   private night = 0;
-  private people: { factory: PeopleFactory; visitor: Look } | null = null;
+  private people: { factory: PeopleFactory; visitor: () => Look } | null = null;
+  /** The riders have their people (the island set has arrived since setPeople). */
+  private dressed = false;
   private visitorKey = '';
   private vestMat: THREE.MeshStandardMaterial | null = null;
   private phase: Phase = 'idle';
@@ -441,15 +444,32 @@ export class JetSki implements Attraction {
   }
 
   /**
-   * Gives the riders their bodies: the visitor in their own look (beachwear and a life vest in
-   * their ski's colour), the rivals in theirs. Until then the merged stand-in figures ride. Can be
-   * called again (the visitor's rider is rebuilt on `start()` if their look has changed since).
+   * Gives the riders their bodies: the visitor in their own look (and a life vest in their ski's
+   * colour), the rivals in theirs. `visitor` is read again at each `start()` (the visitor's rider is
+   * rebuilt if their look has changed since), so a getter or a Look kept up to date both do.
+   *
+   * The rivals are the island set's people, which download on the first trip out, not with the
+   * fair's: until they're in, the merged stand-in figures ride. Waking the race (the visitor on
+   * Palm Cay) asks for the set if nobody has yet; the riders are dressed the frame it arrives.
    */
-  setPeople(factory: PeopleFactory, visitor: Look) {
-    this.people = { factory, visitor };
-    const rivals = rivalRiderLooks();
+  setPeople(factory: PeopleFactory, visitor: Look | (() => Look)) {
+    this.people = { factory, visitor: typeof visitor === 'function' ? visitor : () => visitor };
+    this.dressed = false;
+    if (factory.isSetLoaded('island')) this.dressAll();
+    else if (this.awake) this.askForPeople();
+  }
+
+  private askForPeople() {
+    this.people?.factory.loadSet('island').catch((e: unknown) => console.warn('jet-ski: the island people failed to load', e));
+  }
+
+  private dressAll() {
+    const people = this.people!;
+    const visitor = people.visitor();
+    const rivals = rivalRiderLooks(people.factory, visitor.avatar);
     for (let i = 0; i < this.rigs.length; i++) this.dress(i, i === 0 ? visitorRiderLook(visitor) : rivals[i - 1]);
     this.visitorKey = lookKey(visitor);
+    this.dressed = true;
   }
 
   private dress(i: number, look: Look) {
@@ -463,7 +483,7 @@ export class JetSki implements Attraction {
     rig.body = new Rider(people.factory.create(look), rig.rider, rig.far, vest, this.vestMat, q.shadows && q.tier !== 'low' && q.tier !== 'lowest');
     rig.body.setGlow(this.night);
     // the far figure in the same colours: vest, hair for the helmet, skin for the suit
-    const col: RiderColours = riderColours(look, vest);
+    const col: RiderColours = riderColours(people.factory, look, vest);
     rig.far.geometry.dispose();
     rig.far.geometry = riderGeometry(col.vest, col.hair, col.skin);
   }
@@ -486,6 +506,7 @@ export class JetSki implements Attraction {
     if (this.awake === on) return;
     this.awake = on;
     if (!on) this.ctx.sfx.boatEngine(false);
+    else if (this.people && !this.dressed) this.askForPeople();
   }
 
   /** 0 by day .. 1 at night: the dock's lanterns, the buoys' lamps, the skis' navigation lights. */
@@ -505,9 +526,13 @@ export class JetSki implements Attraction {
   start() {
     this.active = true;
     // the visitor may have changed their look since the people loaded (a hat, a new top)
-    if (this.people && lookKey(this.people.visitor) !== this.visitorKey) {
-      this.visitorKey = lookKey(this.people.visitor);
-      this.dress(0, visitorRiderLook(this.people.visitor));
+    if (this.people && this.dressed) {
+      const visitor = this.people.visitor();
+      const key = lookKey(visitor);
+      if (key !== this.visitorKey) {
+        this.visitorKey = key;
+        this.dress(0, visitorRiderLook(visitor));
+      }
     }
     this.phase = 'grid';
     this.phaseT = 0;
@@ -625,6 +650,8 @@ export class JetSki implements Attraction {
   // ------------------------------------------------------------------ the loop
 
   update(dt: number, t: number) {
+    // (the island set may arrive while the race sleeps: the visitor still in the air)
+    if (this.people && !this.dressed && this.people.factory.isSetLoaded('island')) this.dressAll();
     if (!this.awake) return;
     this.t = t;
     if (this.rescueT > 0) this.rescueT -= dt;
