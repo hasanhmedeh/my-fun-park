@@ -1,17 +1,16 @@
-// The new people (world/crowd/people-factory.ts, person-rig.ts) on their own, to look at and to
-// measure against the old Quaternius rig (world/crowd/people.ts).
+// The people (world/crowd/people-factory.ts, person-rig.ts) on their own, to look at and to measure.
 //
 //   ?scene=people                                   the park set in a line-up, standing about
 //   ?scene=people&base=talk                         …talking (dance, sit on a bench, listen, phone…)
 //   ?scene=people&speed=1.4                         …walking on the spot at 1.4 m/s
 //   ?scene=people&dye=1&seed=3                      …in random dyes (the chance of a dye)
 //   ?scene=people&mode=gaits&ids=Male_Adult_01      one avatar at each pace, stroll to sprint, side on
-//   ?scene=people&mode=bench                        old and new people on the park's 0.47 m bench, side on
-//   ?scene=people&mode=bench&measure=1              logs where the old rig's hips are seated and crouched
+//   ?scene=people&mode=bench                        people on the park's 0.47 m bench, side on
+//   ?scene=people&mode=bench&measure=1              logs where their hips are seated and crouched
 //   ?scene=people&mode=hair&ids=Female_Adult_03     own hair and the shades it takes (hairShades); all=1: five fixed tints
 //   ?scene=people&mode=hat                          a cap with and without the hat clip
 //   ?scene=people&mode=lod&at=14                    LOD0 next to LOD1 at the first switch distance (34: LOD1, LOD2)
-//   ?scene=people&mode=crowd[&old=1]                80 guests walking about; logs update() ms a frame
+//   ?scene=people&mode=crowd                        80 guests walking about; logs update() ms a frame
 //   ?scene=people&mode=roles                        roleLook for each role (pilot, cabin, ground… traveller)
 //   ?scene=people&mode=gestures                     wave standing and walking, armsUp, kick, Interact, phone, carry
 //   ?scene=people&mode=check                        logs the factory's API at work: stand-ins, coloursOf, applyLook, roleLook
@@ -30,10 +29,8 @@
 // hold=1 stops the clock at the shot (on for gestures, so a gesture is caught mid-way).
 //
 // Common parameters: ids (avatar ids), set (default park), t (seconds played before the shot,
-// default 3), turn (degrees; 0 faces the camera), seed, old=1 (the old rig too, where it fits),
-// labels=0, tier (the factory's tier, default the detected one).
+// default 3), turn (degrees; 0 faces the camera), seed, labels=0, tier (the factory's tier, default the detected one).
 import * as THREE from 'three';
-import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { PreviewApi, PreviewScene } from '../main';
@@ -44,52 +41,10 @@ import type { LookRole } from '../../world/crowd/people-factory';
 import { AIRLINE, dyeLook, hairShades, plainLook, type Look } from '../../world/crowd/looks';
 import { PALETTE } from '../../world/textures';
 
-/** Either rig, as far as walking about goes. */
+/** What walking about needs of a rig. */
 interface AnyRig {
   root: THREE.Object3D;
   update(dt: number, speed: number): void;
-}
-
-/**
- * The old Quaternius people (world/crowd/people.ts), to measure against while they're still in the
- * tree. Reached through a glob, so this scene keeps compiling once that file is deleted (the
- * comparisons then say so and leave the old rig out).
- */
-const OLD_PEOPLE = import.meta.glob('../../world/crowd/people.ts');
-interface OldLook {
-  height: number;
-}
-interface OldRig extends AnyRig {
-  seatDrop: number;
-  height: number;
-  setBase(b: string): void;
-  setDetail(near: boolean): void;
-  wave(seconds: number): void;
-}
-interface OldFactory {
-  create(look: OldLook): OldRig;
-}
-interface OldPeople {
-  factory: OldFactory;
-  randomLook(r: () => number, opts?: { child?: boolean; gender?: 'm' | 'f' }): OldLook;
-  visitor: OldLook;
-}
-async function oldPeople(): Promise<OldPeople | null> {
-  const load = Object.values(OLD_PEOPLE)[0];
-  if (!load) {
-    console.warn('people: the old rig (world/crowd/people.ts) is gone: nothing to compare with');
-    return null;
-  }
-  const mod = (await load()) as {
-    GUESTS_URL: string;
-    GUEST_ANIMS_URL: string;
-    PeopleFactory: new (guests: GLTF, anims: GLTF) => OldFactory;
-    randomLook: OldPeople['randomLook'];
-    VISITOR_LOOK: OldLook;
-  };
-  const loader = new GLTFLoader();
-  const [guests, anims] = await Promise.all([loader.loadAsync(mod.GUESTS_URL), loader.loadAsync(mod.GUEST_ANIMS_URL)]);
-  return { factory: new mod.PeopleFactory(guests, anims), randomLook: mod.randomLook, visitor: mod.VISITOR_LOOK };
 }
 
 const DT = 1 / 30;
@@ -125,7 +80,7 @@ const scene: PreviewScene = async (p) => {
     for (let i = 0; i < seconds / DT; i++) for (const r of rigs) r.update(DT, speed);
   };
 
-  if (mode === 'crowd') return crowd(p, people, origin, q.get('old') === '1' ? await oldPeople() : null, rnd);
+  if (mode === 'crowd') return crowd(p, people, origin, rnd);
 
   if (mode === 'check') {
     // the factory's API, logged: a stand-in for an avatar not loaded, coloursOf, applyLook, anchors
@@ -292,19 +247,13 @@ const scene: PreviewScene = async (p) => {
 
   if (mode === 'bench') {
     // side on: each sitter on their own bench, one behind another, so the hips can be compared
-    const old = await oldPeople();
-    const who: { rig: AnyRig & { seatDrop: number; height: number }; label: string; newRig?: PersonRig; oldRig?: OldRig }[] = [];
-    if (old) {
-      const oldM = old.factory.create({ ...old.visitor, height: 1.8 });
-      const oldF = old.factory.create({ ...old.randomLook(rnd, { gender: 'f' }), height: 1.65 });
-      who.push({ rig: oldM, label: 'old m 1.80', oldRig: oldM }, { rig: oldF, label: 'old f 1.65', oldRig: oldF });
-    }
+    const who: { rig: PersonRig; label: string }[] = [];
     for (const id of ids ?? ['Male_Adult_01', 'Female_Adult_01', 'Business_Female_01', 'MH_Older_Woman_01', 'Female_Child_01', 'MH_Toddler_Girl_01']) {
       const spec = people.spec(id);
       if (!spec) continue;
       if (!people.has(id)) await people.load(id);
       const r = people.create(plainLook(spec));
-      who.push({ rig: r, label: `${id} ${r.height.toFixed(2)}`, newRig: r });
+      who.push({ rig: r, label: `${id} ${r.height.toFixed(2)}` });
     }
     const pose = (q.get('base') ?? 'sit') as 'sit' | 'crouch';
     const benchGeo = benchGeometry();
@@ -322,11 +271,11 @@ const scene: PreviewScene = async (p) => {
         bench.position.set(origin.x, 0, z);
         sc.add(bench);
         // as the crowd seats someone: the root 6 cm in front of the bench's middle, seatDrop below the seat
-        // (fwd=…: the new people that much further forward, to try a fix for the backrest)
-        w.rig.root.position.set(origin.x, 0.47 - w.rig.seatDrop, z + 0.06 + (w.newRig ? num('fwd', 0) : 0));
+        // (fwd=…: that much further forward, to try a fix for the backrest)
+        w.rig.root.position.set(origin.x, 0.47 - w.rig.seatDrop, z + 0.06 + num('fwd', 0));
       } else w.rig.root.position.set(origin.x, 0, z);
       w.rig.root.rotation.y = Math.PI;
-      (w.newRig ?? w.oldRig)!.setBase(pose);
+      w.rig.setBase(pose);
       sc.add(w.rig.root);
       if (labels) w.rig.root.add(tag(w.label, w.rig.height));
     });
@@ -338,7 +287,7 @@ const scene: PreviewScene = async (p) => {
         const feet = new THREE.Vector3();
         const v = new THREE.Vector3();
         const n = 120;
-        const node = (name: 'pelvis' | 'foot_l' | 'foot_r') => (w.newRig ? w.newRig.bone(name) : w.rig.root.getObjectByName(name)!);
+        const node = (name: 'pelvis' | 'foot_l' | 'foot_r') => w.rig.bone(name);
         for (let i = 0; i < n; i++) {
           play([w.rig], 0.1);
           w.rig.root.updateMatrixWorld(true);
@@ -540,21 +489,6 @@ const scene: PreviewScene = async (p) => {
     bench.traverse((o) => (o.castShadow = o.receiveShadow = true));
     sc.add(bench);
   }
-  const old = q.get('old') === '1' ? await oldPeople() : null;
-  if (old) {
-    // the old rig at the end of the row, for comparison
-    const o = old.factory.create({ ...old.visitor });
-    x += 0.45;
-    last = x;
-    o.root.position.set(origin.x + x, sit ? 0.47 - o.seatDrop : 0, origin.z + (sit ? 0.06 : 0));
-    o.root.rotation.y = Math.PI + turn;
-    o.setBase(base === 'sit' || base === 'talk' || base === 'dance' || base === 'crouch' ? base : 'stand');
-    sc.add(o.root);
-    if (labels) o.root.add(tag('old rig', o.height));
-    rigs.push(o);
-    speeds.push(num('speed', 0));
-    x += 0.45;
-  }
   // played t seconds before the first frame; the page renders `frames` (30) more before the shot.
   // hold=1 (on for gestures) stops the clock there, so an act `after` seconds before the shot is
   // caught at that moment however long the screenshot takes.
@@ -643,10 +577,9 @@ function stage(p: PreviewApi, origin: THREE.Vector3) {
 
 /**
  * 80 guests walking about a 70 m square, the crowd's LOD and update rate by distance (crowd.ts:
- * every frame within 30 m, every 2nd within 70, every 4th beyond); with `oldFactory`, the old rigs
- * instead. Logs the CPU time of the rigs' update() and the draw calls and triangles.
+ * every frame within 30 m, every 2nd within 70, every 4th beyond). Logs the CPU time of the rigs' update() and the draw calls and triangles.
  */
-function crowd(p: PreviewApi, people: PeopleFactory, origin: THREE.Vector3, old: OldPeople | null, rnd: () => number) {
+function crowd(p: PreviewApi, people: PeopleFactory, origin: THREE.Vector3, rnd: () => number) {
   const q = p.params;
   const count = Number(q.get('count') ?? 80);
   const frames = Number(q.get('frames') ?? 30);
@@ -665,17 +598,8 @@ function crowd(p: PreviewApi, people: PeopleFactory, origin: THREE.Vector3, old:
   const spot = () => [origin.x + (rnd() * 2 - 1) * half, origin.z + (rnd() * 2 - 1) * half];
   for (let i = 0; i < count; i++) {
     const child = rnd() < 0.15;
-    let rig: AnyRig;
-    let lod: (d: number) => void;
-    if (old) {
-      const r = old.factory.create(old.randomLook(rnd, { child }));
-      rig = r;
-      lod = (d) => r.setDetail(d < 22);
-    } else {
-      const r = people.create(people.randomLook(rnd, { child }));
-      rig = r;
-      lod = (d) => r.setDistance(d);
-    }
+    const rig = people.create(people.randomLook(rnd, { child }));
+    const lod = (d: number) => rig.setDistance(d);
     const [x, z] = spot();
     const [tx, tz] = spot();
     walkers.push({ rig, lod, x, z, tx, tz, v: 0.9 + rnd() * 0.6, acc: 0 });
@@ -726,7 +650,7 @@ function crowd(p: PreviewApi, people: PeopleFactory, origin: THREE.Vector3, old:
       const sorted = [...times].sort((a, b) => a - b);
       const mean = times.reduce((s, v) => s + v, 0) / Math.max(1, times.length);
       console.warn(
-        `crowd ${old ? 'OLD' : 'NEW'}: ${count} walking, LOD + update() ${mean.toFixed(3)} ms a frame mean, ${sorted[Math.floor(sorted.length / 2)].toFixed(3)} median (${times.length} frames, ${(updates / times.length).toFixed(1)} rigs updated a frame)`,
+        `crowd: ${count} walking, LOD + update() ${mean.toFixed(3)} ms a frame mean, ${sorted[Math.floor(sorted.length / 2)].toFixed(3)} median (${times.length} frames, ${(updates / times.length).toFixed(1)} rigs updated a frame)`,
       );
     }
   });

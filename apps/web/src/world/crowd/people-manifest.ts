@@ -106,9 +106,27 @@ export interface AvatarSpec {
   outfit?: { regions: Partial<Record<OutfitRegion, { mean: number; colour: string }>> };
   /**
    * The hair's tone in the `parts.hair` material's texture (the hair cards only, not lashes or
-   * brows): mean linear luminance and colour, for tinting it the way the outfit is tinted.
+   * brows): mean linear luminance and colour, for tinting it the way the outfit is tinted. An
+   * avatar without cards has the painted scalp's tone here, or else its beard's.
    */
-  hairTone?: { mean: number; colour: string };
+  hairTone?: {
+    mean: number;
+    colour: string;
+    /**
+     * The scalp's hair painted into the head texture (a crew cut, the scalp under the cards), where
+     * the GLB masks it: a texture named `hairMask` on the head material (R channel; a lossless PNG
+     * in the occlusion slot at strength 0, in the colour texture's UVs, 256 px in crowd files and
+     * 512 in hero files). Its own mean linear luminance and colour, as for the cards. Missing where
+     * the paint isn't masked: covered or bald heads, and thin grey hair that a dye would blotch.
+     */
+    scalp?: { mean: number; colour: string };
+    /**
+     * The beard or moustache painted into the head texture, masked by `hairMask`'s G channel: its
+     * tone. Missing for stubble and for white or grey beards (as bright as the skin between their
+     * hairs, so their mask would come out in patches).
+     */
+    beard?: { mean: number; colour: string };
+  };
   /** A small portrait for the customiser (webp, relative to models/people/). */
   portrait?: string;
 }

@@ -190,20 +190,29 @@ export class Volley implements Attraction {
    */
   setPeople(factory: PeopleFactory, visitor: Look | (() => Look)) {
     this.people = { factory, visitor: typeof visitor === 'function' ? visitor : () => visitor };
-    if (factory.isSetLoaded('island')) this.dress();
-    else if (this.awake) this.askForPeople();
+    this.dressed = 0;
+    if (factory.isSetLoaded('island')) {
+      this.dressPlayers();
+      this.dressFans();
+    } else if (this.awake) this.askForPeople();
   }
 
   private people: { factory: PeopleFactory; visitor: () => Look } | null = null;
-  /** The players have their bodies. */
-  private dressed = false;
+  /**
+   * How far the dressing has got: 0 nobody, 1 the players, 2 the fans and the umpire too. When the
+   * set arrives mid-game (the visitor in the air) it takes two frames, the players then the fans,
+   * so neither costs the frame more than about 15 ms.
+   */
+  private dressed = 0;
+  /** The avatars on the court (and the visitor's), so no fan is a player's double. */
+  private onCourt: ReadonlySet<string> = new Set();
   /** The visitor's look their body was built from (lookKey). */
   private visitorKey = '';
 
   /** The island's people are wanted now: load their set (once; the factory shares a load already under way). */
   private askForPeople() {
     const people = this.people;
-    if (!people || this.dressed) return;
+    if (!people || this.dressed === 2) return;
     people.factory.loadSet('island').catch((e: unknown) => console.warn('volley: the island people failed to load', e));
   }
 
@@ -212,15 +221,13 @@ export class Volley implements Attraction {
     return q.shadows && q.tier !== 'low' && q.tier !== 'lowest';
   }
 
-  /** The players, the fans and the umpire, once the island's people are in. */
-  private dress() {
-    const people = this.people!;
-    const factory = people.factory;
-    this.dressed = true;
-    const q = this.ctx.quality;
+  /** The five on the court, once the island's people are in. */
+  private dressPlayers() {
+    const factory = this.people!.factory;
+    this.dressed = 1;
     const shadows = this.shadows;
     const f = this.court.frame;
-    const visitor = people.visitor();
+    const visitor = this.people!.visitor();
     this.visitorKey = lookKey(visitor);
     this.me.attach(factory.create(visitorBeachLook(visitor)), f, shadows);
     this.me.rig!.root.visible = this.awake && this.active;
@@ -229,7 +236,14 @@ export class Volley implements Attraction {
     this.stand.attach(factory.create(cast.stand), f, shadows);
     this.locals.forEach((l, i) => l.attach(factory.create(cast.locals[i]), f, shadows));
     for (const a of this.everyone) a.rig!.setGlow(this.night);
-    // fans on the bleachers' lowest rows (fewer on modest hardware), and the umpire on the stand
+    this.onCourt = cast.used;
+  }
+
+  /** The fans on the bleachers' lowest rows (fewer on modest hardware), and the umpire on the stand. */
+  private dressFans() {
+    const factory = this.people!.factory;
+    this.dressed = 2;
+    const q = this.ctx.quality;
     const count = { high: 5, medium: 3, low: 1, lowest: 0 }[q.tier];
     const seats: { x: number; y: number; z: number; yaw: number }[] = [];
     const spots = [
@@ -243,7 +257,8 @@ export class Volley implements Attraction {
       const [row, z] = spots[i];
       seats.push({ x: BLEACHER.x0 + row * BLEACHER.step + 0.38, y: 0.42 + row * BLEACHER.rise + 0.03, z, yaw: Math.PI / 2 });
     }
-    this.fans = new Fans(factory, f, seats, q.tier === 'lowest' ? null : { x: UMPIRE.x, y: UMPIRE.y, z: UMPIRE.z, yaw: Math.PI / 2 }, shadows, cast.used);
+    this.fans?.dispose();
+    this.fans = new Fans(factory, this.court.frame, seats, q.tier === 'lowest' ? null : { x: UMPIRE.x, y: UMPIRE.y, z: UMPIRE.z, yaw: Math.PI / 2 }, this.shadows, this.onCourt);
     this.fans.setGlow(this.night);
     this.fans.setVisible(this.awake);
   }
@@ -1102,7 +1117,10 @@ export class Volley implements Attraction {
 
   update(dt: number, t: number) {
     // (the island's people load on the first trip: the players get their bodies once they're in)
-    if (this.people && !this.dressed && this.people.factory.isSetLoaded('island')) this.dress();
+    if (this.people && this.dressed < 2 && this.people.factory.isSetLoaded('island')) {
+      if (this.dressed === 0) this.dressPlayers();
+      else this.dressFans();
+    }
     if (!this.awake && !this.active) return;
     const camDist = this.ctx.camera.position.distanceTo(COURT_ORIGIN);
     const cam = toLocal(this.ctx.camera.position, this.camLocal);

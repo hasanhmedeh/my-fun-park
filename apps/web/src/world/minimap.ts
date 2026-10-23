@@ -22,6 +22,7 @@ const PLACES: Record<ZoneId, Place> = {
   ducks: { icon: '🦆', label: 'Duck Shoot', blurb: 'Knock down the tin ducks before the clock runs out' },
   drone: { icon: '🚁', label: 'Drone Flights', blurb: 'Rent a drone and see it all from the sky' },
   booth: { icon: '🎟️', label: 'Ticket Booth', blurb: 'Free tickets, treats and souvenirs at Rosa’s counter' },
+  changing: { icon: '👕', label: 'Changing room', blurb: 'Beside the booth: be someone else, dye your clothes, try another height' },
   ideas: { icon: '💡', label: 'Idea Box', blurb: 'Tell us what you’d love to see in the fair' },
   museum: { icon: '🏛️', label: 'Career Museum', blurb: 'Hasan Hmedeh’s work from 2019 to today, in framed pictures' },
   workshop: { icon: '🛠️', label: 'Coaster Workshop', blurb: 'Build your own coaster, and send it in to run here in the valley' },

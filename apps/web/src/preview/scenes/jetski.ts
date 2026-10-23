@@ -9,6 +9,7 @@
 //   ?scene=jetski&race=1&until=finish                just past the flag
 //   &hud=1                                           with the race HUD over it
 //   &close=x,y,z&freeze=1                            a close camera in your ski's frame (x right, y up, z back), sim held
+//                                                    (add near=0.1: the geography's 2 m near plane cuts a rider's head off)
 //   &of=1..4                                         …on a rival's ski instead (Kai, Rosa, Sami, Theo)
 //   &people=0                                        the merged stand-in riders (no people loaded)
 //   &me=Male_Adult_06                                the visitor's avatar (a playable one)
@@ -100,8 +101,6 @@ const preview: PreviewScene = async (p) => {
     camera.up.set(0, 1, 0);
     camera.lookAt(s.x, s.y + 0.9, s.z);
   };
-  for (const r of (js as any).rigs) { if (!r.body) continue; if (q.get("novest")) r.body.vest.visible = false; if (q.get("vestshadow") === "0") { r.body.vest.castShadow = false; r.body.vest.receiveShadow = false; r.body.setShadows = () => {}; } if (q.get("vestbasic")) r.body.vest.material = new THREE.MeshBasicMaterial({ vertexColors: true }); if (q.get("nobody")) for (const m of r.body.rig.skinnedMeshes) m.visible = false; }
-  console.warn("DEBUG vests", JSON.stringify((js as any).rigs.map((r: any) => { if (!r.body) return null; const g = r.body.vest.geometry; const out: Record<string, number> = {}; for (const k of ["position","normal","color"]) { const arr = g.attributes[k].array; let n = 0; for (let i = 0; i < arr.length; i++) if (!Number.isFinite(arr[i])) n++; out[k] = n; } out.count = g.attributes.position.count; const nn = g.attributes.normal.array; let z = 0; for (let i = 0; i < nn.length; i += 3) if (Math.hypot(nn[i], nn[i+1], nn[i+2]) < 0.5) z++; out.zeroN = z; return out; })));
   p.onFrame((dt, ft) => {
     park.update(dt, ft, camera);
     if (!freeze) step(dt);

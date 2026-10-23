@@ -74,8 +74,12 @@ interface Planned {
   props: PropItem[];
   bigCase: boolean;
 }
-/** People made a frame once their set is in (each is a model cloned and dressed: a millisecond or two). */
-const MADE_PER_FRAME = 3;
+/**
+ * Milliseconds a frame may spend making people once their set is in (at least one is made a frame):
+ * most take a millisecond or two, cloned and dressed, but the cabin crew's scarf is fitted to the
+ * body as they're made (10–40 ms), so they come one a frame, on their own.
+ */
+const MAKE_MS = 4;
 /** Within this (m) of Funfair International's terminal the airport's set is wanted (if the game hasn't loaded it yet). */
 const AIRPORT_NEAR = 160;
 
@@ -264,7 +268,10 @@ class Walker {
   handle = 1;
   bag: PropItem | null = null;
   bagDown: { x: number; y: number; z: number; yaw: number } | null = null;
+  /** Their straw hat, worn (null when their own avatar has headwear: see hatItem). */
   hat: PropItem | null = null;
+  /** The straw hat kept for them, worn or not (re-dressed as another avatar, they may wear it after all). */
+  hatItem: PropItem | null = null;
   hatDown: { x: number; y: number; z: number; yaw: number } | null = null;
   /** Checked luggage (dropped at check-in, collected at reclaim) rather than a cabin roll-aboard. */
   bigCase = false;
@@ -285,7 +292,8 @@ class Walker {
   posed = false;
 
   constructor(
-    readonly rig: PersonRig,
+    /** Who they are (swapped for someone else when the visitor takes their avatar: Travellers.setExclude). */
+    public rig: PersonRig,
     readonly role: Role,
     readonly region: Region,
     readonly index: number,
@@ -570,34 +578,48 @@ export class Travellers {
     });
   }
 
-  /** Makes up to `max` of those waiting whose set is in. */
-  private arrive(max: number) {
+  /**
+   * Makes those waiting whose set is in: at least one, then more while under `ms` milliseconds in
+   * all (with a limit, the cabin crew one a frame on their own: see MAKE_MS).
+   */
+  private arrive(ms: number) {
+    const paced = Number.isFinite(ms);
+    const until = performance.now() + ms;
     let made = 0;
-    for (let i = 0; i < this.waiting.length && made < max; ) {
+    for (let i = 0; i < this.waiting.length; ) {
       const p = this.waiting[i];
       if (!this.ready(SET_OF[p.role])) {
         i++;
         continue;
       }
+      if (paced && made && p.role === 'crew') break;
       this.waiting.splice(i, 1);
       this.make(p);
       made++;
+      if (paced && (p.role === 'crew' || performance.now() > until)) break;
     }
   }
 
-  private make(p: Planned) {
-    const rig = this.people.create(this.lookFor(p.role, p.child));
+  /** A new person for someone in this role, shadowed and lit as everyone else is now, in the scene. */
+  private person(role: Role, child: boolean) {
+    const rig = this.people.create(this.lookFor(role, child));
     rig.setShadows(this.shadows);
     if (this.night >= 0) {
       rig.setGlow(this.night);
       rig.setNight(this.night);
     }
     this.scene.add(rig.root);
+    return rig;
+  }
+
+  private make(p: Planned) {
+    const rig = this.person(p.role, p.child);
     const w = new Walker(rig, p.role, p.region, p.index, this.rnd);
     for (const item of p.props) {
       if (item.kind === 'suitcase') w.case = item;
       else if (item.kind === 'strawHat' || item.kind === 'pilotCap') {
         // (no straw hat over their own cap, helmet or headscarf)
+        w.hatItem = item;
         if (hatFits(rig.spec)) w.hat = item;
       } else w.bag = item;
     }
@@ -644,7 +666,14 @@ export class Travellers {
       // (no twins among the crew, who walk out together, nor, as far as there are avatars enough,
       // among the travellers; the beach's few are told apart by their clothes' colours)
       const twin = role !== 'stroller' && role !== 'swimmer' && this.walkers.some((o) => o.role === role && o.look.avatar === look.avatar);
-      if ((!this.exclude.has(look.avatar) && !twin) || tries >= 4) return look;
+      if (!this.exclude.has(look.avatar) && !twin) return look;
+      if (tries >= 4) {
+        if (!this.exclude.has(look.avatar)) return look;
+        // still the visitor's double (the factory favours the avatars used least, and nobody in the
+        // park's crowd is the visitor): someone else of theirs, whatever they wear
+        const beach = role === 'stroller' || role === 'swimmer';
+        return people.randomLook(r, { child, gender: look.gender, exclude: [...this.exclude], ...(beach ? { role: 'beach' as const, set: 'island', dye: 0.8 } : {}) });
+      }
     }
   }
 
@@ -712,6 +741,41 @@ export class Travellers {
   /** The visitor (so people step out of their way, and choose things to do near them), or null. */
   setVisitor(p: THREE.Vector3Like | null) {
     this.visitor = p;
+  }
+
+  /**
+   * Avatars nobody here may wear (the visitor's, whenever they change it, as Crowd.setExclude):
+   * anyone wearing one now is made someone else in the same role, there and then (the visitor
+   * changes in the park's changing room, far from either place). Those still waiting for their set
+   * are picked against the new list when they're made.
+   */
+  setExclude(ids: string[]) {
+    this.exclude.clear();
+    for (const id of ids) this.exclude.add(id);
+    for (const w of this.walkers) {
+      if (!this.exclude.has(w.look.avatar)) continue;
+      const was = w.rig;
+      const rig = this.person(w.role, was.look.child);
+      if (this.exclude.has(rig.look.avatar)) {
+        // (nobody else of that kind is loaded: a double is better than nobody)
+        rig.dispose();
+        continue;
+      }
+      rig.setBase(was.pose);
+      rig.armsUp = was.armsUp;
+      rig.root.rotation.order = 'YXZ';
+      rig.root.position.copy(was.root.position);
+      rig.root.quaternion.copy(was.root.quaternion);
+      rig.root.visible = was.root.visible;
+      // seated (at a gate, a bar, on a lounger): the new body's own drop below the seat
+      if (was.pose === 'sit') w.y += was.seatDrop - rig.seatDrop;
+      was.dispose();
+      w.rig = rig;
+      // (their straw hat, if the new avatar has no headwear of its own)
+      const hat = w.hatItem && hatFits(rig.spec) ? w.hatItem : null;
+      if (w.hat && !hat) this.luggage.hide(w.hat);
+      w.hat = hat;
+    }
   }
 
   setNight(k: number) {
@@ -1083,12 +1147,18 @@ export class Travellers {
         this.ask('island');
         this.ask('airport');
       } else if (this.nearTerminal()) this.ask('airport');
-      this.arrive(MADE_PER_FRAME);
+      this.arrive(MAKE_MS);
     }
     const pr = this.run;
     if (pr?.pending && pr.region === region) {
       const cut = this.camPos.distanceTo(pr.callCam) > 4;
       if (cut || ++pr.pendingFrames > 4) this.fillBoarding(pr, cut);
+    }
+    if (pr && !pr.pending && !pr.finished && pr.region === region && this.frame % 20 === 0) {
+      // nobody to spare at the call (the cabin crew all out on their walk, or their set not in yet):
+      // one to the door, and the ramp agent to the stairs, as soon as there is
+      if (!pr.greeter) pr.greeter = this.doorCrew(region, pr);
+      if (!pr.attendant && region === 'island') pr.attendant = this.stairsAttendant(pr);
     }
     const list = this.byRegion[region];
     if (region === 'home') this.crewSchedule();
@@ -1944,7 +2014,13 @@ export class Travellers {
   // ---- the crew
 
   private crewSchedule() {
-    if (this.crewOut || this.t < this.crewDue) return;
+    if (this.crewOut) {
+      // (the walk is over once nobody is on it: the last up the bridge, or one taken to the aircraft's door)
+      if (this.byRegion.home.some((w) => w.doing === 'crew to gate 3')) return;
+      this.crewOut = false;
+      this.crewDue = this.t + 200 + this.rnd() * 160;
+    }
+    if (this.t < this.crewDue) return;
     const start = this.home.crewStart;
     if (this.seen(start.x, 0, start.z, 70)) return;
     // (whoever is at the aircraft door greeting stays there)
@@ -1957,11 +2033,11 @@ export class Travellers {
       const row = Math.floor(i / 2);
       const side = i % 2 ? 0.55 : -0.55;
       this.placeAt(w, start.x + row * 1.8, 0, start.z + side, Math.PI / 2);
-      w.task = this.crewWalk(w, row * 0.25, i === crew.length - 1);
+      w.task = this.crewWalk(w, row * 0.25);
     });
   }
 
-  private *crewWalk(w: Walker, delay: number, last: boolean): Task {
+  private *crewWalk(w: Walker, delay: number): Task {
     w.doing = 'crew to gate 3';
     w.pace = 1.3;
     yield* this.wait(delay);
@@ -1969,17 +2045,13 @@ export class Travellers {
     yield* this.walkTo(w, way.pen[0].x, way.pen[0].z - 0.8, 0.6);
     yield* this.walkPoints(w, way.pen);
     for (const p of way.up) yield* this.escalate(w, p);
-    this.vanish(w);
-    if (last) {
-      this.crewOut = false;
-      this.crewDue = this.t + 200 + this.rnd() * 160;
-    }
     yield* this.crewMember(w);
   }
 
   /** Between walks the crew are aboard (out of the world); one comes to the door for the visitor's flight. */
   private *crewMember(w: Walker): Task {
     if (!w.away) this.vanish(w);
+    w.doing = 'aboard';
     for (;;) yield;
   }
 

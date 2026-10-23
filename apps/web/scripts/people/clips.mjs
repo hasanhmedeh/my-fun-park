@@ -55,7 +55,8 @@ const FOLDER = { s: 'all_animations_max_motextr_static', xy: 'all_animations_max
 const CLIPS = [
   // stand-ins for the old library's clips
   ['Idle_Loop', 's:m_idle_neutral_01', 's:f_idle_neutral_01', 'idle', true],
-  ['Walk_Loop', 'xy:m_walk_neutral', 'xy:f_walk_neutral', 'move', true],
+  // (the women's heel strike took the toes 1.7 cm under the floor)
+  ['Walk_Loop', 'xy:m_walk_neutral', 'xy:f_walk_neutral', 'move', true, 0, 'lift'],
   ['Jog_Fwd_Loop', 'xy:m_run_slow_01', 'xy:f_run_slow_01', 'move', true],
   ['Sprint_Loop', 'xy:m_run_fast_01', 'xy:f_run_fast_01', 'move', true, 0, 'lift'],
   ['Sitting_Enter', 'xyz:m_sit_down_chair_01', 'xyz:f_sit_down_chair_01', 'sitDown', false],

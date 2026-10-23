@@ -88,8 +88,12 @@ export class Carousel implements Attraction {
   }
 }
 
-/** Where the vendor stands inside the kiosk, and where a customer stands at its counter (world). */
-export const BOOTH_VENDOR = { x: LAYOUT.booth.x, z: LAYOUT.booth.z + 0.5 };
+/**
+ * Where the vendor stands inside the kiosk, and where a customer stands at its counter (world). The
+ * vendor stands a little left of the middle: one of the entrance plaza's garland poles comes down
+ * through the kiosk just right of it, and from the shop's camera (Shop.shot) it hid her face.
+ */
+export const BOOTH_VENDOR = { x: LAYOUT.booth.x - 0.45, z: LAYOUT.booth.z + 0.5 };
 export const BOOTH_COUNTER = { x: LAYOUT.booth.x, z: LAYOUT.booth.z + 2.75 };
 
 /**

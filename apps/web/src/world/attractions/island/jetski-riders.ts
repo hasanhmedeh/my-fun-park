@@ -134,10 +134,15 @@ export function riderColours(people: PeopleFactory, look: Look, vest: string): R
 
 // ------------------------------------------------------------------------------------ the vest
 
-/** Normals for a triangle soup, averaged over the corners that share a position (smooth foam). */
-function smoothNormals(pos: number[]) {
+/**
+ * Normals for a triangle soup, averaged over the corners that share a position (smooth foam), but
+ * only among triangles of the same `side` (one per triangle): the two faces of a strap share their
+ * corners, and averaged together their normals cancel to rounding noise, which the lighting
+ * interpolates through zero into NaN pixels (and the bloom spreads those over the whole screen).
+ */
+function smoothNormals(pos: number[], side: number[]) {
   const acc = new Map<string, THREE.Vector3>();
-  const key = (i: number) => `${Math.round(pos[i] * 2000)},${Math.round(pos[i + 1] * 2000)},${Math.round(pos[i + 2] * 2000)}`;
+  const key = (i: number) => `${side[Math.floor(i / 9)]}:${Math.round(pos[i] * 2000)},${Math.round(pos[i + 1] * 2000)},${Math.round(pos[i + 2] * 2000)}`;
   const a = new THREE.Vector3();
   const b = new THREE.Vector3();
   const c = new THREE.Vector3();
@@ -251,9 +256,12 @@ function fitVest(rig: PersonRig, frame: THREE.Object3D, colour: string) {
   };
   const positions: number[] = [];
   const colours: number[] = [];
+  /** Which surface each triangle belongs to, for the smoothing: the shell 0, a strap's outer face 1, its inner face 2. */
+  const sides: number[] = [];
   const C = new THREE.Color();
-  const push = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, col: THREE.ColorRepresentation) => {
+  const push = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, col: THREE.ColorRepresentation, side = 0) => {
     positions.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+    sides.push(side);
     C.set(col);
     for (let k = 0; k < 3; k++) colours.push(C.r, C.g, C.b);
   };
@@ -318,16 +326,16 @@ function fitVest(rig: PersonRig, frame: THREE.Object3D, colour: string) {
       const r0 = a.clone().addScaledVector(X, half);
       const l1 = b.clone().addScaledVector(X, -half);
       const r1 = b.clone().addScaledVector(X, half);
-      push(l0, l1, r0, colour);
-      push(r0, l1, r1, colour);
-      push(l0, r0, l1, colour);
-      push(r0, r1, l1, colour);
+      push(l0, l1, r0, colour, 1);
+      push(r0, l1, r1, colour, 1);
+      push(l0, r0, l1, colour, 2);
+      push(r0, r1, l1, colour, 2);
     }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
-  g.setAttribute('normal', new THREE.Float32BufferAttribute(smoothNormals(positions), 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(smoothNormals(positions, sides), 3));
   // the collar pad behind the neck
   const collar = new THREE.CapsuleGeometry(0.045, top.rx * 0.9, 3, 8).rotateZ(Math.PI / 2).toNonIndexed();
   collar.deleteAttribute('uv');

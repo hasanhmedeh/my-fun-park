@@ -131,8 +131,14 @@ export class JetSki implements Attraction {
   private awake = true;
   private night = 0;
   private people: { factory: PeopleFactory; visitor: () => Look } | null = null;
-  /** The riders have their people (the island set has arrived since setPeople). */
-  private dressed = false;
+  /**
+   * How many riders have their people (the visitor's first). Once the island set arrives mid-game
+   * (the visitor in the air) they're dressed one a frame: each is a body and a vest fitted to it,
+   * 10 to 20 ms, which all five at once would turn into a visible stall.
+   */
+  private dressed = 0;
+  /** The rivals' looks, cast when the visitor's rider is dressed. */
+  private rivalLooks: Look[] = [];
   private visitorKey = '';
   private vestMat: THREE.MeshStandardMaterial | null = null;
   private phase: Phase = 'idle';
@@ -450,12 +456,12 @@ export class JetSki implements Attraction {
    *
    * The rivals are the island set's people, which download on the first trip out, not with the
    * fair's: until they're in, the merged stand-in figures ride. Waking the race (the visitor on
-   * Palm Cay) asks for the set if nobody has yet; the riders are dressed the frame it arrives.
+   * Palm Cay) asks for the set if nobody has yet; the riders are dressed as it arrives (see dressed).
    */
   setPeople(factory: PeopleFactory, visitor: Look | (() => Look)) {
     this.people = { factory, visitor: typeof visitor === 'function' ? visitor : () => visitor };
-    this.dressed = false;
-    if (factory.isSetLoaded('island')) this.dressAll();
+    this.dressed = 0;
+    if (factory.isSetLoaded('island')) this.dressRest();
     else if (this.awake) this.askForPeople();
   }
 
@@ -463,13 +469,20 @@ export class JetSki implements Attraction {
     this.people?.factory.loadSet('island').catch((e: unknown) => console.warn('jet-ski: the island people failed to load', e));
   }
 
-  private dressAll() {
+  /** Dresses the next rider: the visitor first (casting the rivals, who must not be their double), then Kai, Rosa, Sami and Theo. */
+  private dressNext() {
     const people = this.people!;
-    const visitor = people.visitor();
-    const rivals = rivalRiderLooks(people.factory, visitor.avatar);
-    for (let i = 0; i < this.rigs.length; i++) this.dress(i, i === 0 ? visitorRiderLook(visitor) : rivals[i - 1]);
-    this.visitorKey = lookKey(visitor);
-    this.dressed = true;
+    const i = this.dressed++;
+    if (i === 0) {
+      const visitor = people.visitor();
+      this.visitorKey = lookKey(visitor);
+      this.rivalLooks = rivalRiderLooks(people.factory, visitor.avatar);
+      this.dress(0, visitorRiderLook(visitor));
+    } else this.dress(i, this.rivalLooks[i - 1]);
+  }
+
+  private dressRest() {
+    while (this.dressed < this.rigs.length) this.dressNext();
   }
 
   private dress(i: number, look: Look) {
@@ -506,7 +519,7 @@ export class JetSki implements Attraction {
     if (this.awake === on) return;
     this.awake = on;
     if (!on) this.ctx.sfx.boatEngine(false);
-    else if (this.people && !this.dressed) this.askForPeople();
+    else if (this.people && this.dressed < this.rigs.length) this.askForPeople();
   }
 
   /** 0 by day .. 1 at night: the dock's lanterns, the buoys' lamps, the skis' navigation lights. */
@@ -526,7 +539,9 @@ export class JetSki implements Attraction {
   start() {
     this.active = true;
     // the visitor may have changed their look since the people loaded (a hat, a new top)
-    if (this.people && this.dressed) {
+    if (this.people?.factory.isSetLoaded('island')) {
+      // (a race straight off the plane may come before the last rival is dressed)
+      this.dressRest();
       const visitor = this.people.visitor();
       const key = lookKey(visitor);
       if (key !== this.visitorKey) {
@@ -651,7 +666,7 @@ export class JetSki implements Attraction {
 
   update(dt: number, t: number) {
     // (the island set may arrive while the race sleeps: the visitor still in the air)
-    if (this.people && !this.dressed && this.people.factory.isSetLoaded('island')) this.dressAll();
+    if (this.people && this.dressed < this.rigs.length && this.people.factory.isSetLoaded('island')) this.dressNext();
     if (!this.awake) return;
     this.t = t;
     if (this.rescueT > 0) this.rescueT -= dt;

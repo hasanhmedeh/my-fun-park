@@ -17,9 +17,10 @@
 // Bip02 renamed Bip01, joints parent-first, the Footsteps node and empty takes gone, real
 // materials — which the measurements, the masks and the retargeting read. The game files are built
 // from it: the hair cards turned to face outwards, the outfit mask from masks.mjs added (a PNG in
-// the body material's occlusion slot), textures to KTX2 (Basis ETC1S, normal maps UASTC, via
-// basisu's WASI build; three's KTX2Loader transcodes them to BC7/ASTC/ETC2 on the GPU), geometry
-// meshopt-compressed.
+// the body material's occlusion slot) and the hair mask from hair-mask.mjs (a PNG in the head
+// material's, where hair is painted into the head texture), textures to KTX2 (Basis ETC1S,
+// normal maps UASTC, via basisu's WASI build; three's KTX2Loader transcodes them to BC7/ASTC/ETC2
+// on the GPU), geometry meshopt-compressed.
 //
 // The seat measurement needs the seated clip, so run clips.mjs first (run-all.mjs does).
 // Work already done is skipped unless --force.
@@ -34,7 +35,8 @@ import { cloneDocument, dedup, meshopt, prune, simplifyPrimitive, weld } from '@
 import { AVATARS, STARTER, avatar } from './catalogue.mjs';
 import { fetchAvatar } from './fetch.mjs';
 import { FBX2GLTF, FFMPEG, META, OUT, WORK, basisu, cli, ensureDir, gltfIO, readJson, run, sanitize, size, writeJson } from './lib.mjs';
-import { hairTone } from './hair-tone.mjs';
+import { embedHairMask, HAIR_MASK_PX, hairMaskImage, makeHairMask } from './hair-mask.mjs';
+import { hairTone, hairToneSpec } from './hair-tone.mjs';
 import { BONES, measureBind, measureSeat, partsOf, rigOf, skinTone } from './measure.mjs';
 
 /**
@@ -317,8 +319,8 @@ async function packTextures(doc, id, variant, hairMaterial) {
   const hair = root.listMaterials().find((m) => m.getName() === hairMaterial)?.getBaseColorTexture();
   let gpu = 0;
   for (const t of root.listTextures()) {
-    if (t.getName() === 'outfitMask') {
-      // stays a PNG: ETC1S would smear its four regions into each other (RGBA8 on the GPU)
+    if (t.getName() === 'outfitMask' || t.getName() === 'hairMask') {
+      // stays a PNG: ETC1S would smear its regions into each other (RGBA8 on the GPU)
       const [w, h] = t.getSize();
       gpu += w * h * 4 * (4 / 3);
       continue;
@@ -454,6 +456,19 @@ async function outfitMask(base, parts, id) {
   }
 }
 
+/**
+ * The hair masks (hair-mask.mjs) of base.glb's head texture, or null: none painted, or, with a
+ * warning, when working them out fails, so an avatar still converts without them.
+ */
+async function hairMasks(base, parts, a, id) {
+  try {
+    return await makeHairMask(base, parts, { tags: a.tags, gender: a.gender, age: a.age });
+  } catch (e) {
+    console.warn(`  ${id}: no hair mask (${e.message})`);
+    return null;
+  }
+}
+
 /** Everything for one avatar. */
 export async function convertAvatar(id, opts = {}) {
   const a = avatar(id);
@@ -482,11 +497,13 @@ export async function convertAvatar(id, opts = {}) {
   const tone = headTex ? await skinTone(headTex.getImage()) : null;
 
   const mask = await outfitMask(base, parts, id);
+  const painted = await hairMasks(base, parts, a, id);
 
   ensureDir(OUT);
   // crowd: LODs, 512 px
   const crowd = cloneDocument(base);
   if (mask) await mask.embed(crowd, parts.body, mask.crowd);
+  if (painted) await embedHairMask(crowd, parts.head, hairMaskImage(painted, HAIR_MASK_PX.crowd), HAIR_MASK_PX.crowd);
   const tris = addLods(crowd, parts);
   const crowdGpu = await packTextures(crowd, id, 'crowd', parts.hair);
   const crowdBytes = await writeVariant(crowd, crowdFile);
@@ -497,11 +514,13 @@ export async function convertAvatar(id, opts = {}) {
   if (a.hero) {
     const hero = cloneDocument(base);
     if (mask) await mask.embed(hero, parts.body, mask.hero);
+    if (painted) await embedHairMask(hero, parts.head, hairMaskImage(painted, HAIR_MASK_PX.hero), HAIR_MASK_PX.hero);
     heroGpu = await packTextures(hero, id, 'hero', parts.hair);
     heroBytes = await writeVariant(hero, heroFile);
   } else rmSync(heroFile, { force: true });
 
   const portraitPath = a.roles.includes('playable') || a.hero ? await portrait(id) : null;
+  const hairSpec = hairToneSpec(hair, painted?.tones);
   const spec = {
     id,
     source: 'rocketbox',
@@ -520,7 +539,7 @@ export async function convertAvatar(id, opts = {}) {
     anchors: bind.anchors,
     parts,
     ...(mask ? { outfit: { regions: mask.regions } } : {}),
-    ...(hair ? { hairTone: { mean: hair.mean, colour: hair.colour } } : {}),
+    ...(hairSpec ? { hairTone: hairSpec } : {}),
     ...(portraitPath ? { portrait: portraitPath } : {}),
     // for the report and the review sheet, not the manifest
     stats: { tris, floor: bind.floor, extraTop: bind.extraTop, gpuBytes: { crowd: crowdGpu, ...(a.hero ? { hero: heroGpu } : {}) }, skinL: tone?.L, skinColour: tone?.colour, seat, seconds: Math.round((Date.now() - t0) / 100) / 10 },

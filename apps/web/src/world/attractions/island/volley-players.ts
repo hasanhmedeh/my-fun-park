@@ -43,6 +43,9 @@ function aim(bone: THREE.Object3D, child: THREE.Object3D, dir: THREE.Vector3, k:
 
 /** The arm bones the poses turn: the upper arm and the forearm on each side (the hands only give the forearms their direction). */
 const ARM_BONES = ['upperarm_l', 'lowerarm_l', 'upperarm_r', 'lowerarm_r'] as const;
+/** Where each arm starts in Athlete.bones (upper arm, forearm, hand). */
+const LEFT = 0;
+const RIGHT = 3;
 
 /**
  * One player on the sand. Positions are in the court's frame; `goTo` sets where to run, `face`
@@ -288,33 +291,34 @@ export class Athlete {
   /** One pose at weight k. Directions are in the player's own frame (forward −z, left −x), turned to the world. */
   private pose(a: Arms, k: number) {
     if (k < 0.01) return;
-    const [ul, ll, hl, ur, lr, hr] = this.bones;
-    const dir = (x: number, y: number, z: number) => DIR.set(x, y, z).normalize().applyQuaternion(RQ);
-    const arm = (upper: THREE.Object3D, lower: THREE.Object3D, hand: THREE.Object3D, u: THREE.Vector3Like, l: THREE.Vector3Like) => {
-      aim(upper, lower, dir(u.x, u.y, u.z), k);
-      aim(lower, hand, dir(l.x, l.y, l.z), k);
-    };
     if (a === 'ready') {
-      arm(ul, ll, hl, { x: -0.35, y: -0.75, z: -0.55 }, { x: -0.1, y: -0.1, z: -1 });
-      arm(ur, lr, hr, { x: 0.35, y: -0.75, z: -0.55 }, { x: 0.1, y: -0.1, z: -1 });
+      this.arm(LEFT, -0.35, -0.75, -0.55, -0.1, -0.1, -1, k);
+      this.arm(RIGHT, 0.35, -0.75, -0.55, 0.1, -0.1, -1, k);
     } else if (a === 'dig') {
-      arm(ul, ll, hl, { x: 0.12, y: -0.62, z: -1 }, { x: 0.2, y: -0.55, z: -1 });
-      arm(ur, lr, hr, { x: -0.12, y: -0.62, z: -1 }, { x: -0.2, y: -0.55, z: -1 });
+      this.arm(LEFT, 0.12, -0.62, -1, 0.2, -0.55, -1, k);
+      this.arm(RIGHT, -0.12, -0.62, -1, -0.2, -0.55, -1, k);
     } else if (a === 'set') {
-      arm(ul, ll, hl, { x: -0.55, y: 0.8, z: -0.45 }, { x: 0.25, y: 1, z: -0.2 });
-      arm(ur, lr, hr, { x: 0.55, y: 0.8, z: -0.45 }, { x: -0.25, y: 1, z: -0.2 });
+      this.arm(LEFT, -0.55, 0.8, -0.45, 0.25, 1, -0.2, k);
+      this.arm(RIGHT, 0.55, 0.8, -0.45, -0.25, 1, -0.2, k);
     } else if (a === 'cock') {
       // the hitting arm drawn back behind the head, the other reaching up at the ball
-      arm(ur, lr, hr, { x: 0.45, y: 0.85, z: 0.45 }, { x: -0.1, y: 0.55, z: 0.85 });
-      arm(ul, ll, hl, { x: -0.25, y: 0.95, z: -0.35 }, { x: -0.1, y: 1, z: -0.3 });
+      this.arm(RIGHT, 0.45, 0.85, 0.45, -0.1, 0.55, 0.85, k);
+      this.arm(LEFT, -0.25, 0.95, -0.35, -0.1, 1, -0.3, k);
     } else if (a === 'swing') {
       // the whip: from overhead to down past the hip, over a quarter of a second
       const s = this.swingT;
       const up = Math.cos(s * Math.PI * 0.8);
       const fw = Math.sin(s * Math.PI * 0.8);
-      arm(ur, lr, hr, { x: 0.3, y: up, z: -fw - 0.2 }, { x: 0.15, y: up * 0.9, z: -fw - 0.4 });
-      arm(ul, ll, hl, { x: -0.4, y: -0.3, z: -0.6 }, { x: -0.1, y: -0.5, z: -0.8 });
+      this.arm(RIGHT, 0.3, up, -fw - 0.2, 0.15, up * 0.9, -fw - 0.4, k);
+      this.arm(LEFT, -0.4, -0.3, -0.6, -0.1, -0.5, -0.8, k);
     }
+  }
+
+  /** Aims one arm (`side` LEFT or RIGHT into bones): the upper arm along (ux, uy, uz), the forearm along (lx, ly, lz), by k. */
+  private arm(side: number, ux: number, uy: number, uz: number, lx: number, ly: number, lz: number, k: number) {
+    const b = this.bones;
+    aim(b[side], b[side + 1], DIR.set(ux, uy, uz).normalize().applyQuaternion(RQ), k);
+    aim(b[side + 1], b[side + 2], DIR.set(lx, ly, lz).normalize().applyQuaternion(RQ), k);
   }
 
   dispose() {

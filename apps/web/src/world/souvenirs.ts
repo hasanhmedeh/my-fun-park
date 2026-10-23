@@ -10,7 +10,7 @@
 // through the crown, -z forward.
 import * as THREE from 'three';
 import { std } from './context';
-import type { PersonRig } from './crowd/person-rig';
+import type { HatClip, PersonRig } from './crowd/person-rig';
 import { PALETTE } from './textures';
 
 type Holder = 'head' | 'leftHand' | 'rightHand';
@@ -34,6 +34,11 @@ interface Head {
   eyeGap: number;
   /** Half the head's width at the temples, just behind the eyes (where the shades' arms go). */
   temple: number;
+  /**
+   * The head mesh above the brow (x, y, z in turn): where a few avatars' hair is modelled into it,
+   * it bulges out above the brow, and a cap's crown has to go round that too (crownFit).
+   */
+  dome: Float32Array;
 }
 
 /** A head measured for one avatar, and the head frame's turn within its head bone. */
@@ -42,17 +47,27 @@ interface Fit {
   frame: THREE.Matrix4;
 }
 
+/** A hat's opening, where it meets the head (head frame): its height, half its width, its front and back. */
+interface Brim {
+  y: number;
+  half: number;
+  front: number;
+  back: number;
+}
+
 interface Piece {
   id: string;
   holder: Holder;
   object: THREE.Object3D;
-  /** Head pieces: sizes the piece to the head and says where it goes (in the head frame). */
-  fit?: (head: Head) => THREE.Vector3;
+  /**
+   * Head pieces: sizes the piece to the head and says where it goes (in the head frame), and for a
+   * hat where its opening is (the hair above that is tucked away under it).
+   */
+  fit?: (head: Head) => { at: THREE.Vector3; brim?: Brim };
+  /** A hat as worn now: the hair it tucks away (PersonRig.setHatClip). */
+  clip?: HatClip;
   dispose: () => void;
 }
-
-/** The pieces that sit on the crown: the hair under them is tucked away (PersonRig.setHatClip). */
-const HATS = new Set(['cap', 'top-hat']);
 /** An eyeball's radius: the shades sit in front of the eyeballs, whose bones are at their centres. */
 const EYEBALL = 0.012;
 /**
@@ -61,6 +76,8 @@ const EYEBALL = 0.012;
  * modelled into the head mesh itself (a few avatars' curls) can't be clipped, so the cap goes round it.
  */
 const HAIR_ROOM = 0.008;
+/** How far a hat's hair clip reaches past the hair (and the hat) at its widest. */
+const CLIP_ROOM = 0.02;
 
 /** Every avatar's head, measured once (the hero file and the crowd file share their proportions). */
 const fits = new Map<string, Fit | null>();
@@ -154,10 +171,12 @@ export class Wardrobe {
       p.object.visible = this.shown;
       return;
     }
+    p.clip = undefined;
     const fit = fitFor(this.rig);
     if (!fit || !p.fit) return;
-    const at = p.fit(fit.head).applyMatrix4(fit.frame);
-    p.object.position.copy(at);
+    const { at, brim } = p.fit(fit.head);
+    if (brim) p.clip = hatClip(fit, brim);
+    p.object.position.copy(at.applyMatrix4(fit.frame));
     p.object.quaternion.setFromRotationMatrix(fit.frame);
     p.object.visible = this.shown;
     this.rig.bone('Head').add(p.object);
@@ -165,9 +184,9 @@ export class Wardrobe {
 
   /** A hat tucks the hair under it (and hides the avatar's own hat); without one it's all back. */
   private clipHair() {
-    let hat = false;
-    for (const id of this.pieces.keys()) if (HATS.has(id)) hat = true;
-    this.rig.setHatClip(hat ? this.rig.defaultHatClip() : null);
+    let clip: HatClip | null = null;
+    for (const p of this.pieces.values()) clip ??= p.clip ?? null;
+    this.rig.setHatClip(clip);
   }
 
   /** Worn on the right hand like a glove: along the forearm, palm out of the fist. */
@@ -301,7 +320,9 @@ function measure(rig: PersonRig): Fit | null {
   const brow = { front: Infinity, back: -Infinity, half: 0, n: 0 };
   const all = { front: Infinity, back: -Infinity, half: 0 };
   let temple = 0;
+  const dome: number[] = [];
   each(rig.parts.head, (p) => {
+    if (p.y > eyeY + 0.02) dome.push(p.x, p.y, p.z);
     n++;
     if (Math.abs(p.y - eyeY) < 0.015 && p.z > eyeFront && p.z < eyeFront + 0.035) temple = Math.max(temple, Math.abs(p.x));
     skull = Math.max(skull, p.y);
@@ -332,7 +353,7 @@ function measure(rig: PersonRig): Fit | null {
       hairBack = Math.max(hairBack, p.z);
       if (p.y > eyeY + 0.06) hairFront = Math.min(hairFront, p.z);
     });
-  return { head: { skull, hair: Math.max(skull, hairTop), half, front, back, hairHalf, hairFront, hairBack, eyeY, eyeFront, eyeGap, temple }, frame };
+  return { head: { skull, hair: Math.max(skull, hairTop), half, front, back, hairHalf, hairFront, hairBack, eyeY, eyeFront, eyeGap, temple, dome: new Float32Array(dome) }, frame };
 }
 
 /**
@@ -346,6 +367,48 @@ function covered(h: Head) {
     back: Math.max(h.back, Math.min(h.hairBack, h.back + HAIR_ROOM)),
     top: Math.max(h.skull, Math.min(h.hair, h.skull + HAIR_ROOM)),
   };
+}
+
+/**
+ * The hair a hat tucks away: an ellipsoid round everything above the hat's opening, as wide as the
+ * hair stands out there (plus CLIP_ROOM, so no curl pokes through the crown), narrowing to the hat's
+ * own size at the opening, so the hair hanging below it (a fringe, sideburns, the back of long hair,
+ * a bun) still shows. An ellipsoid is widest at its middle: it's centred above the opening, at the
+ * height where its cross-section has narrowed to the hat's, and reaches over the top of the hair.
+ * Built in the head frame and given in the head bone's (the clip is axis-aligned there): the frame's
+ * up, forward and side are the bone's x, y and z, near enough (they're a few degrees apart).
+ */
+function hatClip({ head: h, frame }: Fit, b: Brim): HatClip {
+  const mid = (b.front + b.back) / 2;
+  const hatX = b.half;
+  const hatZ = (b.back - b.front) / 2;
+  const rx = Math.max(hatX, h.hairHalf) + CLIP_ROOM;
+  const rz = Math.max(hatZ, mid - h.hairFront, h.hairBack - mid) + CLIP_ROOM;
+  // at the opening the cross-section is k of the widest (the smaller of the two, so the clip never
+  // reaches past the hat there), which it is t of the vertical radius below the middle
+  const k = THREE.MathUtils.clamp(Math.min(hatX / rx, hatZ / rz), 0.3, 0.95);
+  const t = Math.sqrt(1 - k * k);
+  const ry = Math.max(0.06, (h.hair + CLIP_ROOM - b.y) / (1 + t));
+  const c = new THREE.Vector3(0, b.y + t * ry, mid).applyMatrix4(frame);
+  return { centre: [c.x, c.y, c.z], radii: [ry, rz, rx] };
+}
+
+/**
+ * How much a cap's crown (the unit crown scaled to rx, ry, rz, its base at `base` and centred at
+ * `mid` front to back) has to grow, in all three directions, to go round the head mesh above
+ * `rim`: 1 if it already does. Below the base the band, straight down to the rim, has to.
+ */
+function crownFit(h: Head, rim: number, base: number, mid: number, rx: number, ry: number, rz: number) {
+  let grow = 1;
+  const d = h.dome;
+  for (let i = 0; i < d.length; i += 3) {
+    const y = d[i + 1];
+    if (y < rim) continue;
+    const q = Math.hypot(d[i] / rx, (d[i + 2] - mid) / rz);
+    const u = Math.max(0, y - base) / ry;
+    grow = Math.max(grow, (q ** 2.4 + u ** 2.4) ** (1 / 2.4));
+  }
+  return grow;
 }
 
 // ---------- The pieces ----------
@@ -386,12 +449,18 @@ function build(id: string): Piece | null {
           // snug round the head at the brow, the band just above the eyebrows, the crown's top
           // just over the head's (the crown starts a tenth of its height above the rim)
           const c = covered(h);
-          const rx = c.half + 0.007;
-          const front = c.front - 0.007;
-          const back = c.back + 0.007;
-          const rz = (back - front) / 2;
           const rim = h.eyeY + 0.038;
-          const ry = Math.max(0.07, (c.top + 0.006 - rim) / 1.1);
+          const mid = (c.front + c.back) / 2;
+          let rx = c.half + 0.007;
+          let rz = (c.back - c.front) / 2 + 0.007;
+          let ry = Math.max(0.07, (c.top + 0.006 - rim) / 1.1);
+          // (and round hair modelled into the head that bulges out above the brow, with the same room)
+          const grow = crownFit(h, rim, rim + ry * 0.1, mid, rx - 0.003, ry - 0.003, rz - 0.003);
+          rx *= grow;
+          ry *= grow;
+          rz *= grow;
+          const front = mid - rz;
+          const back = mid + rz;
           crown.scale.set(rx, ry, rz);
           // the sweatband: from the crown's edge down to the brow
           band.scale.set(rx, ry, rz);
@@ -402,7 +471,7 @@ function build(id: string): Piece | null {
           brim.rotation.x = 0.16;
           button.position.set(0, ry, 0);
           button.scale.setScalar(Math.max(rx, rz) * 0.9);
-          return new THREE.Vector3(0, rim + ry * 0.1, (front + back) / 2);
+          return { at: new THREE.Vector3(0, rim + ry * 0.1, (front + back) / 2), brim: { y: rim, half: rx, front, back } };
         },
       };
     }
@@ -426,8 +495,11 @@ function build(id: string): Piece | null {
           // the crown's opening fits round the head; it sits down on the hair, level
           const c = covered(h);
           const r = Math.max(c.half, (c.back - c.front) / 2) * 0.97 + 0.004;
-          g.scale.set(r, r * 0.98, (c.back - c.front) / 2 + 0.008);
-          return new THREE.Vector3(0, c.top - 0.045, (c.front + c.back) / 2);
+          const rz = (c.back - c.front) / 2 + 0.008;
+          g.scale.set(r, r * 0.98, rz);
+          const y = c.top - 0.045;
+          const mid = (c.front + c.back) / 2;
+          return { at: new THREE.Vector3(0, y, mid), brim: { y, half: r, front: mid - rz, back: mid + rz } };
         },
       };
     }
@@ -482,7 +554,7 @@ function build(id: string): Piece | null {
             arm.position.set(side * hinge, r * 0.15, 0.004);
             arm.rotation.y = side * Math.atan2(splay, depth);
           }
-          return new THREE.Vector3(0, h.eyeY + 0.002, h.eyeFront - 0.016);
+          return { at: new THREE.Vector3(0, h.eyeY + 0.002, h.eyeFront - 0.016) };
         },
       };
     }

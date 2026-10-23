@@ -30,8 +30,9 @@ import { cloneDocument, meshopt, prune, weld } from '@gltf-transform/functions';
 import { MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import { CACHE, META, OUT, basisu, ensureDir, gltfIO, readJson, sanitize, size, writeJson } from './lib.mjs';
 import { BONES, rigOf, skinned } from './measure.mjs';
-import { embedMask } from './masks.mjs';
-import { hairTone } from './hair-tone.mjs';
+import { boxBlur, embedMask, fabricOf } from './masks.mjs';
+import { embedHairMask, HAIR_MASK_PX, hairMaskImage, makeHairMask } from './hair-mask.mjs';
+import { hairTone, hairToneSpec } from './hair-tone.mjs';
 
 export const MH = join(CACHE, 'makehuman');
 const WORKDIR = join(MH, 'work');
@@ -645,19 +646,48 @@ async function outfitMask(garments, atlasPng) {
   const rgba = new Uint8Array(S * S * 4);
   for (let o = 0; o < S * S; o++) if (label[o] >= 0) rgba[o * 4 + label[o]] = 255;
 
-  // region stats from the colour atlas, on covered texels only
+  // Region stats from the colour atlas, on covered texels only: the garment's own fabric, its
+  // dominant colour (as masks.mjs takes it for Rocketbox's), not everything in the region. A blue
+  // trainer's white sole and laces would grey a plain average, and the dye's mean with it.
   const { data } = await sharp(atlasPng).removeAlpha().resize(S, S, { fit: 'fill' }).raw().toBuffer({ resolveWithObject: true });
   const lin = (c) => (c / 255 <= 0.04045 ? c / 255 / 12.92 : ((c / 255 + 0.055) / 1.055) ** 2.4);
   const toSrgb = (l) => Math.round(255 * (l <= 0.0031308 ? l * 12.92 : 1.055 * l ** (1 / 2.4) - 0.055));
+  const N = S * S;
+  const lr = new Float32Array(N), lg = new Float32Array(N), lb = new Float32Array(N), lum = new Float32Array(N);
+  for (let o = 0; o < N; o++) {
+    lr[o] = lin(data[o * 3]);
+    lg[o] = lin(data[o * 3 + 1]);
+    lb[o] = lin(data[o * 3 + 2]);
+    lum[o] = 0.2126 * lr[o] + 0.7152 * lg[o] + 0.0722 * lb[o];
+  }
+  // chromaticity from a 3×3 average (a dark fabric's own texels are noise), as masks.mjs has it
+  const [br, bg, bb] = [lr, lg, lb].map((c) => boxBlur(c, S));
+  const cx = new Float32Array(N), cy = new Float32Array(N);
+  for (let o = 0; o < N; o++) {
+    cx[o] = Math.log((br[o] + 0.004) / (bg[o] + 0.004));
+    cy[o] = Math.log((bb[o] + 0.004) / (bg[o] + 0.004));
+  }
   const regions = {};
   for (const [name, i] of Object.entries(REGION_INDEX)) {
-    let n = 0, sl = 0, sr = 0, sg = 0, sb = 0;
-    for (let o = 0; o < S * S; o++) {
-      if (label[o] !== i || !covered[o]) continue;
-      const r = lin(data[o * 3]), g = lin(data[o * 3 + 1]), b = lin(data[o * 3 + 2]);
-      n++; sl += 0.2126 * r + 0.7152 * g + 0.0722 * b; sr += r; sg += g; sb += b;
+    const texels = [];
+    for (let o = 0; o < N; o++) if (label[o] === i && covered[o]) texels.push(o);
+    if (texels.length < N * 0.002) continue;
+    const own = fabricOf(cx, cy, lum, texels);
+    const { model } = own;
+    let { fabric } = own;
+    // A shoe's lining and insole take as much of its texture as its outside, and are usually pale:
+    // a coloured fabric about as large as the pale one is the shoe's own colour (MH_Child_Boy_01's
+    // blue trainers would otherwise come out beige).
+    if (name === 'shoes' && Math.hypot(model.mx, model.my) < 0.25) {
+      const pale = new Set(fabric);
+      const other = fabricOf(cx, cy, lum, texels.filter((o) => !pale.has(o)));
+      if (Math.hypot(other.model.mx, other.model.my) > 0.5 && other.fabric.length > fabric.length * 0.8) fabric = other.fabric;
     }
-    if (n < S * S * 0.002) continue;
+    // (a print of many colours has no one fabric: then the whole garment's average)
+    const use = fabric.length > texels.length * 0.3 ? fabric : texels;
+    let sl = 0, sr = 0, sg = 0, sb = 0;
+    for (const o of use) { sl += lum[o]; sr += lr[o]; sg += lg[o]; sb += lb[o]; }
+    const n = use.length;
     regions[name] = { mean: r4(sl / n), colour: '#' + [sr, sg, sb].map((v) => Math.min(255, toSrgb(v / n)).toString(16).padStart(2, '0')).join('') };
   }
   return { size: S, rgba, regions };
@@ -928,6 +958,10 @@ export async function postProcess(id) {
   // ---- measurements
   const bind = measure(doc);
   const hair = await hairTone(doc, { hair: `${id}_opacity` }, { tags: job.tags });
+  // the hair painted on the scalp under the cards (in the skin texture), masked so it tints with them
+  const parts = { body: `${id}_body`, head: `${id}_head`, hair: `${id}_opacity` };
+  const painted = await makeHairMask(doc, parts, { tags: job.tags, gender: job.gender, age: job.age });
+  const hairSpec = hairToneSpec(hair, painted?.tones);
   const sitFile = join(CACHE, 'work', 'anim', `sit-${job.gender}.json`);
   let seat = null;
   if (existsSync(sitFile)) {
@@ -935,8 +969,9 @@ export async function postProcess(id) {
     seat = measureSeatBare(doc, sit.clip, sit.refHip, rawParts.find((p) => p.kind === 'seat'));
   }
 
-  // ---- the crowd file: KTX2 at 512 (the mask stays a lossless PNG, halved), meshopt
+  // ---- the crowd file: KTX2 at 512 (the masks stay lossless PNGs, the outfit's halved), meshopt
   const crowd = cloneDocument(doc);
+  if (painted) await embedHairMask(crowd, parts.head, hairMaskImage(painted, HAIR_MASK_PX.crowd), HAIR_MASK_PX.crowd);
   crowd.createExtension(KHRTextureBasisu).setRequired(true);
   const ktxDir = ensureDir(join(workDir, 'ktx'));
   let gpu = 0;
@@ -946,6 +981,10 @@ export async function postProcess(id) {
       const mask = await halveMask(t.getImage());
       t.setImage(mask.png);
       gpu += mask.size * mask.size * 4 * (4 / 3);
+      continue;
+    }
+    if (t.getName() === 'hairMask') {
+      gpu += HAIR_MASK_PX.crowd * HAIR_MASK_PX.crowd * 4 * (4 / 3);
       continue;
     }
     const px = normals.has(t) ? CROWD_NORMAL_TEX : CROWD_TEX;
@@ -980,9 +1019,9 @@ export async function postProcess(id) {
     hip: bind.hip,
     seatDrop: seat?.seatDrop ?? Math.round((bind.hip * 0.53 - 0.07) * 1000) / 1000,
     anchors: bind.anchors,
-    parts: { body: `${id}_body`, head: `${id}_head`, hair: `${id}_opacity` },
+    parts,
     outfit: { regions: mask.regions },
-    ...(hair ? { hairTone: { mean: hair.mean, colour: hair.colour } } : {}),
+    ...(hairSpec ? { hairTone: hairSpec } : {}),
     ...(existsSync(join(OUT, 'portraits', `${id}.webp`)) ? { portrait: `portraits/${id}.webp` } : {}),
     // for the report, the credits and the review sheet, not the manifest
     stats: {

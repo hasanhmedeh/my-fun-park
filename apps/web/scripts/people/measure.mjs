@@ -217,6 +217,17 @@ export function measureBind(doc) {
   const head = rig.pos(BONES.Head);
   let top = -Infinity;
   for (const { p } of person) if (Math.hypot(p.x - head.x, p.z - head.z) < 0.07) top = Math.max(top, p.y);
+  // Under a keffiyeh the skull is cut away (only the face is modelled), so nothing of the person
+  // reaches more than a few centimetres above the head joint: the cloth on the head is its top then,
+  // and counts in the height (a hat is left out because there's a head under it).
+  if (top < head.y + 0.1) {
+    let cloth = -Infinity;
+    for (const { p } of verts.extra) if (Math.hypot(p.x - head.x, p.z - head.z) < 0.07) cloth = Math.max(cloth, p.y);
+    if (cloth > top) {
+      top = cloth;
+      maxY = Math.max(maxY, cloth);
+    }
+  }
   const headTop = anchor(rig, 'Head', new THREE.Vector3(head.x, top, head.z));
 
   // between the shoulder blades: the back's surface (−z), 40% of the way from Spine2 up to the neck

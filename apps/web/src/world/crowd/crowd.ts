@@ -149,10 +149,19 @@ interface Bench {
   seats: (Guest | null)[];
 }
 
+/**
+ * The backrest leans back (this much backward per metre up, about 13°), as a park bench's does:
+ * a sitter's back is tipped back too, so an upright one would cut through their shoulders.
+ */
+const BACK_LEAN = 0.24;
+
 export function benchGeometry() {
   const parts: THREE.BufferGeometry[] = [];
   for (let i = 0; i < 4; i++) parts.push(new THREE.BoxGeometry(1.8, 0.04, 0.09).translate(0, 0.45, -0.17 + i * 0.11));
-  for (let i = 0; i < 3; i++) parts.push(new THREE.BoxGeometry(1.8, 0.09, 0.03).translate(0, 0.62 + i * 0.12, 0.25).rotateX(0));
+  for (let i = 0; i < 3; i++) {
+    const y = 0.62 + i * 0.12;
+    parts.push(new THREE.BoxGeometry(1.8, 0.09, 0.03).rotateX(Math.atan(BACK_LEAN)).translate(0, y, 0.25 + (y - 0.5) * BACK_LEAN));
+  }
   return mergeGeometries(parts)!;
 }
 
@@ -165,11 +174,16 @@ export const benchFront = (height: number) => 0.06 + 0.09 * height;
 
 export function benchFrame() {
   const parts: THREE.BufferGeometry[] = [];
+  const lean = Math.atan(BACK_LEAN);
   for (const x of [-0.78, 0.78]) {
     parts.push(new THREE.BoxGeometry(0.06, 0.45, 0.06).translate(x, 0.225, -0.18));
-    parts.push(new THREE.BoxGeometry(0.06, 0.9, 0.06).translate(x, 0.45, 0.25));
+    // the back leg, then the upright leaning back with the backrest
+    parts.push(new THREE.BoxGeometry(0.06, 0.47, 0.06).translate(x, 0.235, 0.25));
+    parts.push(new THREE.BoxGeometry(0.06, 0.47 / Math.cos(lean), 0.06).rotateX(lean).translate(x, 0.685, 0.25 + 0.235 * BACK_LEAN));
     parts.push(new THREE.BoxGeometry(0.06, 0.05, 0.5).translate(x, 0.43, 0.03));
-    parts.push(new THREE.BoxGeometry(0.05, 0.05, 0.42).translate(x, 0.65, -0.02)); // arm rest
+    // the arm rest, from the upright to a post over the front leg
+    parts.push(new THREE.BoxGeometry(0.05, 0.05, 0.5).translate(x, 0.65, 0.02));
+    parts.push(new THREE.BoxGeometry(0.04, 0.2, 0.04).translate(x, 0.54, -0.19));
   }
   return mergeGeometries(parts)!;
 }
@@ -482,7 +496,8 @@ export class Crowd {
       m.makeRotationY(s.heading).setPosition(s.x, 0, s.z);
       wood.setMatrixAt(i, m);
       iron.setMatrixAt(i, m);
-      staticBox(this.ctx, s.x, 0.4, s.z, 0.95, 0.4, 0.3, s.heading);
+      // (deep enough for the top of the leaning backrest)
+      staticBox(this.ctx, s.x, 0.4, s.z, 0.95, 0.4, 0.36, s.heading);
       this.benches.push({ ...s, seats: [null, null, null] });
     });
     for (const im of [wood, iron]) {
@@ -756,11 +771,28 @@ export class Crowd {
     sitters.forEach((m, k) => {
       b.seats[seats[k]] = null;
       m.rig.setBase('stand');
-      m.y = 0;
-      m.scripted = false;
-      if (m !== L) m.setTask(this.follow(m));
+      if (m !== L)
+        m.setTask(
+          (function* () {
+            yield* crowd.standUp(m, b);
+            yield* crowd.follow(m);
+          })(),
+        );
     });
+    yield* this.standUp(L, b);
     yield* this.wait(0.6);
+  }
+
+  /** Up off the bench and a step forward, clear of it (it would push anyone still in it straight out). */
+  private *standUp(m: Guest, b: Bench): Task {
+    const fx = -Math.sin(b.heading);
+    const fz = -Math.cos(b.heading);
+    const rx = Math.cos(b.heading);
+    const rz = -Math.sin(b.heading);
+    // (where along the bench they sat; the bench's collider is 0.36 deep, a walker keeps 0.3 off it)
+    const along = (m.x - b.x) * rx + (m.z - b.z) * rz;
+    yield* this.glide(m, new THREE.Vector3(b.x + fx * 0.68 + rx * along, 0, b.z + fz * 0.68 + rz * along), 0.9, false);
+    m.scripted = false;
   }
 
   private *sitOnBench(m: Guest, b: Bench, i: number): Task {
@@ -832,12 +864,17 @@ export class Crowd {
   private *queueTurn(g: Guest, q: Queue, turn: () => Task): Task {
     q.join(g);
     const slot = { x: 0, z: 0, heading: 0 };
-    g.rig.setBase(this.queueBase(g));
+    let lined = false;
     for (;;) {
       const i = q.people.indexOf(g);
       q.slot(i, slot);
       const far = this.seek(g, slot, 0.25);
-      if (far < 0.4) g.faceHeading = slot.heading;
+      if (far < 0.4) {
+        g.faceHeading = slot.heading;
+        // in the line now: settle in to wait (and keep it up shuffling forward)
+        if (!lined) g.rig.setBase(this.queueBase(g));
+        lined = true;
+      }
       if (i === 0 && far < 0.5) break;
       yield;
     }
@@ -947,13 +984,17 @@ export class Crowd {
     const slot = { x: 0, z: 0, heading: 0 };
     g.done = false;
     // ---- queue until the operator calls you to a seat
-    g.rig.setBase(this.queueBase(g));
+    let lined = false;
     while (g.seatIndex < 0) {
       const i = q.people.indexOf(g);
       if (i < 0) q.join(g);
       q.slot(Math.max(0, i), slot);
       const far = this.seek(g, slot, 0.25);
-      if (far < 0.4) g.faceHeading = slot.heading;
+      if (far < 0.4) {
+        g.faceHeading = slot.heading;
+        if (!lined) g.rig.setBase(this.queueBase(g));
+        lined = true;
+      }
       yield;
     }
     const seat = g.seatIndex;
@@ -971,9 +1012,8 @@ export class Crowd {
       g.faceHeading = Math.atan2(-(seatPos.x - spot.x), -(seatPos.z - spot.z));
       yield* this.wait(0.25);
       g.rig.setBase('sit');
-      const target = seatPos.clone();
-      target.y -= g.rig.seatDrop;
-      yield* this.glide(g, target, 1.2, false);
+      // (straight to where the ride will hold them: see sitOnRide)
+      yield* this.glide(g, this.seatSpot(g, stop, seat, new THREE.Vector3()), 1.2, false);
       ok = stop.coaster.dwelling;
     }
     stop.boarding.delete(g);
@@ -1099,14 +1139,19 @@ export class Crowd {
     g.heading += THREE.MathUtils.clamp(d, -rate * dt, rate * dt);
   }
 
+  /** Where a rider's feet (the rig's root) go in seat i of the stop's train, in world space. */
+  private seatSpot(g: Guest, stop: RideStop, i: number, out: THREE.Vector3) {
+    const seat = stop.coaster.seats[i];
+    // (the seat's back is 0.29 m behind its middle and seated hips about 0.19·height behind the root:
+    // a grown-up's back against it, a child a little forward of it, as on a bench)
+    return out.set(seat.local.x, seat.local.y - g.rig.seatDrop, seat.local.z - 0.09 * g.look.height).applyMatrix4(seat.car.matrix);
+  }
+
   /** Riders sit in their seat, moving (and rolling) with the car. */
   private sitOnRide(g: Guest) {
     const stop = g.ride!;
-    const seat = stop.coaster.seats[g.rideSeat];
-    const m = seat.car.matrix;
-    // (the seat's back is 0.29 m behind its middle and seated hips about 0.19·height behind the root:
-    // a grown-up's back against it, a child a little forward of it, as on a bench)
-    this.tmpV.set(seat.local.x, seat.local.y - g.rig.seatDrop, seat.local.z - 0.09 * g.look.height).applyMatrix4(m);
+    const m = stop.coaster.seats[g.rideSeat].car.matrix;
+    this.seatSpot(g, stop, g.rideSeat, this.tmpV);
     g.x = this.tmpV.x;
     g.y = this.tmpV.y;
     g.z = this.tmpV.z;

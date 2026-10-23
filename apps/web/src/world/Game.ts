@@ -5,8 +5,8 @@ import { Player } from './player';
 import { Crowd } from './crowd/crowd';
 import { downloadPeople, PEOPLE_URL, PeopleFactory } from './crowd/people-factory';
 import type { PersonRig } from './crowd/person-rig';
-import { lookFromVisitor, type Look } from './crowd/looks';
-import type { VisitorLook } from './crowd/people-manifest';
+import { lookFromVisitor } from './crowd/looks';
+import type { AvatarSpec, VisitorLook } from './crowd/people-manifest';
 import { defaultLook, visitorLook } from './visitor-look';
 import { Customiser, customiserPeople } from './customiser';
 import { ChangingRoom } from './attractions/changing-room';
@@ -132,6 +132,14 @@ function earlyTier(mobile: boolean): Tier | undefined {
   if (choice !== 'auto') return choice;
   if (mobile && (navigator.hardwareConcurrency ?? 4) < 8) return 'low';
   return undefined;
+}
+
+/**
+ * The people the visitor can be: the playable ones with a close-up file, except Rosa (the booth's
+ * vendor is one of a kind: nobody meets her double at her own counter).
+ */
+function offered(a: AvatarSpec) {
+  return a.roles.includes('playable') && !!a.files.hero && a.id !== VENDOR_AVATAR;
 }
 
 type Mode =
@@ -374,8 +382,6 @@ export class Game {
   private wornLook: VisitorLook | null = null;
   /** Counts changes to the visitor's look: a person still downloading for an earlier change isn't put on (the latest wins). */
   private dressSeq = 0;
-  /** The visitor's Look, one object kept up to date in place (the jet-skis compare it at each start). */
-  private readonly dressed = {} as Look;
   /** No saved look (or its person is no longer offered): the customiser opens as the visitor comes in. */
   private firstLook = false;
   /** The changing room by the booth, and the customiser it (and a first visit) opens. */
@@ -448,7 +454,7 @@ export class Game {
     // who the visitor is: their saved look, or (none yet, or that person is no longer offered) a
     // default, picked as soon as the manifest is in so their file downloads with the rest
     const firstLook = dl.manifest.then((m) => {
-      const playable = m.avatars.filter((a) => a.roles.includes('playable') && a.files.hero);
+      const playable = m.avatars.filter(offered);
       if (saved && playable.some((a) => a.id === saved.avatar)) return { look: saved, first: false };
       const look = defaultLook(session.user?.gender, playable);
       if (!look) throw new Error('people: no playable avatars in the manifest');
@@ -739,7 +745,6 @@ export class Game {
       await people.load(look.avatar, { hero: true });
       this.wornLook = look;
       this.player = new Player(this.ctx, people.create(lookFromVisitor(look, people.spec(look.avatar)!)));
-      Object.assign(this.dressed, this.player.rig.look);
       // Rosa behind the booth's counter, and what the visitor wears from her shop
       this.booth.setVendor(people.create(vendorLook(people.spec(VENDOR_AVATAR)!)));
       this.wardrobe = new Wardrobe(this.player.rig, this.scene);
@@ -751,10 +756,13 @@ export class Game {
         palmCay: this.palmCay,
         shadows: this.quality.shadows && this.quality.tier !== 'low',
         tier: this.quality.tier,
+        // (none of them is the visitor's double)
+        exclude: [look.avatar],
       });
-      // the island's players and riders: the visitor's own look, as it is when each round starts
+      // the island's players and riders: the visitor's own look, whatever it is now (they follow a
+      // change made in the changing room)
       this.volley.setPeople(people, () => this.player.rig.look);
-      this.jetski.setPeople(people, this.dressed);
+      this.jetski.setPeople(people, () => this.player.rig.look);
       // the flight, with the world's ground under it: the terrain and the sea, the airfields' pavement
       this.flight = new Flight(this.ctx, {
         env: this.env,
@@ -1891,18 +1899,26 @@ export class Game {
     const people = this.people!;
     this.customiser = new Customiser(
       {
-        people: customiserPeople(people.manifest.avatars, PEOPLE_URL),
+        people: customiserPeople(people.manifest.avatars.filter(offered), PEOPLE_URL),
         preview: (look) => this.dressVisitor(look),
         close: (saved) => this.leaveDressing(saved),
         turn: () => this.player.face(this.player.facing + Math.PI),
       },
       this.ui.hud,
     );
-    visitorLook.onChange((look) => {
+    const follow = (look: VisitorLook | null) => {
       // (while the customiser is open it puts on the looks itself, and its Done ends in leaveDressing)
-      if (!look || this.customiser?.isOpen || !people.spec(look.avatar)?.roles.includes('playable')) return;
+      const spec = look && people.spec(look.avatar);
+      if (!look || !spec || !offered(spec) || this.customiser?.isOpen) return;
+      // they have a look of their own now: no first-visit customiser
+      this.firstLook = false;
       this.dressVisitor(look).catch((e: unknown) => console.warn('The Funfair: the visitor’s look could not be put on.', e));
-    });
+    };
+    visitorLook.onChange(follow);
+    // a look that came while the fair was being built: a member's own, as their session was restored
+    // or they logged in on the intro card (the visitor was made from what there was at the start)
+    const now = visitorLook.get();
+    if (now && !this.devLook() && JSON.stringify(now) !== JSON.stringify(this.wornLook)) follow(now);
   }
 
   /**
@@ -1925,7 +1941,6 @@ export class Game {
       this.swapRig(people.create(look));
     }
     this.wornLook = v;
-    Object.assign(this.dressed, this.player.rig.look);
   }
 
   /** The visitor becomes another person: whatever holds their body (the player, their souvenirs) moves over to the new one. */
@@ -1933,8 +1948,12 @@ export class Game {
     const old = this.player.rig;
     this.player.setRig(rig);
     this.wardrobe?.setRig(rig);
-    // nobody in the crowd may wear the visitor's new face (a guest wearing it becomes someone else)
-    if (rig.look.avatar !== old.look.avatar) this.crowd?.setExclude([rig.look.avatar]);
+    // nobody in the crowd, the airport or on the island may wear the visitor's new face (anyone
+    // wearing it becomes someone else)
+    if (rig.look.avatar !== old.look.avatar) {
+      this.crowd?.setExclude([rig.look.avatar]);
+      this.travellers?.setExclude([rig.look.avatar]);
+    }
     old.dispose();
   }
 
@@ -1967,6 +1986,8 @@ export class Game {
     this.player.enabled = false;
     this.input.paused = true;
     this.dressCam.inRoom = inRoom;
+    // (the room's ring lies between the camera and the visitor: it would glow across the shot)
+    if (inRoom) this.zones.setHidden('changing');
     this.customiser.open(this.wornLook, { firstVisit: !inRoom });
     this.resize();
     // (into the room the camera glides from behind the visitor; on a first visit it starts in front
@@ -1997,12 +2018,23 @@ export class Game {
       if (look) this.dressVisitor(look).catch((e: unknown) => console.warn('The Funfair: the visitor’s look could not be put on.', e));
     }
     this.mode = 'drive';
+    this.zones.setHidden(null);
     this.input.paused = false;
     this.player.enabled = this.inFair;
     this.camYaw = this.player.facing; // behind the visitor, wherever they face
     this.camPitch = 0.2;
     this.resize();
     this.sfx.chime();
+    // out of the cubicle (behind it the camera would only see its back wall): back on the ring in
+    // front of it, facing it as they did when they stepped in, the camera behind them
+    if (this.dressCam.inRoom && this.inFair)
+      this.fade(() => {
+        if (this.mode !== 'drive') return;
+        const z = ZONES.changing;
+        this.placeVisitor(z.x, z.z, z.heading);
+        this.camYaw = z.heading;
+        this.updateDriveCamera(1, true);
+      });
   }
 
   /** The customiser's camera: the room's shot, or (a first visit) in front of the visitor where they stand. */
@@ -3309,7 +3341,11 @@ export class Game {
     this.sfx.setCoaster(best, launching, false);
   }
 
-  /** Dev-only helpers: ?cam=x,y,z,lx,ly,lz pins the camera; window.__game for scripting. */
+  /**
+   * Dev-only helpers: ?cam=x,y,z,lx,ly,lz pins the camera; ?look=<avatar id> plays as that person
+   * (devLook); window.__game for scripting (its `people` is the people factory, `player.rig` the
+   * visitor, `customiser` the panel, `room` the changing room).
+   */
   private setupDebug() {
     if (!import.meta.env.DEV) return;
     (window as unknown as { __game: Game }).__game = this;
@@ -3335,7 +3371,7 @@ export class Game {
 
   private updateZones(t: number) {
     this.showIdeaNews();
-    const zone = this.zones.update(this.player.position, t);
+    const zone = this.zones.update(this.player.position, t, this.camera.position);
     this.worldMap.setNear(zone);
     if (zone) {
       const z = ZONES[zone];

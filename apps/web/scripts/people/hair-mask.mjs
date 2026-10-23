@@ -31,14 +31,24 @@
 //      texel counts as darker than skin; blonde and grey hair are told apart by their chromaticity.
 //      A texel nearer the hair than the skin is hair, softly (a painted hairline fades into skin,
 //      and so does the mask).
-//   3. Clean-up: specks closed, crumbs dropped (a mole, a stray shadow), each mask kept to what
-//      joins its main areas, edges softened, then averaged down to the output size and spread past
-//      the islands' edges so filtering doesn't fade the tint at the seams.
+//   3. Where the shape says it isn't hair: skin standing off the skull at the ears (earOut) loses
+//      what hair it seemed to have unless that is unmistakable; down the nape, where the paint fades
+//      from hair to skin in wisps, only solid hair counts; a beard that is the skin's own colour,
+//      deeper and only a little darker, is the shade under the jaw.
+//   4. Clean-up: specks closed, crumbs dropped (a mole, a stray shadow), each mask kept to what
+//      joins its main areas (and a moustache, a strip too thin for that, kept on its own), holes
+//      wholly inside the hair filled (highlights), patches where hair and skin take turns faded
+//      out, edges softened, then averaged down to the output size and spread past the islands'
+//      edges so filtering doesn't fade the tint at the seams. A scalp mask still ragged after all
+//      that (thin grey hair over a balding crown, light short hair over the ears under a solid
+//      crown), or grey hair covering little more than half the crown, is dropped: dyed in patches
+//      it would read as blotches.
 //
 // Each one's tone, for the tint to keep the paint's light and shade relative to it (as hairTone
 // does for the cards): mean linear luminance and colour over its texels. None when there's too
-// little: a bald head has no scalp mask, a shaven face no beard. People in a headscarf, a keffiyeh
-// or a burqa get none.
+// little: a bald head has no scalp mask, a shaven face no beard, and a white or grey beard none
+// either (it's as bright as the skin between its hairs, so its mask comes out in patches). People
+// in a headscarf, a keffiyeh, a burqa or a helmet get none.
 
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -63,12 +73,20 @@ const smooth = (a, b, x) => {
 };
 const round = (v, d) => Math.round(v * 10 ** d) / 10 ** d;
 
-/** Tags (catalogue.mjs) of people whose hair is covered: no mask. (A hood is painted round the face.) */
-const COVERED = new Set(['headscarf', 'keffiyeh', 'burqa', 'hood']);
+/**
+ * Tags (catalogue.mjs) of people whose hair is covered: no mask. (A hood is painted round the face.
+ * The game never tints hair under a veil or a helmet either: looks.ts hairCovered.)
+ */
+const COVERED = new Set(['headscarf', 'keffiyeh', 'burqa', 'hood', 'veil', 'helmet']);
 /** Tags of people in a hat: modelled (islands of its own above the head) or painted on the crown. */
 const HATS = new Set(['hat', 'cap', 'beanie']);
+/** The mask's size in the game files (crowd, hero): lossless, so small. */
+export const HAIR_MASK_PX = { crowd: 256, hero: 512 };
 /** Analysis size (the head textures are 1024 px). */
 const ANALYSIS = 1024;
+/** How ragged (see `ragged`) a scalp mask may be and still be dyed: all of it, and the part below the crown. */
+const RAGGED = 0.035;
+const RAGGED_LOW = 0.03;
 /** The nape: on the head's own skin, hair behind the ears stops this far below the eyes (metres). */
 const NAPE = -0.115;
 
@@ -189,6 +207,34 @@ export async function makeHairMask(doc, parts, { tags = [], gender = 'm', age = 
   for (let i = 0; i < islandBase; i++) if (i !== mainIsland && islandArea[i] > 0 && islandH[i] / islandArea[i] > 0.05) hatIslands += islandArea[i];
   const modelledHat = hatIslands > N * 0.02;
 
+  // The ears stick out of the skull: a texel of the head's own skin well outside the skull's radius
+  // at its angle and height (the least radius there, round the skull's axis) is an ear, front or
+  // back. Its back is painted dark where it shades the skull, as dark as dark hair on dark skin.
+  const earOut = new Float32Array(N);
+  {
+    const BA = 3, BH = 0.005, NA = 61, NH = 80, H0 = -0.25;
+    const ai = (a) => Math.min(NA - 1, Math.max(0, Math.round(a / BA)));
+    const hi = (h) => Math.min(NH - 1, Math.max(0, Math.round((h - H0) / BH)));
+    const rad = new Float32Array(N);
+    const least = new Float32Array(NA * NH).fill(Infinity);
+    for (let t = 0; t < N; t++) {
+      if (islandOf[t] !== mainIsland || off[t]) continue;
+      rad[t] = Math.hypot(X[t], Z[t] - axisZ);
+      const b = ai(A[t]) * NH + hi(H[t]);
+      if (rad[t] < least[b]) least[b] = rad[t];
+    }
+    for (let t = 0; t < N; t++) {
+      if (islandOf[t] !== mainIsland || off[t] || A[t] < 70 || A[t] > 118 || H[t] < -0.08 || H[t] > 0.04) continue;
+      let skull = Infinity;
+      for (let da = -1; da <= 1; da++)
+        for (let dh = -1; dh <= 1; dh++) {
+          const a = ai(A[t]) + da, h = hi(H[t]) + dh;
+          if (a >= 0 && a < NA && h >= 0 && h < NH) skull = Math.min(skull, least[a * NH + h]);
+        }
+      earOut[t] = smooth(0.005, 0.011, rad[t] - skull);
+    }
+  }
+
   // ---- colour: linear RGB, chromaticity from a 3×3 average (dark texels' own ratios are noise)
   const { data } = await sharp(Buffer.from(texture.getImage())).resize(R, R, { fit: 'fill', kernel: 'lanczos3' }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const r = new Float32Array(N), g = new Float32Array(N), b = new Float32Array(N);
@@ -218,10 +264,11 @@ export async function makeHairMask(doc, parts, { tags = [], gender = 'm', age = 
     const floor = islandOf[t] === mainIsland ? Math.max(scalpFloor(a), NAPE) : scalpFloor(a);
     scalpZone[t] = smooth(-0.006, 0.006, h - floor);
     // A woman's or a child's hair can frame the face, down the temples beside the eyes to the
-    // cheeks: allowed there too, but only grown down from the hair above (see `clean`), and never
-    // the eyebrows or the eyelids. (A man's cheeks there are his beard's.)
+    // cheeks, and hang below the ears to the jaw: allowed there too, but only grown down from the
+    // hair above (see `clean`), and never the eyebrows or the eyelids. (A man's cheeks there are
+    // his beard's.)
     if ((!male || child) && islandOf[t] === mainIsland && h > -0.11 && !(x < 0.056 && h > -0.015)) {
-      scalpZone[t] = Math.max(scalpZone[t], smooth(34, 40, a) * (1 - smooth(85, 92, a)));
+      scalpZone[t] = Math.max(scalpZone[t], smooth(34, 40, a));
     }
     // modelled hair (a fringe, a bun, a ponytail) is its own islands, wherever it hangs; but under a
     // hat those islands are the hat
@@ -313,6 +360,9 @@ export async function makeHairMask(doc, parts, { tags = [], gender = 'm', age = 
   // the skin a shade darker, and stays as it is)
   let beard = male && !child ? model(chin, 0.1, 4, 0.4) : null;
   if (beard && beard.l > skinL + Math.log(0.4) && Math.hypot(beard.mx - skinChroma.mx, beard.my - skinChroma.my) < 0.25) beard = null;
+  // The shade under the jaw (painted into the texture) is the skin's own colour, deeper and only a
+  // little darker; hair is greyer than the skin, or far darker.
+  if (beard && beard.l > skinL + Math.log(0.3) && Math.hypot(beard.mx, beard.my) > Math.hypot(skinChroma.mx, skinChroma.my)) beard = null;
   // A white or grey beard on light skin is as bright as the skin between its hairs, so its mask
   // comes out in patches, and a dye in patches reads as blotches: such a beard stays as it is.
   if (beard && beard.l > skinL - 0.4) beard = null;
@@ -367,6 +417,10 @@ export async function makeHairMask(doc, parts, { tags = [], gender = 'm', age = 
   }
   const scalpP = classify(scalp, scalpZone, hatModel, [0.15, 0.5]);
   const beardP = classify(beard, beardZone, null, [0.25, 0.7]);
+  // Behind and below the ears the paint fades from hair to skin down the nape, in wisps, and the
+  // shade there is a blonde's colour: it takes most of the way to the hair's colour to count.
+  const nape = (t) => (islandOf[t] === mainIsland ? smooth(-0.04, -0.065, H[t]) * smooth(75, 90, A[t]) : 0);
+  if (scalp) for (let t = 0; t < N; t++) if (scalpP[t] && nape(t)) scalpP[t] *= 1 - nape(t) * (1 - smooth(0.45, 0.8, fraction(scalp, t)));
 
   // A modelled piece of hair (its own island) that is mostly hair is hair throughout: its
   // highlights and the shadows between its locks too.
@@ -384,10 +438,39 @@ export async function makeHairMask(doc, parts, { tags = [], gender = 'm', age = 
     }
   }
 
+  // No hair on the ears, front or back: each stretch of skin sticking out of the skull (earOut) that
+  // is mostly not hair is an ear, and loses what hair it seemed to have unless that is unmistakable
+  // (the shade behind a dark-skinned ear reads as dark hair; curls over an ear are hair). A stretch
+  // that is mostly hair is hair modelled standing off the skull (a bob's volume), and keeps it.
+  {
+    const seen = new Uint8Array(N);
+    const queue = new Int32Array(N);
+    for (let s = 0; s < N; s++) {
+      if (seen[s] || earOut[s] <= 0.15) continue;
+      let head = 0, tail = 0, hairy = 0;
+      queue[tail++] = s;
+      seen[s] = 1;
+      while (head < tail) {
+        const i = queue[head++];
+        if (scalpP[i] > 0.5) hairy++;
+        const x = i % R, y = (i / R) | 0;
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            const xx = x + dx, yy = y + dy;
+            if (xx < 0 || yy < 0 || xx >= R || yy >= R) continue;
+            const j = yy * R + xx;
+            if (!seen[j] && earOut[j] > 0.15) { seen[j] = 1; queue[tail++] = j; }
+          }
+      }
+      if (hairy > tail * 0.7) continue;
+      for (let k = 0; k < tail; k++) scalpP[queue[k]] *= 1 - smooth(0.15, 0.45, earOut[queue[k]]) * (1 - smooth(4.5, 6.5, dSkin[queue[k]]));
+    }
+  }
+
   // Clean-up: closed, then only what joins a clear stretch of hair (hysteresis: texels over 0.85
   // in `core` spread through their neighbours over 0.35), so speckles of hair-coloured skin (a
   // blonde's yellowish neck, a fold's shadow) drop out while the hair's own soft edges stay.
-  const clean = (p, minShare, core) => {
+  const clean = (p, minShare, core, fillable = null) => {
     let m = new Uint8Array(N);
     for (let t = 0; t < N; t++) m[t] = p[t] > 0.35 ? 1 : 0;
     m = morph(morph(m, R, true, 2), R, false, 2); // close
@@ -407,10 +490,22 @@ export async function makeHairMask(doc, parts, { tags = [], gender = 'm', age = 
         }
     }
     m = dropSmall(keep, R, Math.round(N * minShare));
+    // Speckles (a blonde's pale wisps fading into the neck, hair-coloured freckles of skin) hang on
+    // to the hair by threads a texel or two wide: cut the threads (shrink by 4), keep the pieces of
+    // real size that hold clear hair of their own (not the shade on a blonde's nape, cut off), and
+    // let the mask reach only a few texels past them.
+    let body = morph(m, R, false, 4);
+    body = dropSmall(body, R, Math.round(N * minShare));
+    body = seeded(body, R, (t) => p[t] > 0.85 && core(t));
+    body = morph(body, R, true, 10);
+    for (let t = 0; t < N; t++) m[t] &= body[t];
+    // Holes wholly inside the hair (a blonde's highlights, the shine on a crown) are hair; not ones
+    // reaching skin, an ear, or the edge of the paint.
+    const filled = fillable ? fillHoles(m, covered, R, Math.round(N * 0.002), fillable) : null;
     // soft edges: the probability inside the cleaned area, and its own 1-texel fringe
     const grown = morph(m, R, true, 1);
     const out = new Float32Array(N);
-    for (let t = 0; t < N; t++) if (grown[t]) out[t] = m[t] ? Math.max(p[t], 0.35 * (p[t] > 0.15)) : p[t] * 0.5;
+    for (let t = 0; t < N; t++) if (grown[t]) out[t] = filled?.[t] ? 1 : m[t] ? Math.max(p[t], 0.35 * (p[t] > 0.15)) : p[t] * 0.5;
     const soft = boxBlur(out, R);
     // and where the hair thins out to stray wisps (a hairline fading into the neck), the mask fades
     // out with it: wisps tinted one by one read as specks
@@ -418,8 +513,38 @@ export async function makeHairMask(doc, parts, { tags = [], gender = 'm', age = 
     for (let t = 0; t < N; t++) soft[t] *= covered[t] * smooth(0.2, 0.55, density[t]);
     return soft;
   };
-  const scalpMask = clean(scalpP, 0.002, (t) => H[t] > 0.03 || islandOf[t] !== mainIsland || A[t] > 120);
-  const beardMask = smoothBeard(clean(beardP, 0.0004, (t) => H[t] < -0.05 && H[t] > -0.13), covered, lips, R);
+  // (clear hair starts on the crown, a modelled piece, or the back of the head above the nape: down
+  // the nape it only hangs from the hair above, so a blonde's wisps there don't start blobs of their own)
+  const scalpMask = clean(scalpP, 0.002, (t) => H[t] > 0.03 || islandOf[t] !== mainIsland || (A[t] > 120 && H[t] > -0.04), (t) => scalpZone[t] > 0.5 && earOut[t] < 0.15 && !off[t]);
+  const beardRaw = clean(beardP, 0.0004, (t) => H[t] < -0.05 && H[t] > -0.13);
+  // A moustache is a strip over the upper lip, too thin to outlast clean's cutting of threads, and
+  // often apart from the beard (or joined only at the mouth's corners): kept on its own, wherever
+  // the beard's model finds clear hair right over the lips. (Left out, it stays dark over a
+  // blonde or a grey beard.)
+  if (beard) {
+    let tash = new Uint8Array(N);
+    for (let t = 0; t < N; t++) tash[t] = beardP[t] > 0.35 && Math.abs(X[t]) < 0.045 && H[t] > -0.07 && H[t] < -0.04 && A[t] < 60 ? 1 : 0;
+    tash = morph(morph(tash, R, true, 2), R, false, 2);
+    tash = seeded(dropSmall(tash, R, Math.round(N * 0.0002)), R, (t) => beardP[t] > 0.85);
+    for (let t = 0; t < N; t++) if (tash[t]) beardRaw[t] = Math.max(beardRaw[t], beardP[t]);
+  }
+  const beardMask = smoothBeard(beardRaw, covered, lips, R);
+  // Behind and below the ears the painted hair thins out down the nape (a blonde's in wisps over
+  // the skin, which the mask takes in blobs a few centimetres across): there it keeps only solid
+  // hair, and fades where hair and skin share the paint. (Measured over the paint only: the nape
+  // runs to the island's edge at the back seam.)
+  {
+    const solid = new Float32Array(N), paint = new Float32Array(N);
+    for (let t = 0; t < N; t++) {
+      paint[t] = covered[t];
+      solid[t] = scalpMask[t] > 0.5 ? covered[t] : 0;
+    }
+    const around = boxBlurWide(solid, R, 24), painted = boxBlurWide(paint, R, 24);
+    for (let t = 0; t < N; t++) {
+      if (!scalpMask[t] || !nape(t)) continue;
+      scalpMask[t] *= 1 - nape(t) * (1 - smooth(0.6, 0.9, around[t] / Math.max(painted[t], 1e-3)));
+    }
+  }
 
   const tone = (mask) => {
     let n = 0, sl = 0;
@@ -434,6 +559,19 @@ export async function makeHairMask(doc, parts, { tags = [], gender = 'm', age = 
     if (n < N * 0.0015) return null;
     return { mean: round(sl / n, 4), colour: hex(s.map((v) => v / n)), texels: n };
   };
+  unpatch(scalpMask, covered, R);
+  dropCrumbs(scalpMask, R, Math.round(N * 0.0004));
+  // (below the crown: the hair round the face and over the ears, all that shows under a hat, where
+  // light short hair over the skin can come out in patches while the crown is solid)
+  const underCrown = (t) => islandOf[t] === mainIsland && H[t] < 0.03;
+  const raggedness = { scalp: round(ragged(scalpMask, covered, R), 3), low: round(ragged(scalpMask, covered, R, underCrown, Math.round(N * 0.02)), 3), beard: round(ragged(beardMask, covered, R), 3) };
+  // what's left of thin grey hair over a balding head is still in patches (a dye would blotch it):
+  // it stays as it is
+  if (raggedness.scalp > RAGGED || raggedness.low > RAGGED_LOW) scalpMask.fill(0);
+  // and so does grey hair thinning over the crown in one piece: hair nearly as light as the skin
+  // over little more than half the crown leaves a hole of thin hair on the scalp, neither skin nor
+  // hair, which beside dyed hair reads as a dark blotch (a bald crown of skin reads as bald)
+  if (scalp && scalp.share < 0.65 && scalp.l > skinL - 1) scalpMask.fill(0);
   const tones = { scalp: tone(scalpMask), beard: tone(beardMask) };
   if (!tones.scalp) scalpMask.fill(0);
   if (!tones.beard) beardMask.fill(0);
@@ -443,8 +581,8 @@ export async function makeHairMask(doc, parts, { tags = [], gender = 'm', age = 
     scalp: scalpMask,
     beard: beardMask,
     tones,
-    stats: { skin: { x: round(skinChroma.mx, 3), y: round(skinChroma.my, 3), l: round(skinL, 2) }, scalp: scalp && { x: round(scalp.mx, 3), y: round(scalp.my, 3), l: round(scalp.l, 2), share: round(scalp.share, 2) }, beard: beard && { x: round(beard.mx, 3), y: round(beard.my, 3), l: round(beard.l, 2), share: round(beard.share, 2) }, hat: hatModel && { x: round(hatModel.mx, 3), y: round(hatModel.my, 3), l: round(hatModel.l, 2), same: !!hatModel.same } },
-    debug: { covered, scalpZone, beardZone, rgb: data, islandOf, mainIsland, off, H, A, X, dSkin, scalpP, beardP },
+    stats: { ragged: raggedness, skin: { x: round(skinChroma.mx, 3), y: round(skinChroma.my, 3), l: round(skinL, 2) }, scalp: scalp && { x: round(scalp.mx, 3), y: round(scalp.my, 3), l: round(scalp.l, 2), share: round(scalp.share, 2) }, beard: beard && { x: round(beard.mx, 3), y: round(beard.my, 3), l: round(beard.l, 2), share: round(beard.share, 2) }, hat: hatModel && { x: round(hatModel.mx, 3), y: round(hatModel.my, 3), l: round(hatModel.l, 2), same: !!hatModel.same } },
+    debug: { covered, scalpZone, beardZone, rgb: data, islandOf, mainIsland, off, H, A, X, dSkin, scalpP, beardP, earOut },
   };
 }
 
@@ -463,6 +601,103 @@ function smoothBeard(mask, covered, lips, R) {
   const out = new Float32Array(N);
   for (let t = 0; t < N; t++) out[t] = near[t] && covered[t] && !lips[t] ? Math.min(1, Math.max(mask[t] * 0.6, soft[t] * 1.5)) : 0;
   return out;
+}
+
+/**
+ * Fills the holes in a 0/1 mask (in place) that are no bigger than `maxArea`, closed on every side
+ * by the mask and wholly `fillable`: a hole that reaches the edge of the paint (an uncovered texel)
+ * or anything not fillable stays open. Returns the texels it filled (0/1).
+ */
+function fillHoles(m, covered, R, maxArea, fillable) {
+  const N = R * R;
+  const seen = new Uint8Array(N);
+  const filled = new Uint8Array(N);
+  const queue = new Int32Array(N);
+  for (let s = 0; s < N; s++) {
+    if (m[s] || seen[s] || !covered[s]) continue;
+    let head = 0, tail = 0, open = false;
+    queue[tail++] = s;
+    seen[s] = 1;
+    while (head < tail) {
+      const i = queue[head++];
+      if (!fillable(i)) open = true;
+      const x = i % R, y = (i / R) | 0;
+      for (const [ok, j] of [[x > 0, i - 1], [x < R - 1, i + 1], [y > 0, i - R], [y < R - 1, i + R]]) {
+        if (!ok || !covered[j]) { open = true; continue; }
+        if (!m[j] && !seen[j]) { seen[j] = 1; queue[tail++] = j; }
+      }
+    }
+    if (open || tail > maxArea) continue;
+    for (let k = 0; k < tail; k++) m[queue[k]] = filled[queue[k]] = 1;
+  }
+  return filled;
+}
+
+/**
+ * How ragged a mask is: its edge (texels over 0.5 beside one under it, not counting the paint's
+ * own edges) over its area, within `zone` if given (0 when that holds under `minArea` texels of
+ * it: a short edge would count for too much). A solid head of hair is a few hundredths; thin grey
+ * hair over a scalp, where the mask comes out in patches, several times that.
+ */
+function ragged(mask, covered, R, zone = null, minArea = 1) {
+  let area = 0, edge = 0;
+  for (let i = 0; i < R * R; i++) {
+    if (mask[i] <= 0.5 || (zone && !zone(i))) continue;
+    area++;
+    const x = i % R, y = (i / R) | 0;
+    for (const [ok, j] of [[x > 0, i - 1], [x < R - 1, i + 1], [y > 0, i - R], [y < R - 1, i + R]])
+      if (ok && covered[j] && mask[j] <= 0.5) { edge++; break; }
+  }
+  return area >= minArea ? edge / area : 0;
+}
+
+/**
+ * Fades a mask out (in place) where it comes in patches: thin grey hair over a balding crown, or a
+ * blonde's last wisps down the neck, where hair and skin take turns every few texels. Dyed, such a
+ * stretch reads as blotches; left alone it reads as thinning hair. Measured by how much of a 25-texel
+ * window is the mask's edge: along a clean hairline about 2 texels in 25, in patches several times
+ * that.
+ */
+function unpatch(mask, covered, R) {
+  const N = R * R;
+  const edge = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    if (!covered[i]) continue;
+    const inside = mask[i] > 0.5;
+    const x = i % R, y = (i / R) | 0;
+    for (const [ok, j] of [[x > 0, i - 1], [x < R - 1, i + 1], [y > 0, i - R], [y < R - 1, i + R]])
+      if (ok && covered[j] && mask[j] > 0.5 !== inside) { edge[i] = 1; break; }
+  }
+  const density = boxBlurWide(edge, R, 12);
+  for (let i = 0; i < N; i++) mask[i] *= 1 - smooth(0.12, 0.22, density[i]);
+}
+
+/** The pieces (8-connected) of a binary mask holding at least one texel `seed` picks: a new mask. */
+function seeded(m, R, seed) {
+  const out = new Uint8Array(R * R);
+  const queue = new Int32Array(R * R);
+  let tail = 0;
+  for (let t = 0; t < R * R; t++) if (m[t] && seed(t)) { out[t] = 1; queue[tail++] = t; }
+  for (let head = 0; head < tail; head++) {
+    const i = queue[head];
+    const x = i % R, y = (i / R) | 0;
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        const xx = x + dx, yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= R || yy >= R) continue;
+        const j = yy * R + xx;
+        if (m[j] && !out[j]) { out[j] = 1; queue[tail++] = j; }
+      }
+  }
+  return out;
+}
+
+/** Zeroes (in place) the crumbs of a soft mask: pieces over 0.2 smaller than `minArea` texels. */
+function dropCrumbs(mask, R, minArea) {
+  const b = new Uint8Array(R * R);
+  for (let i = 0; i < R * R; i++) b[i] = mask[i] > 0.2 ? 1 : 0;
+  const kept = morph(dropSmall(b, R, minArea), R, true, 2);
+  for (let i = 0; i < R * R; i++) if (!kept[i]) mask[i] = 0;
 }
 
 /** A box blur of radius `r`, horizontally then vertically. */

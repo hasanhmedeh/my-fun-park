@@ -52,10 +52,13 @@ export const CAST = [
     eyes: 'brown',
     eyebrows: 'eyebrow010',
     eyelashes: 'eyelashes02',
-    hair: 'afro01',
+    // (afro01's curls are rows of cards that read as a grid on a head this small, and as a black
+    // lump once LOD2 thins them)
+    hair: 'ponytail01',
+    hairTint: 'black',
     clothes: ['toigo_camisole_dress_with_full_skirt', 'cortu_t-bar'],
     regions: { toigo_camisole_dress_with_full_skirt: 'top' },
-    tags: ['dress', 'sandals', 'curlyHair'],
+    tags: ['dress', 'sandals', 'ponytail'],
   },
   {
     id: 'MH_Child_Boy_01',

@@ -115,8 +115,9 @@ export function buildManifest() {
       // the file really carries
       const recorded = (j.materials ?? []).find((m) => m.name === a.parts.body)?.extras?.outfit;
       if (recorded && kind === 'crowd') a.outfit = recorded;
-      const hasMask = [...(j.textures ?? []), ...(j.images ?? [])].some((t) => t.name === 'outfitMask');
-      if (a.outfit && !hasMask) warn(`${a.id}: ${rel} has outfit regions but no outfitMask texture`);
+      const named = (name) => [...(j.textures ?? []), ...(j.images ?? [])].some((t) => t.name === name);
+      if (a.outfit && !named('outfitMask')) warn(`${a.id}: ${rel} has outfit regions but no outfitMask texture`);
+      if ((a.hairTone?.scalp || a.hairTone?.beard) && !named('hairMask')) warn(`${a.id}: ${rel} has painted hair tones but no hairMask texture`);
       const lods = kind === 'crowd' ? a.lods : 1;
       for (let i = 0; i < lods; i++) if (!nodes.has(`LOD${i}`)) warn(`${a.id}: ${rel} has no LOD${i}`);
       if (rig) {

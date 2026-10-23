@@ -8,7 +8,9 @@
 // (view front|side|three|head|crown|waist|feet; lod 0–2); cell=WxH; src=<url> loads that GLB for the (one)
 // avatar instead, e.g. src=/.people-cache/work/Male_Adult_01/base.glb (the uncompressed source);
 // anchors=1 marks the avatar's anchors (red head top, green back, blue shoulder, yellow palms) on
-// their bones, as the game would attach things. It plays nothing: each cell is frozen at its time, so
+// their bones, as the game would attach things; swatches=1 shows the colours the manifest gives
+// (outfit regions top, bottom, shoes, trim; hair: the cards, the painted scalp, the beard) as chips
+// under each name, to check them against the avatar. It plays nothing: each cell is frozen at its time, so
 // the sheet is reproducible. On the console (shot.mjs prints warnings): per avatar, the lowest
 // skinned vertex in every cell (feet on the floor: about 0; seated: the seat's height or more), its
 // texture memory on the GPU, and anything that failed to load.
@@ -206,6 +208,21 @@ async function main() {
     label.textContent = `${avatar.id} · ${avatar.height.toFixed(2)} m · skin ${avatar.skin}`;
     label.style.cssText = `position:absolute;left:${col * CW}px;top:0;width:${CW}px`;
     labels.appendChild(label);
+    if (q.get('swatches')) {
+      const chips = document.createElement('div');
+      chips.style.cssText = `position:absolute;left:${col * CW}px;top:16px;width:${CW}px;display:flex;flex-wrap:wrap;gap:2px`;
+      const ht = avatar.hairTone ?? {};
+      const swatches = [...Object.entries(avatar.outfit?.regions ?? {}).map(([k, v]) => [k, v.colour]), ['hair', ht.colour], ['scalp', ht.scalp?.colour], ['beard', ht.beard?.colour]];
+      for (const [name, colour] of swatches) {
+        if (!colour) continue;
+        const chip = document.createElement('span');
+        chip.textContent = name;
+        const light = parseInt(colour.slice(1, 3), 16) + parseInt(colour.slice(3, 5), 16) + parseInt(colour.slice(5, 7), 16) > 380;
+        chip.style.cssText = `background:${colour};color:${light ? '#000' : '#fff'};padding:1px 3px;font-size:10px;border:1px solid #0006`;
+        chips.appendChild(chip);
+      }
+      labels.appendChild(chips);
+    }
   }
   for (const [row, r] of ROWS.entries()) {
     const label = document.createElement('div');

@@ -30,6 +30,8 @@ export class Zones {
   private markers: Marker[] = [];
   /** The labels are hidden during a ride (setVisible). */
   private labels = true;
+  /** A ring the camera stands over for a close-up (the changing room's, while dressing): not drawn. */
+  private hidden: ZoneId | null = null;
   active: ZoneId | null = null;
 
   constructor(private ctx: Ctx) {
@@ -98,15 +100,22 @@ export class Zones {
     for (const m of this.markers) this.show(m);
   }
 
+  /** Hides one zone's ring and label (`null`: none) while the camera looks across it at the visitor. */
+  setHidden(id: ZoneId | null) {
+    this.hidden = id;
+    for (const m of this.markers) this.show(m);
+  }
+
   /** Shows or hides a marker's ring, fill, label and roadworks: only near the visitor, and not when switched off. */
   private show(m: Marker) {
-    const on = m.near && !m.off;
+    const on = m.near && !m.off && m.id !== this.hidden;
     m.ring.visible = m.fill.visible = on;
     m.label.visible = on && this.labels;
     if (m.site) m.site.group.visible = on && m.closed;
   }
 
-  update(carPos: THREE.Vector3, t: number) {
+  /** `eye`: the camera, if a label it comes close to should fade away rather than fill the screen. */
+  update(carPos: THREE.Vector3, t: number, eye?: THREE.Vector3) {
     let found: ZoneId | null = null;
     for (const m of this.markers) {
       const z = ZONES[m.id];
@@ -125,7 +134,10 @@ export class Zones {
       m.label.position.y = m.baseY + Math.sin(t * 2 + z.z) * 0.15;
       // fade labels that are far away so the scene stays readable
       const d = Math.hypot(carPos.x - z.x, carPos.z - z.z);
-      (m.label.material as THREE.SpriteMaterial).opacity = THREE.MathUtils.clamp(1.4 - d / 45, 0.25, 1);
+      // (and those the camera passes close to, as it does a neighbour's behind the visitor: the
+      // booth's, from the changing room's ring)
+      const pass = eye ? THREE.MathUtils.smoothstep(m.label.position.distanceTo(eye), 3, 7) : 1;
+      (m.label.material as THREE.SpriteMaterial).opacity = THREE.MathUtils.clamp(1.4 - d / 45, 0.25, 1) * pass;
       if (m.closed && d < 120) m.site?.update(t);
     }
     this.active = found;

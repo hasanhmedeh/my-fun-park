@@ -50,7 +50,7 @@ The park is a round lawn 280 m across inside a fence (`PARK` in `apps/web/src/wo
 
 Lamps line every path at even spacing, avenues of trees line North Avenue and the East and West Avenues, groves fill the gardens between the paths and a green belt runs inside the fence. Scenery lays itself out from the paths and from each attraction's footprint (`FOOTPRINTS`), so moving an attraction in `LAYOUT` moves its trigger ring, its queue and the space kept clear round it too. The rides outside the fence are placed the same way: each coaster's track starts where `LAYOUT.coaster` / `LAYOUT.falcon` puts its station, and `LAYOUT.circuit` moves the kart circuit (the Rally Trail stays where it is: its ghost runs are kept in world coordinates).
 
-Stack: **Vite + TypeScript + Three.js + cannon-es + postprocessing + N8AO** for the game, **NestJS + Prisma + PostgreSQL** for accounts, in a **pnpm + Turborepo** monorepo. The world is built procedurally and all sound is synthesized with WebAudio; the one model file is the visitor, "Casual Character" by [Quaternius](https://quaternius.com) (CC0, from [Poly Pizza](https://poly.pizza/m/kZ3DmIoGip)).
+Stack: **Vite + TypeScript + Three.js + cannon-es + postprocessing + N8AO** for the game, **NestJS + Prisma + PostgreSQL** for accounts, in a **pnpm + Turborepo** monorepo. The world is built procedurally and all sound is synthesized with WebAudio; the people are [Microsoft Rocketbox](https://github.com/microsoft/Microsoft-Rocketbox) avatars (MIT) with MakeHuman children and older women (CC0), moving with Rocketbox clips and [Quaternius](https://quaternius.com)' Universal Animation Library (CC0); the game's credits page lists every asset.
 
 ## Accounts, tickets & rides
 
@@ -419,10 +419,13 @@ src/world/Game.ts       renderer, physics, loop, camera modes, interactions, the
 src/world/minimap.ts    corner minimap + the shared top-down painter of the fair
 src/world/world-map.ts  full-screen park map: pan, zoom, legend and fast travel
 src/world/player.ts     the visitor: walk/run/roll/kick/wave controls and physics on a crowd rig
-src/world/crowd/        the park's guests: people.ts (rig, outfits, animation), pets.ts (dogs, leashes),
-                        crowd.ts (parties, queues, coaster boarding, benches, kids' play), nav.ts + obstacles.ts (walking)
-public/models/guests.glb       "Universal Base Characters" by Quaternius (CC0): bodies + hairstyles
-public/models/guest-anims.glb  "Universal Animation Library" by Quaternius (CC0): a curated set of clips
+src/world/crowd/        the people: people-factory.ts (the download, avatars, looks by role), person-rig.ts (one person: LODs,
+                        clips, poses, gestures, garments, night glow), looks.ts (outfits, dyes, hair), pets.ts (dogs, leashes),
+                        crowd.ts (parties, queues, coaster boarding, benches, kids' play), travellers.ts (the airport and Palm Cay),
+                        nav.ts + obstacles.ts (walking)
+src/world/customiser.ts the visitor's look (person, colours, height, build); visitor-look.ts keeps it (account or browser)
+public/models/people/   the people by set (park, airport, island; crowd and hero files), clip packs, manifest.json
+                        (built by scripts/people/), Microsoft Rocketbox (MIT, LICENSE-rocketbox.txt) and MakeHuman (CC0)
 public/models/dog-*.glb        Shiba Inu and Husky by Quaternius (CC0, via Poly Pizza)
 src/world/subdivide.ts  rounds off faceted models at load: welds, one Loop subdivision, smooth normals, blended skin weights
 src/world/environment.ts sky, lights, ground, trees, lamps, tents, balloons

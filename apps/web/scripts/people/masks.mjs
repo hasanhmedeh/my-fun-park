@@ -140,18 +140,18 @@ function readPrimitive(prim) {
   const uvA = prim.getAttribute('TEXCOORD_0');
   if (!uvA) throw new Error('body primitive has no TEXCOORD_0');
   const n = pos.getCount();
-  const uv = new Float32Array(n * 2), y = new Float32Array(n);
+  const uv = new Float32Array(n * 2), xyz = new Float32Array(n * 3);
   const e = [];
   for (let i = 0; i < n; i++) {
     uvA.getElement(i, e);
     uv[i * 2] = e[0];
     uv[i * 2 + 1] = e[1];
     pos.getElement(i, e);
-    y[i] = e[1];
+    xyz.set(e, i * 3);
   }
   const idx = prim.getIndices();
   const tris = idx ? Uint32Array.from({ length: idx.getCount() }, (_, i) => idx.getScalar(i)) : Uint32Array.from({ length: n }, (_, i) => i);
-  return { prim, n, uv, y, tris, joints: prim.getAttribute('JOINTS_0'), weights: prim.getAttribute('WEIGHTS_0') };
+  return { prim, n, uv, xyz, tris, joints: prim.getAttribute('JOINTS_0'), weights: prim.getAttribute('WEIGHTS_0') };
 }
 
 /** 3×3 box average. */
@@ -384,6 +384,29 @@ export function dominant(cx, cy, lum, texels, darkLum) {
   return model;
 }
 
+/**
+ * A garment's own fabric among its texels: the dominant colour's model and the texels close to it.
+ * A garment of two fabrics (a hoodie's blue yoke and sleeves over a grey front, a blue trainer on
+ * a white sole): a grey or white fabric's chromaticity is the most even, so its peak can beat a
+ * coloured fabric that covers clearly more of the garment, and that one is the garment's colour.
+ */
+export function fabricOf(cx, cy, lum, texels) {
+  const median = texels.map((t) => lum[t]).sort((a, b) => a - b)[texels.length >> 1];
+  const darkLum = Math.max(0.004, median * 0.3);
+  let model = dominant(cx, cy, lum, texels, darkLum);
+  let fabric = texels.filter((t) => distance(model, cx[t], cy[t]) < 2.5);
+  const rest = Math.hypot(model.mx, model.my) < 0.12 ? texels.filter((t) => distance(model, cx[t], cy[t]) >= 2.5) : [];
+  if (rest.length > fabric.length * 1.3) {
+    const other = dominant(cx, cy, lum, rest, darkLum);
+    const more = rest.filter((t) => distance(other, cx[t], cy[t]) < 2.5);
+    if (more.length > fabric.length * 1.3) {
+      model = other;
+      fabric = more;
+    }
+  }
+  return { model, fabric };
+}
+
 // ------------------------------------------------------------------------------------ the mask
 
 /**
@@ -421,14 +444,17 @@ export async function makeOutfitMask(doc, { size = 512, merge = true, forceTrim 
   // joint names, from the skin of a node that draws this mesh
   const skinOf = new Map();
   for (const node of root.listNodes()) if (node.getMesh() && node.getSkin()) skinOf.set(node.getMesh(), node.getSkin());
+  // the mesh's up (its own axes, before the skin's bind pose turns it upright): from the feet to the
+  // trunk, by the skin weights
+  const trunk = [0, 0, 0, 0], feet = [0, 0, 0, 0];
   for (const p of prims) {
     const mesh = p.prim.listParents().find((x) => x.propertyType === 'Mesh');
     const skin = skinOf.get(mesh);
     if (!skin || !p.joints) throw new Error('body is not skinned');
     const jointGroup = skin.listJoints().map((j) => boneGroup(j.getName()));
     const jointLow = skin.listJoints().map((j) => /(Calf|HorseLink|Foot|Toe)w*$/i.test(j.getName().replace(/[_s]+/g, ' ')));
-    const vg = new Float32Array(p.n * GROUPS);
-    const vlow = new Float32Array(p.n);
+    const vg = (p.vg = new Float32Array(p.n * GROUPS));
+    const vlow = (p.vlow = new Float32Array(p.n));
     const j = [], w = [];
     for (let i = 0; i < p.n; i++) {
       p.joints.getElement(i, j);
@@ -437,7 +463,20 @@ export async function makeOutfitMask(doc, { size = 512, merge = true, forceTrim 
         vg[i * GROUPS + jointGroup[j[k]]] += w[k];
         if (jointLow[j[k]]) vlow[i] += w[k];
       }
+      for (const [sum, g] of [[trunk, TORSO], [feet, FOOT]]) {
+        const wg = vg[i * GROUPS + g];
+        for (let c = 0; c < 3; c++) sum[c] += p.xyz[i * 3 + c] * wg;
+        sum[3] += wg;
+      }
     }
+  }
+  const up = [0, 1, 2].map((c) => trunk[c] / Math.max(trunk[3], 1e-6) - feet[c] / Math.max(feet[3], 1e-6));
+  const upLen = Math.hypot(...up) || 1;
+  // texels on faces turned to the ground (the soles: never seen, and often more of the foot's texture
+  // than the shoe's upper)
+  const under = new Uint8Array(N);
+  for (const p of prims) {
+    const { vg, vlow } = p;
     // UV islands from the mesh, not the raster (islands can touch in the texture): triangles that
     // share a UV corner are in one island
     const corner = new Int32Array(p.n);
@@ -451,11 +490,17 @@ export async function makeOutfitMask(doc, { size = 512, merge = true, forceTrim 
       uf.union(corner[p.tris[k]], corner[p.tris[k + 1]]);
       uf.union(corner[p.tris[k]], corner[p.tris[k + 2]]);
     }
+    const q = p.xyz;
     rasterise(R, p.uv, p.tris, (t, w0, w1, w2, a, b, c) => {
       covered[t] = 1;
       for (let g = 0; g < GROUPS; g++) groupW[g][t] = w0 * vg[a * GROUPS + g] + w1 * vg[b * GROUPS + g] + w2 * vg[c * GROUPS + g];
       island[t] = corner[a];
       lowW[t] = w0 * vlow[a] + w1 * vlow[b] + w2 * vlow[c];
+      // the face's normal (glTF winds front faces anticlockwise) against up
+      const ux = q[b * 3] - q[a * 3], uy = q[b * 3 + 1] - q[a * 3 + 1], uz = q[b * 3 + 2] - q[a * 3 + 2];
+      const vx = q[c * 3] - q[a * 3], vy = q[c * 3 + 1] - q[a * 3 + 1], vz = q[c * 3 + 2] - q[a * 3 + 2];
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      under[t] = (nx * up[0] + ny * up[1] + nz * up[2]) / (Math.hypot(nx, ny, nz) * upLen || 1) < -0.7 ? 1 : 0;
     });
   }
   for (let t = 0; t < N; t++) if (covered[t]) island[t] = uf.find(island[t]);
@@ -570,13 +615,26 @@ export async function makeOutfitMask(doc, { size = 512, merge = true, forceTrim 
   for (const [region, parts] of Object.entries(REGION_PARTS)) {
     // (well clear of the skin, so a bare leg's fringe can't pass for the fabric)
     let texels = [];
-    for (let t = 0; t < N; t++) if (covered[t] && parts.includes(part[t]) && skinDist[t] > 3.2 && !skinMap[t]) texels.push(t);
-    if (texels.length < N * 0.004) texels = texels.filter(() => false).concat([...Array(N).keys()].filter((t) => covered[t] && parts.includes(part[t]) && !isSkinLike(t)));
+    const clothed = [];
+    for (let t = 0; t < N; t++) {
+      if (!covered[t] || !parts.includes(part[t]) || isSkinLike(t)) continue;
+      clothed.push(t);
+      if (skinDist[t] > 3.2) texels.push(t);
+    }
+    // Fabric of the skin's own hue (brown trousers, tan leather) is told apart from skin only by
+    // being darker: when what's well clear of the skin's colour is a sliver of what isn't skin (a
+    // pocket's stitching on brown trousers), the garment is everything that isn't skin.
+    if (texels.length < Math.max(N * 0.004, clothed.length * 0.2)) texels = clothed;
     // a garment needs some area: a few stray texels on a bare foot are not shoes
     if (texels.length < N * 0.004) continue;
+    // A shoe's colour is its upper's: a work boot's dark rubber sole can be more of its texture than
+    // the tan leather everyone sees, and the sole keeps its own colour (as a white one does).
+    if (region === 'shoes') {
+      const seen = texels.filter((t) => !under[t]);
+      if (seen.length >= N * 0.004) texels = seen;
+    }
     const median = (ts) => ts.map((t) => lum[t]).sort((a, b) => a - b)[ts.length >> 1];
-    const model = dominant(cx, cy, lum, texels, Math.max(0.004, median(texels) * 0.3));
-    const fabric = texels.filter((t) => distance(model, cx[t], cy[t]) < 2.5);
+    const { model, fabric } = fabricOf(cx, cy, lum, texels);
     if (fabric.length < N * 0.002) continue;
     models[region] = { ...model, typical: median(fabric) };
   }

@@ -19,7 +19,9 @@
 //                                    swimming, treading water, kneeling, sitting on the sand, waiting, the case…) side on,
 //                                    with their bones' extents logged; ids=… avatars, bases=… poses
 //
-// Other parameters: n (passengers, default 18), pre (seconds, default 90), tier (as quality).
+// Other parameters: n (passengers, default 18), pre (seconds, default 90), tier (as quality), exclude
+// (avatars nobody is made from: the visitor's, as the game passes it), swap (the visitor changing into
+// these avatars once the day is simulated: setExclude), who=1 (who everyone is, logged).
 // The people are the game's (world/crowd/people-factory.ts): the park set first, then the airport's
 // and the island's, as the game's first trip loads them.
 import * as THREE from 'three';
@@ -100,7 +102,7 @@ const preview: PreviewScene = async (p) => {
     island.update(1 / 30, i / 30);
   }
 
-  const people = new Travellers(ctx, factory, { home, island, palmCay, shadows: ctx.quality.shadows, tier });
+  const people = new Travellers(ctx, factory, { home, island, palmCay, shadows: ctx.quality.shadows, tier, exclude: params.get('exclude')?.split(',') });
   // the visitor stands where the camera looks (as the game's camera follows them), or at visitor=x,z
   const vq = (params.get('visitor') ?? params.get('look') ?? '').split(',').map(Number);
   if (vq.length >= 2 && vq.every(Number.isFinite)) people.setVisitor(vq.length === 2 ? { x: vq[0], y: 0, z: vq[1] } : { x: vq[0], y: vq[1], z: vq[2] });
@@ -112,6 +114,15 @@ const preview: PreviewScene = async (p) => {
     // game's trip would, and how many frames until everyone waiting for them is made
     for (let i = 0; i < 30; i++) people.update(1 / 30, i / 30, ctx.camera, place);
     console.warn(`[late] park only: ${JSON.stringify(people.counts)} · ${JSON.stringify(people.debug())}`);
+    // (and what each one made from then on costs: a slow frame is a hitch as the trip's people arrive)
+    const create = factory.create.bind(factory);
+    factory.create = (look) => {
+      const c0 = performance.now();
+      const rig = create(look);
+      const ms = performance.now() - c0;
+      if (ms > 4) console.warn(`[late] made ${look.avatar}${look.wear?.scarf ? '+scarf' : ''} in ${ms.toFixed(1)} ms`);
+      return rig;
+    };
     const t0 = performance.now();
     await Promise.all([factory.loadSet('airport'), factory.loadSet('island')]);
     const loadMs = performance.now() - t0;
@@ -209,6 +220,16 @@ const preview: PreviewScene = async (p) => {
       people.setNight(p.env?.night ?? 0);
       const f = flight as Boarding | null;
       console.warn(`[travellers] ${place} t=${t.toFixed(0)}s ${JSON.stringify(people.debug())}${f ? ` · flight ${(f.progress * 100).toFixed(0)}%${f.done ? ' done' : ''}` : ''}`);
+      // swap=<ids>: the visitor changes into one of those avatars now (as in the changing room):
+      // whoever wears it is made someone else (setExclude)
+      const swap = params.get('swap')?.split(',');
+      if (swap) {
+        const wearing = () => people.debugLooks().made.filter((m) => swap.some((id) => m.includes(`:${id}`))).length;
+        const before = wearing();
+        const s0 = performance.now();
+        people.setExclude(swap);
+        console.warn(`[swap] ${swap.join(',')}: ${before} wearing it before, ${wearing()} after (${(performance.now() - s0).toFixed(0)} ms)`);
+      }
       if (params.has('who')) {
         const who = people.debugLooks();
         console.warn(`[travellers] made ${who.made.join(' · ')} · waiting ${who.waiting.join(' · ') || 'nobody'}`);

@@ -126,7 +126,6 @@ const preview: PreviewScene = async (p) => {
       });
     }
   }
-  console.warn("DEBUG", JSON.stringify(vb.athletes.map((a) => a.rig?.spec.id)), JSON.stringify((vb as any).fans?.rigs.map((f: any) => f.rig.spec.id)));
   p.onFrame((fdt, ft) => {
     park.update(fdt, ft, camera);
     if (!play) {

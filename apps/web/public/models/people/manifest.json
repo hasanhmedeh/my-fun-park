@@ -358,7 +358,7 @@
           "start": 416
         }
       ],
-      "bytes": 577172
+      "bytes": 577236
     },
     "f": {
       "file": "clips-f.glb",
@@ -663,7 +663,7 @@
           "start": 428
         }
       ],
-      "bytes": 615984
+      "bytes": 615948
     },
     "extra": {
       "file": "clips-extra.glb",
@@ -833,7 +833,7 @@
         "crowd": "Business_Female_01.crowd.glb"
       },
       "bytes": {
-        "crowd": 385440
+        "crowd": 397596
       },
       "lods": 3,
       "height": 1.7404,
@@ -904,7 +904,11 @@
       },
       "hairTone": {
         "mean": 0.0084,
-        "colour": "#1c160f"
+        "colour": "#1c160f",
+        "scalp": {
+          "mean": 0.0075,
+          "colour": "#1a140e"
+        }
       }
     },
     {
@@ -928,7 +932,7 @@
         "crowd": "Business_Female_02.crowd.glb"
       },
       "bytes": {
-        "crowd": 433796
+        "crowd": 459488
       },
       "lods": 3,
       "height": 1.7288,
@@ -991,18 +995,22 @@
             "colour": "#4c2520"
           },
           "bottom": {
-            "mean": 0.0085,
+            "mean": 0.0086,
             "colour": "#1b1610"
           },
           "shoes": {
-            "mean": 0.0088,
-            "colour": "#1a1711"
+            "mean": 0.0065,
+            "colour": "#15130d"
           }
         }
       },
       "hairTone": {
         "mean": 0.1343,
-        "colour": "#7d6147"
+        "colour": "#7d6147",
+        "scalp": {
+          "mean": 0.12,
+          "colour": "#775c43"
+        }
       }
     },
     {
@@ -1025,7 +1033,7 @@
         "crowd": "Business_Female_03.crowd.glb"
       },
       "bytes": {
-        "crowd": 371320
+        "crowd": 378896
       },
       "lods": 3,
       "height": 1.7431,
@@ -1096,7 +1104,11 @@
       },
       "hairTone": {
         "mean": 0.0056,
-        "colour": "#16100d"
+        "colour": "#16100d",
+        "scalp": {
+          "mean": 0.007,
+          "colour": "#19130f"
+        }
       }
     },
     {
@@ -1118,7 +1130,7 @@
         "crowd": "Business_Female_04.crowd.glb"
       },
       "bytes": {
-        "crowd": 333036
+        "crowd": 342832
       },
       "lods": 3,
       "height": 1.7333,
@@ -1185,7 +1197,11 @@
       },
       "hairTone": {
         "mean": 0.0188,
-        "colour": "#2e231c"
+        "colour": "#2e231c",
+        "scalp": {
+          "mean": 0.0158,
+          "colour": "#2c1f18"
+        }
       }
     },
     {
@@ -1206,7 +1222,7 @@
         "crowd": "Business_Male_01.crowd.glb"
       },
       "bytes": {
-        "crowd": 341540
+        "crowd": 347944
       },
       "lods": 3,
       "height": 1.8065,
@@ -1277,7 +1293,11 @@
       },
       "hairTone": {
         "mean": 0.0111,
-        "colour": "#241912"
+        "colour": "#241912",
+        "scalp": {
+          "mean": 0.0126,
+          "colour": "#271b14"
+        }
       }
     },
     {
@@ -1298,7 +1318,7 @@
         "crowd": "Business_Male_02.crowd.glb"
       },
       "bytes": {
-        "crowd": 332584
+        "crowd": 339196
       },
       "lods": 3,
       "height": 1.8233,
@@ -1358,14 +1378,18 @@
             "colour": "#292932"
           },
           "shoes": {
-            "mean": 0.0126,
+            "mean": 0.0129,
             "colour": "#1e1e1b"
           }
         }
       },
       "hairTone": {
         "mean": 0.0064,
-        "colour": "#15120f"
+        "colour": "#15120f",
+        "scalp": {
+          "mean": 0.0075,
+          "colour": "#181511"
+        }
       }
     },
     {
@@ -1386,7 +1410,7 @@
         "crowd": "Business_Male_03.crowd.glb"
       },
       "bytes": {
-        "crowd": 354964
+        "crowd": 360904
       },
       "lods": 3,
       "height": 1.8192,
@@ -1453,7 +1477,11 @@
       },
       "hairTone": {
         "mean": 0.0141,
-        "colour": "#251e1a"
+        "colour": "#251e1a",
+        "scalp": {
+          "mean": 0.0119,
+          "colour": "#211b17"
+        }
       }
     },
     {
@@ -1566,7 +1594,7 @@
         "crowd": "Business_Male_05.crowd.glb"
       },
       "bytes": {
-        "crowd": 275724
+        "crowd": 283072
       },
       "lods": 3,
       "height": 1.8018,
@@ -1633,6 +1661,14 @@
             "colour": "#1e1c1c"
           }
         }
+      },
+      "hairTone": {
+        "mean": 0.0228,
+        "colour": "#35271d",
+        "scalp": {
+          "mean": 0.0228,
+          "colour": "#35271d"
+        }
       }
     },
     {
@@ -1655,8 +1691,8 @@
         "hero": "Business_Male_06.hero.glb"
       },
       "bytes": {
-        "crowd": 259588,
-        "hero": 658384
+        "crowd": 266256,
+        "hero": 673908
       },
       "lods": 3,
       "height": 1.8102,
@@ -1724,6 +1760,14 @@
           }
         }
       },
+      "hairTone": {
+        "mean": 0.0109,
+        "colour": "#201a14",
+        "scalp": {
+          "mean": 0.0109,
+          "colour": "#201a14"
+        }
+      },
       "portrait": "portraits/Business_Male_06.webp"
     },
     {
@@ -1748,8 +1792,8 @@
         "hero": "Business_Male_07.hero.glb"
       },
       "bytes": {
-        "crowd": 270988,
-        "hero": 700184
+        "crowd": 270972,
+        "hero": 700192
       },
       "lods": 3,
       "height": 1.7959,
@@ -1839,7 +1883,7 @@
         "crowd": "Chef_Female_01.crowd.glb"
       },
       "bytes": {
-        "crowd": 286772
+        "crowd": 291780
       },
       "lods": 3,
       "height": 1.7334,
@@ -1905,6 +1949,14 @@
             "mean": 0.0101,
             "colour": "#1b1919"
           }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0063,
+        "colour": "#16120e",
+        "scalp": {
+          "mean": 0.0063,
+          "colour": "#16120e"
         }
       }
     },
@@ -2021,7 +2073,7 @@
         "crowd": "Construction_Male_02.crowd.glb"
       },
       "bytes": {
-        "crowd": 324488
+        "crowd": 324896
       },
       "lods": 3,
       "height": 1.7959,
@@ -2087,8 +2139,8 @@
             "colour": "#0e365a"
           },
           "shoes": {
-            "mean": 0.0191,
-            "colour": "#252625"
+            "mean": 0.1391,
+            "colour": "#786647"
           }
         }
       }
@@ -2113,7 +2165,7 @@
         "crowd": "Construction_Male_03.crowd.glb"
       },
       "bytes": {
-        "crowd": 412596
+        "crowd": 412564
       },
       "lods": 3,
       "height": 1.8068,
@@ -2176,7 +2228,7 @@
             "colour": "#113e73"
           },
           "shoes": {
-            "mean": 0.2381,
+            "mean": 0.2384,
             "colour": "#9d8258"
           }
         }
@@ -2294,7 +2346,7 @@
         "crowd": "Construction_Male_05.crowd.glb"
       },
       "bytes": {
-        "crowd": 314696
+        "crowd": 315472
       },
       "lods": 3,
       "height": 1.8051,
@@ -2356,8 +2408,8 @@
             "colour": "#10447f"
           },
           "shoes": {
-            "mean": 0.0241,
-            "colour": "#2a2b2b"
+            "mean": 0.1454,
+            "colour": "#7a6849"
           }
         }
       }
@@ -2382,7 +2434,7 @@
         "crowd": "Construction_Male_06.crowd.glb"
       },
       "bytes": {
-        "crowd": 415004
+        "crowd": 415740
       },
       "lods": 3,
       "height": 1.8149,
@@ -2445,8 +2497,8 @@
             "colour": "#133c6f"
           },
           "shoes": {
-            "mean": 0.0234,
-            "colour": "#292b2a"
+            "mean": 0.1124,
+            "colour": "#6d5c40"
           }
         }
       }
@@ -2471,7 +2523,7 @@
         "crowd": "Construction_Male_07.crowd.glb"
       },
       "bytes": {
-        "crowd": 328628
+        "crowd": 328596
       },
       "lods": 3,
       "height": 1.8106,
@@ -2537,8 +2589,8 @@
             "colour": "#164c7b"
           },
           "shoes": {
-            "mean": 0.0156,
-            "colour": "#222121"
+            "mean": 0.0161,
+            "colour": "#222222"
           },
           "trim": {
             "mean": 0.5369,
@@ -2635,7 +2687,7 @@
             "colour": "#0e396d"
           },
           "shoes": {
-            "mean": 0.2535,
+            "mean": 0.2537,
             "colour": "#a2865a"
           },
           "trim": {
@@ -2669,8 +2721,8 @@
         "hero": "Delivery_Male_01.hero.glb"
       },
       "bytes": {
-        "crowd": 278648,
-        "hero": 753848
+        "crowd": 282236,
+        "hero": 763308
       },
       "lods": 3,
       "height": 1.8161,
@@ -2738,6 +2790,14 @@
           }
         }
       },
+      "hairTone": {
+        "mean": 0.0136,
+        "colour": "#281d16",
+        "beard": {
+          "mean": 0.0136,
+          "colour": "#281d16"
+        }
+      },
       "portrait": "portraits/Delivery_Male_01.webp"
     },
     {
@@ -2762,8 +2822,8 @@
         "hero": "Female_Adult_01.hero.glb"
       },
       "bytes": {
-        "crowd": 384204,
-        "hero": 877216
+        "crowd": 397320,
+        "hero": 908204
       },
       "lods": 3,
       "height": 1.7433,
@@ -2834,7 +2894,11 @@
       },
       "hairTone": {
         "mean": 0.2083,
-        "colour": "#9c7752"
+        "colour": "#9c7752",
+        "scalp": {
+          "mean": 0.1909,
+          "colour": "#96724d"
+        }
       },
       "portrait": "portraits/Female_Adult_01.webp"
     },
@@ -2859,8 +2923,8 @@
         "hero": "Female_Adult_02.hero.glb"
       },
       "bytes": {
-        "crowd": 378172,
-        "hero": 879528
+        "crowd": 389824,
+        "hero": 904860
       },
       "lods": 3,
       "height": 1.7352,
@@ -2931,7 +2995,11 @@
       },
       "hairTone": {
         "mean": 0.0157,
-        "colour": "#2e1e14"
+        "colour": "#2e1e14",
+        "scalp": {
+          "mean": 0.0129,
+          "colour": "#271b14"
+        }
       },
       "portrait": "portraits/Female_Adult_02.webp"
     },
@@ -2956,8 +3024,8 @@
         "hero": "Female_Adult_03.hero.glb"
       },
       "bytes": {
-        "crowd": 404868,
-        "hero": 883768
+        "crowd": 422296,
+        "hero": 924148
       },
       "lods": 3,
       "height": 1.7389,
@@ -3021,14 +3089,18 @@
             "colour": "#1c1d17"
           },
           "shoes": {
-            "mean": 0.0267,
-            "colour": "#302d24"
+            "mean": 0.0214,
+            "colour": "#2b281f"
           }
         }
       },
       "hairTone": {
         "mean": 0.007,
-        "colour": "#171310"
+        "colour": "#171310",
+        "scalp": {
+          "mean": 0.007,
+          "colour": "#171310"
+        }
       },
       "portrait": "portraits/Female_Adult_03.webp"
     },
@@ -3055,8 +3127,8 @@
         "hero": "Female_Adult_04.hero.glb"
       },
       "bytes": {
-        "crowd": 396824,
-        "hero": 885520
+        "crowd": 408484,
+        "hero": 914636
       },
       "lods": 3,
       "height": 1.7659,
@@ -3120,14 +3192,18 @@
             "colour": "#5a523d"
           },
           "shoes": {
-            "mean": 0.0108,
+            "mean": 0.0109,
             "colour": "#1d1b15"
           }
         }
       },
       "hairTone": {
         "mean": 0.3741,
-        "colour": "#c59e6f"
+        "colour": "#c59e6f",
+        "scalp": {
+          "mean": 0.3364,
+          "colour": "#ba976b"
+        }
       },
       "portrait": "portraits/Female_Adult_04.webp"
     },
@@ -3152,8 +3228,8 @@
         "hero": "Female_Adult_05.hero.glb"
       },
       "bytes": {
-        "crowd": 387880,
-        "hero": 859796
+        "crowd": 394876,
+        "hero": 876544
       },
       "lods": 3,
       "height": 1.7362,
@@ -3224,7 +3300,11 @@
       },
       "hairTone": {
         "mean": 0.0083,
-        "colour": "#1d1511"
+        "colour": "#1d1511",
+        "scalp": {
+          "mean": 0.0074,
+          "colour": "#1b1310"
+        }
       },
       "portrait": "portraits/Female_Adult_05.webp"
     },
@@ -3248,8 +3328,8 @@
         "hero": "Female_Adult_06.hero.glb"
       },
       "bytes": {
-        "crowd": 298860,
-        "hero": 721944
+        "crowd": 298892,
+        "hero": 722000
       },
       "lods": 3,
       "height": 1.7363,
@@ -3310,7 +3390,7 @@
           },
           "shoes": {
             "mean": 0.0123,
-            "colour": "#201d19"
+            "colour": "#201d18"
           }
         }
       },
@@ -3338,8 +3418,8 @@
         "hero": "Female_Adult_07.hero.glb"
       },
       "bytes": {
-        "crowd": 369012,
-        "hero": 837780
+        "crowd": 379920,
+        "hero": 862768
       },
       "lods": 3,
       "height": 1.7226,
@@ -3410,7 +3490,11 @@
       },
       "hairTone": {
         "mean": 0.0227,
-        "colour": "#39251a"
+        "colour": "#39251a",
+        "scalp": {
+          "mean": 0.018,
+          "colour": "#332015"
+        }
       },
       "portrait": "portraits/Female_Adult_07.webp"
     },
@@ -3435,8 +3519,8 @@
         "hero": "Female_Adult_08.hero.glb"
       },
       "bytes": {
-        "crowd": 376216,
-        "hero": 870424
+        "crowd": 391884,
+        "hero": 904492
       },
       "lods": 3,
       "height": 1.7349,
@@ -3507,7 +3591,11 @@
       },
       "hairTone": {
         "mean": 0.0194,
-        "colour": "#32231a"
+        "colour": "#32231a",
+        "scalp": {
+          "mean": 0.0176,
+          "colour": "#2f2118"
+        }
       },
       "portrait": "portraits/Female_Adult_08.webp"
     },
@@ -3532,8 +3620,8 @@
         "hero": "Female_Adult_09.hero.glb"
       },
       "bytes": {
-        "crowd": 383836,
-        "hero": 876004
+        "crowd": 396736,
+        "hero": 906032
       },
       "lods": 3,
       "height": 1.7354,
@@ -3593,18 +3681,22 @@
             "colour": "#564a3d"
           },
           "bottom": {
-            "mean": 0.0073,
-            "colour": "#141511"
+            "mean": 0.0084,
+            "colour": "#171714"
           },
           "shoes": {
-            "mean": 0.0351,
-            "colour": "#363435"
+            "mean": 0.0383,
+            "colour": "#4a3128"
           }
         }
       },
       "hairTone": {
         "mean": 0.0419,
-        "colour": "#4b3526"
+        "colour": "#4b3526",
+        "scalp": {
+          "mean": 0.0298,
+          "colour": "#3f2c20"
+        }
       },
       "portrait": "portraits/Female_Adult_09.webp"
     },
@@ -3629,8 +3721,8 @@
         "hero": "Female_Adult_10.hero.glb"
       },
       "bytes": {
-        "crowd": 261012,
-        "hero": 532172
+        "crowd": 261068,
+        "hero": 532292
       },
       "lods": 3,
       "height": 1.7369,
@@ -3690,7 +3782,7 @@
             "colour": "#161616"
           },
           "shoes": {
-            "mean": 0.0188,
+            "mean": 0.0187,
             "colour": "#2c2419"
           }
         }
@@ -3718,8 +3810,8 @@
         "hero": "Female_Adult_11.hero.glb"
       },
       "bytes": {
-        "crowd": 392428,
-        "hero": 889008
+        "crowd": 403448,
+        "hero": 915028
       },
       "lods": 3,
       "height": 1.7364,
@@ -3779,14 +3871,18 @@
             "colour": "#2e1e16"
           },
           "shoes": {
-            "mean": 0.0131,
-            "colour": "#2a1b15"
+            "mean": 0.0135,
+            "colour": "#2b1b15"
           }
         }
       },
       "hairTone": {
         "mean": 0.0084,
-        "colour": "#1e1510"
+        "colour": "#1e1510",
+        "scalp": {
+          "mean": 0.0079,
+          "colour": "#1c1410"
+        }
       },
       "portrait": "portraits/Female_Adult_11.webp"
     },
@@ -3813,8 +3909,8 @@
         "hero": "Female_Adult_12.hero.glb"
       },
       "bytes": {
-        "crowd": 378836,
-        "hero": 870828
+        "crowd": 388792,
+        "hero": 892424
       },
       "lods": 3,
       "height": 1.7267,
@@ -3878,14 +3974,18 @@
             "colour": "#1e292e"
           },
           "shoes": {
-            "mean": 0.0121,
+            "mean": 0.012,
             "colour": "#1f1c1c"
           }
         }
       },
       "hairTone": {
         "mean": 0.0208,
-        "colour": "#3a2217"
+        "colour": "#3a2217",
+        "scalp": {
+          "mean": 0.013,
+          "colour": "#2c1a12"
+        }
       },
       "portrait": "portraits/Female_Adult_12.webp"
     },
@@ -3911,8 +4011,8 @@
         "hero": "Female_Adult_13.hero.glb"
       },
       "bytes": {
-        "crowd": 383412,
-        "hero": 853664
+        "crowd": 395088,
+        "hero": 881340
       },
       "lods": 3,
       "height": 1.7516,
@@ -3983,7 +4083,11 @@
       },
       "hairTone": {
         "mean": 0.3136,
-        "colour": "#b5926a"
+        "colour": "#b5926a",
+        "scalp": {
+          "mean": 0.3012,
+          "colour": "#b38f66"
+        }
       },
       "portrait": "portraits/Female_Adult_13.webp"
     },
@@ -4009,8 +4113,8 @@
         "hero": "Female_Adult_14.hero.glb"
       },
       "bytes": {
-        "crowd": 384492,
-        "hero": 873476
+        "crowd": 396352,
+        "hero": 902016
       },
       "lods": 3,
       "height": 1.7438,
@@ -4081,7 +4185,11 @@
       },
       "hairTone": {
         "mean": 0.053,
-        "colour": "#533c2a"
+        "colour": "#533c2a",
+        "scalp": {
+          "mean": 0.0312,
+          "colour": "#3f2e21"
+        }
       },
       "portrait": "portraits/Female_Adult_14.webp"
     },
@@ -4107,8 +4215,8 @@
         "hero": "Female_Adult_15.hero.glb"
       },
       "bytes": {
-        "crowd": 417476,
-        "hero": 911152
+        "crowd": 436952,
+        "hero": 962932
       },
       "lods": 3,
       "height": 1.739,
@@ -4179,7 +4287,11 @@
       },
       "hairTone": {
         "mean": 0.0572,
-        "colour": "#5d3c25"
+        "colour": "#5d3c25",
+        "scalp": {
+          "mean": 0.0559,
+          "colour": "#5c3b27"
+        }
       },
       "portrait": "portraits/Female_Adult_15.webp"
     },
@@ -4202,7 +4314,7 @@
         "crowd": "Female_Adult_16.crowd.glb"
       },
       "bytes": {
-        "crowd": 170584
+        "crowd": 170680
       },
       "lods": 3,
       "height": 1.7369,
@@ -4261,8 +4373,8 @@
             "colour": "#4a567c"
           },
           "shoes": {
-            "mean": 0.0217,
-            "colour": "#2f271f"
+            "mean": 0.0214,
+            "colour": "#2e271e"
           }
         }
       }
@@ -4290,8 +4402,8 @@
         "hero": "Female_Adult_17.hero.glb"
       },
       "bytes": {
-        "crowd": 375344,
-        "hero": 854412
+        "crowd": 388524,
+        "hero": 885696
       },
       "lods": 3,
       "height": 1.751,
@@ -4355,14 +4467,18 @@
             "colour": "#7c98a3"
           },
           "shoes": {
-            "mean": 0.0468,
-            "colour": "#473a38"
+            "mean": 0.0604,
+            "colour": "#50433f"
           }
         }
       },
       "hairTone": {
         "mean": 0.2205,
-        "colour": "#9f7a56"
+        "colour": "#9f7a56",
+        "scalp": {
+          "mean": 0.1821,
+          "colour": "#946f4d"
+        }
       },
       "portrait": "portraits/Female_Adult_17.webp"
     },
@@ -4387,7 +4503,7 @@
         "crowd": "Female_Child_01.crowd.glb"
       },
       "bytes": {
-        "crowd": 275240
+        "crowd": 287356
       },
       "lods": 3,
       "height": 1.433,
@@ -4450,9 +4566,17 @@
             "colour": "#929da9"
           },
           "shoes": {
-            "mean": 0.6364,
-            "colour": "#d1d1d1"
+            "mean": 0.1449,
+            "colour": "#8f568f"
           }
+        }
+      },
+      "hairTone": {
+        "mean": 0.1589,
+        "colour": "#8b6848",
+        "scalp": {
+          "mean": 0.1589,
+          "colour": "#8b6848"
         }
       }
     },
@@ -4474,7 +4598,7 @@
         "crowd": "Female_Child_02.crowd.glb"
       },
       "bytes": {
-        "crowd": 276068
+        "crowd": 276052
       },
       "lods": 3,
       "height": 1.438,
@@ -4562,8 +4686,8 @@
         "hero": "Female_Party_01.hero.glb"
       },
       "bytes": {
-        "crowd": 428280,
-        "hero": 897668
+        "crowd": 445524,
+        "hero": 936848
       },
       "lods": 3,
       "height": 1.7534,
@@ -4630,7 +4754,11 @@
       },
       "hairTone": {
         "mean": 0.4224,
-        "colour": "#caa97c"
+        "colour": "#caa97c",
+        "scalp": {
+          "mean": 0.386,
+          "colour": "#c5a173"
+        }
       },
       "portrait": "portraits/Female_Party_01.webp"
     },
@@ -4656,8 +4784,8 @@
         "hero": "Female_Party_02.hero.glb"
       },
       "bytes": {
-        "crowd": 409864,
-        "hero": 911248
+        "crowd": 425956,
+        "hero": 947372
       },
       "lods": 3,
       "height": 1.7903,
@@ -4721,14 +4849,18 @@
             "colour": "#111111"
           },
           "shoes": {
-            "mean": 0.0167,
-            "colour": "#2f2017"
+            "mean": 0.0185,
+            "colour": "#332118"
           }
         }
       },
       "hairTone": {
         "mean": 0.0142,
-        "colour": "#2b1d12"
+        "colour": "#2b1d12",
+        "scalp": {
+          "mean": 0.0114,
+          "colour": "#25190f"
+        }
       },
       "portrait": "portraits/Female_Party_02.webp"
     },
@@ -4753,7 +4885,7 @@
         "crowd": "Gardener_Male_01.crowd.glb"
       },
       "bytes": {
-        "crowd": 354092
+        "crowd": 359424
       },
       "lods": 3,
       "height": 1.8124,
@@ -4809,8 +4941,8 @@
       "outfit": {
         "regions": {
           "top": {
-            "mean": 0.0277,
-            "colour": "#382c20"
+            "mean": 0.0261,
+            "colour": "#372b1e"
           },
           "shoes": {
             "mean": 0.2274,
@@ -4820,7 +4952,11 @@
       },
       "hairTone": {
         "mean": 0.0182,
-        "colour": "#2d231c"
+        "colour": "#2d231c",
+        "scalp": {
+          "mean": 0.026,
+          "colour": "#342b23"
+        }
       }
     },
     {
@@ -4843,7 +4979,7 @@
         "crowd": "MH_Child_Boy_01.crowd.glb"
       },
       "bytes": {
-        "crowd": 348532
+        "crowd": 353236
       },
       "lods": 3,
       "height": 1.199,
@@ -4907,14 +5043,18 @@
             "colour": "#3e3f41"
           },
           "shoes": {
-            "mean": 0.1459,
-            "colour": "#6c6a70"
+            "mean": 0.0356,
+            "colour": "#223459"
           }
         }
       },
       "hairTone": {
         "mean": 0.0195,
-        "colour": "#272625"
+        "colour": "#272625",
+        "scalp": {
+          "mean": 0.023,
+          "colour": "#332722"
+        }
       }
     },
     {
@@ -4938,7 +5078,7 @@
         "crowd": "MH_Child_Girl_01.crowd.glb"
       },
       "bytes": {
-        "crowd": 411704
+        "crowd": 416480
       },
       "lods": 3,
       "height": 1.1718,
@@ -4998,18 +5138,22 @@
             "colour": "#ffffff"
           },
           "bottom": {
-            "mean": 0.0292,
-            "colour": "#29303e"
+            "mean": 0.0277,
+            "colour": "#272e3e"
           },
           "shoes": {
-            "mean": 0.0062,
-            "colour": "#1a100c"
+            "mean": 0.0055,
+            "colour": "#180f0b"
           }
         }
       },
       "hairTone": {
         "mean": 0.0628,
-        "colour": "#5e402d"
+        "colour": "#5e402d",
+        "scalp": {
+          "mean": 0.0623,
+          "colour": "#5e402e"
+        }
       }
     },
     {
@@ -5033,7 +5177,7 @@
         "crowd": "MH_Older_Woman_01.crowd.glb"
       },
       "bytes": {
-        "crowd": 366472
+        "crowd": 371288
       },
       "lods": 3,
       "height": 1.6309,
@@ -5097,14 +5241,18 @@
             "colour": "#3e3f41"
           },
           "shoes": {
-            "mean": 0.0483,
-            "colour": "#403e3e"
+            "mean": 0.0547,
+            "colour": "#424242"
           }
         }
       },
       "hairTone": {
         "mean": 0.5287,
-        "colour": "#c3c0b9"
+        "colour": "#c3c0b9",
+        "scalp": {
+          "mean": 0.3634,
+          "colour": "#a6a29c"
+        }
       }
     },
     {
@@ -5128,7 +5276,7 @@
         "crowd": "MH_Older_Woman_02.crowd.glb"
       },
       "bytes": {
-        "crowd": 422464
+        "crowd": 427052
       },
       "lods": 3,
       "height": 1.6469,
@@ -5184,22 +5332,26 @@
       "outfit": {
         "regions": {
           "top": {
-            "mean": 0.0319,
-            "colour": "#452b2f"
+            "mean": 0.0464,
+            "colour": "#543439"
           },
           "bottom": {
             "mean": 0.0452,
             "colour": "#393d39"
           },
           "shoes": {
-            "mean": 0.0905,
-            "colour": "#6b4f3e"
+            "mean": 0.0283,
+            "colour": "#2f2f2f"
           }
         }
       },
       "hairTone": {
         "mean": 0.253,
-        "colour": "#8c8a85"
+        "colour": "#8c8a85",
+        "scalp": {
+          "mean": 0.1805,
+          "colour": "#787672"
+        }
       }
     },
     {
@@ -5221,7 +5373,7 @@
         "crowd": "MH_Toddler_Boy_01.crowd.glb"
       },
       "bytes": {
-        "crowd": 405492
+        "crowd": 410144
       },
       "lods": 3,
       "height": 0.9539,
@@ -5277,22 +5429,26 @@
       "outfit": {
         "regions": {
           "top": {
-            "mean": 0.5446,
-            "colour": "#bec3d0"
+            "mean": 0.8065,
+            "colour": "#e8e8e8"
           },
           "bottom": {
-            "mean": 0.2569,
-            "colour": "#628cc9"
+            "mean": 0.2647,
+            "colour": "#638fcb"
           },
           "shoes": {
-            "mean": 0.147,
-            "colour": "#6e6a6a"
+            "mean": 0.1629,
+            "colour": "#746f70"
           }
         }
       },
       "hairTone": {
         "mean": 0.0512,
-        "colour": "#4c3d33"
+        "colour": "#4c3d33",
+        "scalp": {
+          "mean": 0.0531,
+          "colour": "#513d31"
+        }
       }
     },
     {
@@ -5308,24 +5464,24 @@
       "tags": [
         "dress",
         "sandals",
-        "curlyHair"
+        "ponytail"
       ],
       "files": {
         "crowd": "MH_Toddler_Girl_01.crowd.glb"
       },
       "bytes": {
-        "crowd": 448360
+        "crowd": 434840
       },
       "lods": 3,
-      "height": 0.9594,
+      "height": 0.9433,
       "hip": 0.469,
       "seatDrop": 0.2077,
       "anchors": {
         "headTop": {
           "bone": "Head",
           "at": [
-            0.1474,
-            -0.0236,
+            0.1315,
+            -0.021,
             0
           ]
         },
@@ -5370,18 +5526,22 @@
       "outfit": {
         "regions": {
           "top": {
-            "mean": 0.187,
-            "colour": "#817199"
+            "mean": 0.1863,
+            "colour": "#807199"
           },
           "shoes": {
-            "mean": 0.0061,
-            "colour": "#1a100c"
+            "mean": 0.0059,
+            "colour": "#19100c"
           }
         }
       },
       "hairTone": {
-        "mean": 0.0026,
-        "colour": "#120606"
+        "mean": 0.0183,
+        "colour": "#252523",
+        "scalp": {
+          "mean": 0.0125,
+          "colour": "#1e1d1c"
+        }
       }
     },
     {
@@ -5405,8 +5565,8 @@
         "hero": "Male_Adult_01.hero.glb"
       },
       "bytes": {
-        "crowd": 360280,
-        "hero": 808128
+        "crowd": 367752,
+        "hero": 825420
       },
       "lods": 3,
       "height": 1.8237,
@@ -5470,14 +5630,18 @@
             "colour": "#998763"
           },
           "shoes": {
-            "mean": 0.1025,
-            "colour": "#5b5a58"
+            "mean": 0.0904,
+            "colour": "#565552"
           }
         }
       },
       "hairTone": {
         "mean": 0.0134,
-        "colour": "#2a1b13"
+        "colour": "#2a1b13",
+        "scalp": {
+          "mean": 0.0139,
+          "colour": "#2b1c13"
+        }
       },
       "portrait": "portraits/Male_Adult_01.webp"
     },
@@ -5501,8 +5665,8 @@
         "hero": "Male_Adult_02.hero.glb"
       },
       "bytes": {
-        "crowd": 341892,
-        "hero": 771236
+        "crowd": 348772,
+        "hero": 787040
       },
       "lods": 3,
       "height": 1.8227,
@@ -5573,7 +5737,11 @@
       },
       "hairTone": {
         "mean": 0.0118,
-        "colour": "#241a14"
+        "colour": "#241a14",
+        "scalp": {
+          "mean": 0.0114,
+          "colour": "#231a13"
+        }
       },
       "portrait": "portraits/Male_Adult_02.webp"
     },
@@ -5598,8 +5766,8 @@
         "hero": "Male_Adult_03.hero.glb"
       },
       "bytes": {
-        "crowd": 331244,
-        "hero": 772228
+        "crowd": 331452,
+        "hero": 773100
       },
       "lods": 3,
       "height": 1.8072,
@@ -5663,8 +5831,8 @@
             "colour": "#171717"
           },
           "shoes": {
-            "mean": 0.0553,
-            "colour": "#43433e"
+            "mean": 0.0548,
+            "colour": "#43423e"
           }
         }
       },
@@ -5696,8 +5864,8 @@
         "hero": "Male_Adult_04.hero.glb"
       },
       "bytes": {
-        "crowd": 382440,
-        "hero": 848816
+        "crowd": 390084,
+        "hero": 866212
       },
       "lods": 3,
       "height": 1.8686,
@@ -5761,14 +5929,22 @@
             "colour": "#3c3326"
           },
           "shoes": {
-            "mean": 0.2474,
+            "mean": 0.2473,
             "colour": "#8b8886"
           }
         }
       },
       "hairTone": {
         "mean": 0.0117,
-        "colour": "#231a15"
+        "colour": "#231a15",
+        "scalp": {
+          "mean": 0.0107,
+          "colour": "#211914"
+        },
+        "beard": {
+          "mean": 0.0137,
+          "colour": "#281d15"
+        }
       },
       "portrait": "portraits/Male_Adult_04.webp"
     },
@@ -5795,8 +5971,8 @@
         "hero": "Male_Adult_05.hero.glb"
       },
       "bytes": {
-        "crowd": 370132,
-        "hero": 835696
+        "crowd": 373852,
+        "hero": 843804
       },
       "lods": 3,
       "height": 1.8124,
@@ -5855,15 +6031,23 @@
             "mean": 0.0326,
             "colour": "#303522"
           },
+          "bottom": {
+            "mean": 0.0362,
+            "colour": "#423227"
+          },
           "shoes": {
-            "mean": 0.0445,
-            "colour": "#49382a"
+            "mean": 0.0905,
+            "colour": "#685135"
           }
         }
       },
       "hairTone": {
         "mean": 0.0182,
-        "colour": "#2d231c"
+        "colour": "#2d231c",
+        "scalp": {
+          "mean": 0.0264,
+          "colour": "#362b24"
+        }
       },
       "portrait": "portraits/Male_Adult_05.webp"
     },
@@ -5888,8 +6072,8 @@
         "hero": "Male_Adult_06.hero.glb"
       },
       "bytes": {
-        "crowd": 360172,
-        "hero": 814252
+        "crowd": 368032,
+        "hero": 832072
       },
       "lods": 3,
       "height": 1.8313,
@@ -5953,14 +6137,18 @@
             "colour": "#252c2d"
           },
           "shoes": {
-            "mean": 0.111,
-            "colour": "#595e64"
+            "mean": 0.1094,
+            "colour": "#585e63"
           }
         }
       },
       "hairTone": {
         "mean": 0.0262,
-        "colour": "#3c291c"
+        "colour": "#3c291c",
+        "scalp": {
+          "mean": 0.029,
+          "colour": "#3f2b1e"
+        }
       },
       "portrait": "portraits/Male_Adult_06.webp"
     },
@@ -5984,8 +6172,8 @@
         "hero": "Male_Adult_07.hero.glb"
       },
       "bytes": {
-        "crowd": 328300,
-        "hero": 788672
+        "crowd": 334112,
+        "hero": 802012
       },
       "lods": 3,
       "height": 1.8205,
@@ -6049,14 +6237,18 @@
             "colour": "#293941"
           },
           "shoes": {
-            "mean": 0.0127,
-            "colour": "#281b16"
+            "mean": 0.0373,
+            "colour": "#4f2e25"
           }
         }
       },
       "hairTone": {
         "mean": 0.0058,
-        "colour": "#1a0f09"
+        "colour": "#1a0f09",
+        "scalp": {
+          "mean": 0.0127,
+          "colour": "#281b13"
+        }
       },
       "portrait": "portraits/Male_Adult_07.webp"
     },
@@ -6080,8 +6272,8 @@
         "hero": "Male_Adult_08.hero.glb"
       },
       "bytes": {
-        "crowd": 346364,
-        "hero": 785356
+        "crowd": 353776,
+        "hero": 803296
       },
       "lods": 3,
       "height": 1.8257,
@@ -6152,7 +6344,11 @@
       },
       "hairTone": {
         "mean": 0.0186,
-        "colour": "#312218"
+        "colour": "#312218",
+        "scalp": {
+          "mean": 0.0402,
+          "colour": "#4a3426"
+        }
       },
       "portrait": "portraits/Male_Adult_08.webp"
     },
@@ -6178,8 +6374,8 @@
         "hero": "Male_Adult_09.hero.glb"
       },
       "bytes": {
-        "crowd": 329028,
-        "hero": 802936
+        "crowd": 339048,
+        "hero": 825860
       },
       "lods": 3,
       "height": 1.8222,
@@ -6243,14 +6439,18 @@
             "colour": "#606c6f"
           },
           "shoes": {
-            "mean": 0.0277,
-            "colour": "#332e26"
+            "mean": 0.0287,
+            "colour": "#342e27"
           }
         }
       },
       "hairTone": {
         "mean": 0.0116,
-        "colour": "#211b17"
+        "colour": "#211b17",
+        "scalp": {
+          "mean": 0.0153,
+          "colour": "#24211c"
+        }
       },
       "portrait": "portraits/Male_Adult_09.webp"
     },
@@ -6274,8 +6474,8 @@
         "hero": "Male_Adult_10.hero.glb"
       },
       "bytes": {
-        "crowd": 327716,
-        "hero": 752740
+        "crowd": 334172,
+        "hero": 767480
       },
       "lods": 3,
       "height": 1.8313,
@@ -6346,7 +6546,11 @@
       },
       "hairTone": {
         "mean": 0.0045,
-        "colour": "#140d05"
+        "colour": "#140d05",
+        "scalp": {
+          "mean": 0.0051,
+          "colour": "#160e06"
+        }
       },
       "portrait": "portraits/Male_Adult_10.webp"
     },
@@ -6370,8 +6574,8 @@
         "hero": "Male_Adult_11.hero.glb"
       },
       "bytes": {
-        "crowd": 265376,
-        "hero": 678544
+        "crowd": 273904,
+        "hero": 699796
       },
       "lods": 3,
       "height": 1.8027,
@@ -6439,6 +6643,14 @@
           }
         }
       },
+      "hairTone": {
+        "mean": 0.0752,
+        "colour": "#694531",
+        "scalp": {
+          "mean": 0.0752,
+          "colour": "#694531"
+        }
+      },
       "portrait": "portraits/Male_Adult_11.webp"
     },
     {
@@ -6462,8 +6674,8 @@
         "hero": "Male_Adult_12.hero.glb"
       },
       "bytes": {
-        "crowd": 275916,
-        "hero": 739864
+        "crowd": 282368,
+        "hero": 754884
       },
       "lods": 3,
       "height": 1.8069,
@@ -6531,6 +6743,14 @@
           }
         }
       },
+      "hairTone": {
+        "mean": 0.0065,
+        "colour": "#17120e",
+        "scalp": {
+          "mean": 0.0065,
+          "colour": "#17120e"
+        }
+      },
       "portrait": "portraits/Male_Adult_12.webp"
     },
     {
@@ -6554,8 +6774,8 @@
         "hero": "Male_Adult_13.hero.glb"
       },
       "bytes": {
-        "crowd": 269788,
-        "hero": 703792
+        "crowd": 277408,
+        "hero": 722732
       },
       "lods": 3,
       "height": 1.8059,
@@ -6618,9 +6838,17 @@
             "colour": "#354145"
           },
           "shoes": {
-            "mean": 0.0446,
-            "colour": "#4f3626"
+            "mean": 0.0454,
+            "colour": "#503726"
           }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0353,
+        "colour": "#4b2e20",
+        "scalp": {
+          "mean": 0.0353,
+          "colour": "#4b2e20"
         }
       },
       "portrait": "portraits/Male_Adult_13.webp"
@@ -6646,8 +6874,8 @@
         "hero": "Male_Adult_14.hero.glb"
       },
       "bytes": {
-        "crowd": 266116,
-        "hero": 696552
+        "crowd": 272088,
+        "hero": 711916
       },
       "lods": 3,
       "height": 1.7961,
@@ -6710,9 +6938,17 @@
             "colour": "#917e60"
           },
           "shoes": {
-            "mean": 0.0178,
-            "colour": "#341f16"
+            "mean": 0.0161,
+            "colour": "#311e15"
           }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0307,
+        "colour": "#422c1f",
+        "scalp": {
+          "mean": 0.0307,
+          "colour": "#422c1f"
         }
       },
       "portrait": "portraits/Male_Adult_14.webp"
@@ -6739,8 +6975,8 @@
         "hero": "Male_Adult_15.hero.glb"
       },
       "bytes": {
-        "crowd": 278732,
-        "hero": 701868
+        "crowd": 288348,
+        "hero": 724808
       },
       "lods": 3,
       "height": 1.8186,
@@ -6795,13 +7031,25 @@
       "outfit": {
         "regions": {
           "top": {
-            "mean": 0.5395,
+            "mean": 0.539,
             "colour": "#c9c1b4"
           },
           "shoes": {
-            "mean": 0.0444,
-            "colour": "#48382e"
+            "mean": 0.0457,
+            "colour": "#4a392d"
           }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0044,
+        "colour": "#100e09",
+        "scalp": {
+          "mean": 0.0044,
+          "colour": "#100e09"
+        },
+        "beard": {
+          "mean": 0.0137,
+          "colour": "#271d12"
         }
       },
       "portrait": "portraits/Male_Adult_15.webp"
@@ -6828,8 +7076,8 @@
         "hero": "Male_Adult_16.hero.glb"
       },
       "bytes": {
-        "crowd": 275900,
-        "hero": 712012
+        "crowd": 284704,
+        "hero": 734024
       },
       "lods": 3,
       "height": 1.809,
@@ -6892,9 +7140,17 @@
             "colour": "#58656d"
           },
           "shoes": {
-            "mean": 0.0279,
-            "colour": "#2f2f2c"
+            "mean": 0.0275,
+            "colour": "#2e2e2c"
           }
+        }
+      },
+      "hairTone": {
+        "mean": 0.2763,
+        "colour": "#ac8965",
+        "scalp": {
+          "mean": 0.2763,
+          "colour": "#ac8965"
         }
       },
       "portrait": "portraits/Male_Adult_16.webp"
@@ -6922,8 +7178,8 @@
         "hero": "Male_Adult_17.hero.glb"
       },
       "bytes": {
-        "crowd": 282652,
-        "hero": 768060
+        "crowd": 290920,
+        "hero": 787752
       },
       "lods": 3,
       "height": 1.8117,
@@ -6978,17 +7234,29 @@
       "outfit": {
         "regions": {
           "top": {
-            "mean": 0.3233,
-            "colour": "#999b96"
+            "mean": 0.0283,
+            "colour": "#012c69"
           },
           "bottom": {
             "mean": 0.0344,
             "colour": "#2b3638"
           },
           "shoes": {
-            "mean": 0.3346,
+            "mean": 0.3347,
             "colour": "#a19c8f"
           }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0042,
+        "colour": "#100d09",
+        "scalp": {
+          "mean": 0.0042,
+          "colour": "#100d09"
+        },
+        "beard": {
+          "mean": 0.0254,
+          "colour": "#3a2918"
         }
       },
       "portrait": "portraits/Male_Adult_17.webp"
@@ -7014,8 +7282,8 @@
         "hero": "Male_Adult_18.hero.glb"
       },
       "bytes": {
-        "crowd": 250924,
-        "hero": 602164
+        "crowd": 251036,
+        "hero": 602316
       },
       "lods": 3,
       "height": 1.8133,
@@ -7078,8 +7346,8 @@
             "colour": "#1d1d1c"
           },
           "shoes": {
-            "mean": 0.0319,
-            "colour": "#32332a"
+            "mean": 0.0268,
+            "colour": "#2d2e26"
           }
         }
       },
@@ -7108,19 +7376,19 @@
         "hero": "Male_Adult_19.hero.glb"
       },
       "bytes": {
-        "crowd": 305928,
+        "crowd": 305936,
         "hero": 744624
       },
       "lods": 3,
-      "height": 1.7542,
+      "height": 1.8112,
       "hip": 0.8952,
-      "seatDrop": 0.4138,
+      "seatDrop": 0.4081,
       "anchors": {
         "headTop": {
           "bone": "Head",
           "at": [
-            0.0505,
-            -0.0077,
+            0.2207,
+            -0.0337,
             0
           ]
         },
@@ -7171,8 +7439,8 @@
             "colour": "#c4c3bf"
           },
           "shoes": {
-            "mean": 0.0205,
-            "colour": "#272727"
+            "mean": 0.0206,
+            "colour": "#282727"
           }
         }
       },
@@ -7198,8 +7466,8 @@
         "hero": "Male_Adult_20.hero.glb"
       },
       "bytes": {
-        "crowd": 268484,
-        "hero": 712432
+        "crowd": 274560,
+        "hero": 726668
       },
       "lods": 3,
       "height": 1.8049,
@@ -7262,9 +7530,17 @@
             "colour": "#292c30"
           },
           "shoes": {
-            "mean": 0.089,
-            "colour": "#545454"
+            "mean": 0.0154,
+            "colour": "#212121"
           }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0188,
+        "colour": "#342119",
+        "scalp": {
+          "mean": 0.0188,
+          "colour": "#342119"
         }
       },
       "portrait": "portraits/Male_Adult_20.webp"
@@ -7291,19 +7567,19 @@
         "hero": "Male_Adult_21.hero.glb"
       },
       "bytes": {
-        "crowd": 319996,
-        "hero": 838856
+        "crowd": 319980,
+        "hero": 838848
       },
       "lods": 3,
-      "height": 1.7541,
+      "height": 1.8174,
       "hip": 0.8952,
-      "seatDrop": 0.4138,
+      "seatDrop": 0.4075,
       "anchors": {
         "headTop": {
           "bone": "Head",
           "at": [
-            0.0446,
-            -0.0068,
+            0.2275,
+            -0.0348,
             0
           ]
         },
@@ -7380,7 +7656,7 @@
         "crowd": "Male_Child_01.crowd.glb"
       },
       "bytes": {
-        "crowd": 265132
+        "crowd": 272700
       },
       "lods": 3,
       "height": 1.4328,
@@ -7443,9 +7719,17 @@
             "colour": "#66757a"
           },
           "shoes": {
-            "mean": 0.3424,
-            "colour": "#9e9e9e"
+            "mean": 0.2635,
+            "colour": "#8c8c8c"
           }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0105,
+        "colour": "#241811",
+        "scalp": {
+          "mean": 0.0105,
+          "colour": "#241811"
         }
       }
     },
@@ -7470,7 +7754,7 @@
         "crowd": "Male_Child_02.crowd.glb"
       },
       "bytes": {
-        "crowd": 279608
+        "crowd": 288116
       },
       "lods": 3,
       "height": 1.4255,
@@ -7541,6 +7825,14 @@
             "colour": "#b4adaa"
           }
         }
+      },
+      "hairTone": {
+        "mean": 0.0129,
+        "colour": "#251c16",
+        "scalp": {
+          "mean": 0.0129,
+          "colour": "#251c16"
+        }
       }
     },
     {
@@ -7561,7 +7853,7 @@
         "crowd": "Medical_Female_02.crowd.glb"
       },
       "bytes": {
-        "crowd": 372944
+        "crowd": 382856
       },
       "lods": 3,
       "height": 1.7333,
@@ -7635,7 +7927,11 @@
       },
       "hairTone": {
         "mean": 0.0188,
-        "colour": "#2e231c"
+        "colour": "#2e231c",
+        "scalp": {
+          "mean": 0.016,
+          "colour": "#2c1f18"
+        }
       }
     },
     {
@@ -7658,7 +7954,7 @@
         "crowd": "Medical_Male_03.crowd.glb"
       },
       "bytes": {
-        "crowd": 314320
+        "crowd": 320192
       },
       "lods": 3,
       "height": 1.7964,
@@ -7727,6 +8023,14 @@
             "mean": 0.0118,
             "colour": "#1d1d19"
           }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0307,
+        "colour": "#422c1f",
+        "scalp": {
+          "mean": 0.0307,
+          "colour": "#422c1f"
         }
       }
     },
@@ -7842,7 +8146,7 @@
         "crowd": "Pilot_Female_02.crowd.glb"
       },
       "bytes": {
-        "crowd": 328188
+        "crowd": 335432
       },
       "lods": 3,
       "height": 1.7358,
@@ -7912,6 +8216,14 @@
             "colour": "#151410"
           }
         }
+      },
+      "hairTone": {
+        "mean": 0.0075,
+        "colour": "#1a140e",
+        "scalp": {
+          "mean": 0.0075,
+          "colour": "#1a140e"
+        }
       }
     },
     {
@@ -7935,8 +8247,8 @@
         "hero": "Pilot_Male_01.hero.glb"
       },
       "bytes": {
-        "crowd": 270552,
-        "hero": 598116
+        "crowd": 274652,
+        "hero": 607288
       },
       "lods": 3,
       "height": 1.8372,
@@ -7995,9 +8307,17 @@
             "colour": "#151513"
           },
           "shoes": {
-            "mean": 0.0116,
+            "mean": 0.0115,
             "colour": "#1c1c19"
           }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0161,
+        "colour": "#2a2019",
+        "scalp": {
+          "mean": 0.0161,
+          "colour": "#2a2019"
         }
       },
       "portrait": "portraits/Pilot_Male_01.webp"
@@ -8024,8 +8344,8 @@
         "hero": "Pilot_Male_02.hero.glb"
       },
       "bytes": {
-        "crowd": 280332,
-        "hero": 635100
+        "crowd": 284796,
+        "hero": 645960
       },
       "lods": 3,
       "height": 1.8372,
@@ -8089,6 +8409,14 @@
           }
         }
       },
+      "hairTone": {
+        "mean": 0.0321,
+        "colour": "#402f24",
+        "scalp": {
+          "mean": 0.0321,
+          "colour": "#402f24"
+        }
+      },
       "portrait": "portraits/Pilot_Male_02.webp"
     },
     {
@@ -8110,7 +8438,7 @@
         "crowd": "Pilot_Male_03.crowd.glb"
       },
       "bytes": {
-        "crowd": 293760
+        "crowd": 300076
       },
       "lods": 3,
       "height": 1.8551,
@@ -8176,6 +8504,14 @@
             "mean": 0.0055,
             "colour": "#111111"
           }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0154,
+        "colour": "#282018",
+        "scalp": {
+          "mean": 0.0154,
+          "colour": "#282018"
         }
       }
     },
@@ -8289,7 +8625,7 @@
         "crowd": "Security_Male_01.crowd.glb"
       },
       "bytes": {
-        "crowd": 365792
+        "crowd": 373180
       },
       "lods": 3,
       "height": 1.8323,
@@ -8359,6 +8695,14 @@
             "colour": "#121210"
           }
         }
+      },
+      "hairTone": {
+        "mean": 0.1635,
+        "colour": "#846c5d",
+        "scalp": {
+          "mean": 0.1635,
+          "colour": "#846c5d"
+        }
       }
     },
     {
@@ -8382,7 +8726,7 @@
         "crowd": "Sports_Female_01.crowd.glb"
       },
       "bytes": {
-        "crowd": 296480
+        "crowd": 307260
       },
       "lods": 3,
       "height": 1.7334,
@@ -8441,6 +8785,14 @@
             "colour": "#a2456e"
           }
         }
+      },
+      "hairTone": {
+        "mean": 0.1123,
+        "colour": "#755938",
+        "scalp": {
+          "mean": 0.1123,
+          "colour": "#755938"
+        }
       }
     },
     {
@@ -8465,8 +8817,8 @@
         "hero": "Sports_Female_02.hero.glb"
       },
       "bytes": {
-        "crowd": 362212,
-        "hero": 821844
+        "crowd": 373224,
+        "hero": 845352
       },
       "lods": 3,
       "height": 1.7375,
@@ -8537,7 +8889,11 @@
       },
       "hairTone": {
         "mean": 0.0059,
-        "colour": "#15110e"
+        "colour": "#15110e",
+        "scalp": {
+          "mean": 0.0064,
+          "colour": "#16120f"
+        }
       },
       "portrait": "portraits/Sports_Female_02.webp"
     },
@@ -8560,7 +8916,7 @@
         "crowd": "Sports_Male_01.crowd.glb"
       },
       "bytes": {
-        "crowd": 269648
+        "crowd": 276572
       },
       "lods": 3,
       "height": 1.8041,
@@ -8619,6 +8975,14 @@
             "colour": "#202022"
           }
         }
+      },
+      "hairTone": {
+        "mean": 0.048,
+        "colour": "#4e3a29",
+        "scalp": {
+          "mean": 0.048,
+          "colour": "#4e3a29"
+        }
       }
     },
     {
@@ -8641,7 +9005,7 @@
         "crowd": "Sports_Male_02.crowd.glb"
       },
       "bytes": {
-        "crowd": 290944
+        "crowd": 297620
       },
       "lods": 3,
       "height": 1.821,
@@ -8704,6 +9068,14 @@
             "colour": "#a1a1a1"
           }
         }
+      },
+      "hairTone": {
+        "mean": 0.0267,
+        "colour": "#3c2a1d",
+        "scalp": {
+          "mean": 0.0267,
+          "colour": "#3c2a1d"
+        }
       }
     },
     {
@@ -8727,7 +9099,7 @@
         "crowd": "Sports_Male_03.crowd.glb"
       },
       "bytes": {
-        "crowd": 388460
+        "crowd": 401608
       },
       "lods": 3,
       "height": 1.8427,
@@ -8787,14 +9159,18 @@
             "colour": "#212121"
           },
           "shoes": {
-            "mean": 0.0225,
-            "colour": "#292929"
+            "mean": 0.0216,
+            "colour": "#282828"
           }
         }
       },
       "hairTone": {
         "mean": 0.0058,
-        "colour": "#15110d"
+        "colour": "#15110d",
+        "scalp": {
+          "mean": 0.0046,
+          "colour": "#120e0a"
+        }
       }
     },
     {
@@ -8816,7 +9192,7 @@
         "crowd": "Sports_Male_04.crowd.glb"
       },
       "bytes": {
-        "crowd": 280096
+        "crowd": 286724
       },
       "lods": 3,
       "height": 1.8042,
@@ -8883,6 +9259,14 @@
             "colour": "#918f8b"
           }
         }
+      },
+      "hairTone": {
+        "mean": 0.0245,
+        "colour": "#382820",
+        "scalp": {
+          "mean": 0.0245,
+          "colour": "#382820"
+        }
       }
     },
     {
@@ -8909,8 +9293,8 @@
         "hero": "Wood_Male_01.hero.glb"
       },
       "bytes": {
-        "crowd": 284368,
-        "hero": 749172
+        "crowd": 288944,
+        "hero": 760400
       },
       "lods": 3,
       "height": 1.8138,
@@ -8973,9 +9357,21 @@
             "colour": "#4e6577"
           },
           "shoes": {
-            "mean": 0.0473,
-            "colour": "#523827"
+            "mean": 0.0459,
+            "colour": "#523626"
           }
+        }
+      },
+      "hairTone": {
+        "mean": 0.0043,
+        "colour": "#100d09",
+        "scalp": {
+          "mean": 0.0043,
+          "colour": "#100d09"
+        },
+        "beard": {
+          "mean": 0.0167,
+          "colour": "#2d2114"
         }
       },
       "portrait": "portraits/Wood_Male_01.webp"

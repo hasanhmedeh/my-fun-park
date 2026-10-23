@@ -160,6 +160,20 @@ export async function hairTone(doc, parts, { tags = [], debug } = {}) {
   return tone ? { ...tone, texels: n } : null;
 }
 
+/**
+ * AvatarSpec.hairTone from the cards' tone (hairTone(); null without cards) and the painted hair's
+ * (hair-mask.mjs's `tones`, or a sidecar's hairTone: its `scalp` and `beard`, each missing or null
+ * where the head has no mask for it). An avatar without cards takes the painted scalp's tone, or
+ * else the beard's, as its own. Undefined when there's no tone at all.
+ */
+export function hairToneSpec(cards, painted) {
+  const own = (t) => (t ? { mean: t.mean, colour: t.colour } : null);
+  const scalp = own(painted?.scalp);
+  const beard = own(painted?.beard);
+  const main = own(cards) ?? scalp ?? beard;
+  return main ? { ...main, ...(scalp && { scalp }), ...(beard && { beard }) } : undefined;
+}
+
 /** Where an avatar's base document is: the Rocketbox pipeline's or the MakeHuman step's. */
 export function basePathOf(id, source) {
   return source === 'makehuman' ? join(CACHE, 'makehuman', 'work', id, 'base.glb') : join(WORK, id, 'base.glb');
@@ -179,7 +193,9 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
       continue;
     }
     const tone = await hairTone(await io.read(base), spec.parts, { tags: spec.tags, debug: flags.debug ? join(flags.debug, `${id}-hair.png`) : undefined });
-    if (tone) spec.hairTone = { mean: tone.mean, colour: tone.colour };
+    // (the painted hair's tones, which convert.mjs records with the masks it embeds, are kept)
+    const next = hairToneSpec(tone, spec.hairTone);
+    if (next) spec.hairTone = next;
     else delete spec.hairTone;
     writeJson(file, spec);
     console.log(`${id.padEnd(24)} ${tone ? `${tone.colour} mean ${tone.mean} (${tone.texels} texels)` : 'no hair'}`);
